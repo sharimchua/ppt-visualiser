@@ -277,13 +277,13 @@ export const CellViewport: React.FC<CellViewportProps> = ({
 
       {/* EDIT MODE: Interactive Control Header Bar */}
       {isEditMode && (
-        <div className="absolute top-2 inset-x-2 flex items-center justify-between gap-1 z-20 pointer-events-auto bg-[#0b0f19]/90 backdrop-blur-md px-2 py-1 rounded-md border border-purple-500/50 shadow-lg text-xs animate-in fade-in duration-150">
+        <div className="absolute top-2 inset-x-2 flex items-center justify-between gap-1 z-20 pointer-events-auto bg-[#0b0f19]/90 backdrop-blur-md px-1.5 sm:px-2 py-1 rounded-md border border-purple-500/50 shadow-lg text-xs animate-in fade-in duration-150">
           {/* Left: Module Switcher & Flex Stepper */}
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
             <select
               value={cell.module}
               onChange={(e) => handleSwitchModule(e.target.value as VisualiserModuleType)}
-              className="bg-purple-950/40 hover:bg-purple-900/50 text-[11px] font-semibold text-purple-200 border border-purple-500/60 rounded px-1.5 py-0.5 focus:outline-none cursor-pointer"
+              className="bg-purple-950/40 hover:bg-purple-900/50 text-[10px] sm:text-[11px] font-semibold text-purple-200 border border-purple-500/60 rounded px-1 sm:px-1.5 py-0.5 focus:outline-none cursor-pointer shrink-0"
             >
               <option value="orbital">🪐 Clock</option>
               <option value="stream">🌊 Stream</option>
@@ -291,12 +291,12 @@ export const CellViewport: React.FC<CellViewportProps> = ({
             </select>
 
             {/* Flex weight adjuster */}
-            <div className="flex items-center gap-1 bg-slate-900/90 rounded border border-slate-700/80 px-1.5 py-0.5 text-[10px] text-slate-300">
-              <span className="text-slate-500 font-mono">flex:</span>
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-900/90 rounded border border-slate-700/80 px-1 sm:px-1.5 py-0.5 text-[10px] text-slate-300 shrink-0">
+              <span className="text-slate-500 font-mono hidden sm:inline">flex:</span>
               <button
                 onClick={() => handleUpdateFlex((cell.flex ?? 1) - 1)}
                 disabled={(cell.flex ?? 1) <= 1}
-                className="px-1 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 font-bold"
+                className="px-0.5 sm:px-1 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 font-bold"
                 title="Decrease flex weight"
               >
                 -
@@ -305,7 +305,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
               <button
                 onClick={() => handleUpdateFlex((cell.flex ?? 1) + 1)}
                 disabled={(cell.flex ?? 1) >= 10}
-                className="px-1 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 font-bold"
+                className="px-0.5 sm:px-1 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400 font-bold"
                 title="Increase flex weight"
               >
                 +
@@ -313,14 +313,14 @@ export const CellViewport: React.FC<CellViewportProps> = ({
             </div>
 
             {cell.title && (
-              <span className="text-[10px] text-slate-400 truncate max-w-[80px] sm:max-w-[120px] font-medium hidden sm:inline">
+              <span className="text-[10px] text-slate-400 truncate max-w-[60px] sm:max-w-[120px] font-medium hidden sm:inline">
                 {cell.title}
               </span>
             )}
           </div>
 
           {/* Right: Split, Duplicate, Config & Delete Actions */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
             {/* Configure Cell Gear */}
             <button
               onClick={() => setIsConfigOpen(!isConfigOpen)}
@@ -392,7 +392,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
 
       {/* EDIT MODE: In-Cell Configuration Panel / Popover */}
       {isEditMode && isConfigOpen && onUpdateCell && (
-        <div className="absolute inset-x-2 top-12 max-h-[calc(100%-3.5rem)] overflow-y-auto z-30 bg-[#0d121f]/95 backdrop-blur-xl border border-purple-500/60 rounded-lg p-3 shadow-2xl space-y-3 animate-in fade-in zoom-in-95 duration-150">
+        <div className="absolute inset-x-2 top-11 sm:top-12 max-h-[calc(100%-3rem)] sm:max-h-[calc(100%-3.5rem)] overflow-y-auto z-30 bg-[#0d121f]/95 backdrop-blur-xl border border-purple-500/60 rounded-lg p-2.5 sm:p-3 shadow-2xl space-y-2.5 sm:space-y-3 animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
             <div className="flex items-center gap-1.5 font-semibold text-xs text-purple-200 uppercase tracking-wider">
               <Sliders className="w-3.5 h-3.5 text-purple-400" />
@@ -619,7 +619,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
               {/* Register Filter */}
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 block font-medium">Pitch Register Filter:</label>
-                <div className="grid grid-cols-4 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
                   {[
                     { id: 'all' as const, label: 'All' },
                     { id: 'bass' as const, label: 'Bass (<C4)' },
@@ -661,7 +661,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
               {/* Vertex Label Selection */}
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 block font-medium">Vertex Labels:</label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1">
                   {[
                     { id: 'syllables', label: 'Solfège (Do)' },
                     { id: 'pitches', label: 'Pitches (D)' },

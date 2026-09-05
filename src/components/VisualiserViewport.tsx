@@ -294,26 +294,28 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
 
       {/* 4. EDIT MODE: Top Floating Status & Action Pill Bar */}
       {isEditMode && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 bg-[#0b0f19]/95 backdrop-blur-xl border border-purple-500/70 shadow-2xl px-3 py-1.5 rounded-full animate-in fade-in slide-in-from-top-3 duration-200 pointer-events-auto">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 pl-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-            <span>Layout Editor</span>
-            <span className="text-[11px] text-slate-400 font-mono font-normal">
-              ({totalCells} {totalCells === 1 ? 'cell' : 'cells'})
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100vw-1rem)] overflow-x-auto scrollbar-none flex items-center gap-1.5 sm:gap-2 bg-[#0b0f19]/95 backdrop-blur-xl border border-purple-500/70 shadow-2xl px-2 sm:px-3 py-1 sm:py-1.5 rounded-full animate-in fade-in slide-in-from-top-3 duration-200 pointer-events-auto">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-xs font-semibold text-purple-300 pl-0.5 sm:pl-1 whitespace-nowrap">
+            <span className="inline-block w-1.5 sm:w-2 h-1.5 sm:h-2 rounded-full bg-purple-400 animate-pulse shrink-0" />
+            <span className="hidden sm:inline">Layout Editor</span>
+            <span className="sm:hidden text-[11px]">Editor</span>
+            <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono font-normal">
+              ({totalCells}<span className="hidden sm:inline"> {totalCells === 1 ? 'cell' : 'cells'}</span>)
             </span>
           </div>
 
-          <div className="h-4 w-px bg-slate-700/80 mx-1" />
+          <div className="h-3.5 sm:h-4 w-px bg-slate-700/80 mx-0.5 sm:mx-1 shrink-0" />
 
           {/* Quick Add Cell */}
           {onAddCell && (
             <button
               onClick={() => onAddCell('row', 'stream')}
-              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-full border border-slate-700 transition"
+              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-slate-700 transition shrink-0"
               title="Add a new cell to layout"
             >
               <Plus className="w-3.5 h-3.5 text-purple-400" />
-              <span>Add Cell</span>
+              <span className="hidden sm:inline">Add Cell</span>
+              <span className="sm:hidden text-[11px]">Add</span>
             </button>
           )}
 
@@ -321,11 +323,11 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
           {onResetLayout && (
             <button
               onClick={() => onResetLayout()}
-              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-2.5 py-1 rounded-full border border-slate-700 transition"
+              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-slate-700 transition shrink-0"
               title="Reset layout to preset"
             >
               <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
-              <span>Reset</span>
+              <span className="hidden sm:inline">Reset</span>
             </button>
           )}
 
@@ -333,21 +335,21 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
           {onShareLayout && (
             <button
               onClick={onShareLayout}
-              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-purple-300 px-2.5 py-1 rounded-full border border-slate-700 transition"
+              className="flex items-center gap-1 text-xs bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-purple-300 px-1.5 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-slate-700 transition shrink-0"
               title="Export custom layout link"
             >
               <Share2 className="w-3.5 h-3.5 text-purple-400" />
-              <span>Share</span>
+              <span className="hidden sm:inline">Share</span>
             </button>
           )}
 
-          <div className="h-4 w-px bg-slate-700/80 mx-1" />
+          <div className="h-3.5 sm:h-4 w-px bg-slate-700/80 mx-0.5 sm:mx-1 shrink-0" />
 
           {/* Done Editing */}
           {onToggleEditMode && (
             <button
               onClick={onToggleEditMode}
-              className="flex items-center gap-1 text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium px-3 py-1 rounded-full shadow transition"
+              className="flex items-center gap-1 text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full shadow transition shrink-0"
               title="Exit layout edit mode"
             >
               <Check className="w-3.5 h-3.5" />
