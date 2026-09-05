@@ -92,7 +92,7 @@ export const App: React.FC = () => {
 
   const idleTimerRef = useRef<number | null>(null);
 
-  // Synchronize config updates with RenderCoordinator & localStorage
+  // Synchronise config updates with RenderCoordinator & localStorage
   useEffect(() => {
     saveConfig(config);
     renderCoordinatorInstance.setConfig(config);
@@ -145,7 +145,7 @@ export const App: React.FC = () => {
     const unsubPlayback = midiPlayerInstance.onStateChange(setPlaybackState);
     const unsubDevice = midiManagerInstance.onStateChange(setDeviceState);
 
-    // Prompt/ensure Web MIDI is initialized on user gesture if browser requires it
+    // Prompt/ensure Web MIDI is initialised on user gesture if browser requires it
     const handleFirstGesture = () => {
       if (!midiManagerInstance.state.isConnected) {
         midiManagerInstance.requestAccess();
@@ -346,7 +346,7 @@ export const App: React.FC = () => {
         />
       </div>
 
-      {/* Center Maximized Viewport Canvas */}
+      {/* Centre Maximised Viewport Canvas */}
       <main className="flex-1 w-full h-full relative overflow-hidden flex">
         <VisualiserViewport
           config={config}

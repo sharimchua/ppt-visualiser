@@ -461,7 +461,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
 
             <p className="text-[10px] text-slate-500 italic">
-              Defines the physical boundaries of the instrument. In PPT, octaves are centered on Do (12 o'clock) and span ascending from So (7 o'clock) to Fi (6 o'clock). Non-existent physical keys (e.g. G0 below an 88-key piano when Do is C) are omitted without distorting ring assignment.
+              Defines the physical boundaries of the instrument. In PPT, octaves are centred on Do (12 o'clock) and span ascending from So (7 o'clock) to Fi (6 o'clock). Non-existent physical keys (e.g. G0 below an 88-key piano when Do is C) are omitted without distorting ring assignment.
             </p>
           </div>
 
@@ -1136,7 +1136,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             <div className="flex justify-between items-center text-slate-300">
               <div>
                 <span className="font-medium block">Procedural Film Grain</span>
-                <span className="text-[10px] text-slate-400 block">Analog 24fps film emulsion texture</span>
+                <span className="text-[10px] text-slate-400 block">Analogue 24fps film emulsion texture</span>
               </div>
               <div className="flex items-center gap-2">
                 {!(config.filmGrainEnabled ?? true) && (

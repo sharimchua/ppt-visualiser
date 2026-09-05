@@ -81,7 +81,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 </span>
               </h2>
               <p className="text-xs text-slate-400 truncate">
-                Multi-octave geometric music visualizer & interactive theoretical explorer
+                Multi-octave geometric music visualiser & interactive theoretical explorer
               </p>
             </div>
           </div>
@@ -153,7 +153,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   What is the PPT Visualiser?
                 </h3>
                 <p className="text-slate-300">
-                  The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualizer built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and tetrachordal triangles</strong>.
+                  The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualiser built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and tetrachordal triangles</strong>.
                 </p>
                 <p className="text-slate-400 mt-2 text-xs">
                   Whether listening to built-in classical and modern demo tracks, playing via a connected USB MIDI keyboard, or uploading your own MIDI files, the visualiser translates harmonic structure into dynamic light, phosphorescent trails, and geometric resonance.
@@ -173,7 +173,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                       Orbital Pitch Clock
                     </div>
                     <p className="text-xs text-slate-300">
-                      An 8-octave polar clock. Tonic (Do) sits permanently at the 12 o&apos;clock zenith, with registers 1 to 8 organized into concentric orbits. Displays chord polygons, convex hulls, and organic particle sparks.
+                      An 8-octave polar clock. Tonic (Do) sits permanently at the 12 o&apos;clock zenith, with registers 1 to 8 organised into concentric orbits. Displays chord polygons, convex hulls, and organic particle sparks.
                     </p>
                   </div>
 
@@ -292,7 +292,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                {/* Solfege Syllables Color Preview */}
+                {/* Solfege Syllables Colour Preview */}
                 <div className="pt-2">
                   <div className="text-[11px] font-semibold text-slate-400 mb-1.5">12 Chromatic Solfège Degrees:</div>
                   <div className="flex flex-wrap gap-1.5">
@@ -358,7 +358,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   4. 8 Concentric Orbits & Nearest-Address Octave Wrapping
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  The visualizer renders up to <strong>8 concentric octave orbits</strong> from the lowest bass (Register 1, outermost) to the highest treble (Register 8, innermost).
+                  The visualiser renders up to <strong>8 concentric octave orbits</strong> from the lowest bass (Register 1, outermost) to the highest treble (Register 8, innermost).
                 </p>
                 <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-xs space-y-1.5">
                   <div className="font-semibold text-slate-200">Nearest-Address Polar Coordinate Wrapping:</div>
@@ -442,7 +442,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  The visualizer supports WebGL hardware post-processing and fine-grained controls for low-power or battery-operated devices:
+                  The visualiser supports WebGL hardware post-processing and fine-grained controls for low-power or battery-operated devices:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                   <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-center space-y-1">

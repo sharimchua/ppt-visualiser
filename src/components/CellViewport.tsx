@@ -828,9 +828,9 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 </div>
               </div>
 
-              {/* Center Anchor Guide Toggle */}
+              {/* Centre Anchor Guide Toggle */}
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[11px] text-slate-300 font-medium">Center Do Guide Axis:</span>
+                <span className="text-[11px] text-slate-300 font-medium">Centre Do Guide Axis:</span>
                 <button
                   onClick={() =>
                     onUpdateCell({

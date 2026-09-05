@@ -19,7 +19,7 @@ export const SOLFEGE_SYLLABLES = [
 
 /**
  * PPT Solfege Specifications:
- * Syllable -> Glyph Type, Rotation, Canonical Color, Semitone offset, and Nearest-Address coordinate (-5 to +6)
+ * Syllable -> Glyph Type, Rotation, Canonical Colour, Semitone offset, and Nearest-Address coordinate (-5 to +6)
  */
 export const SOLFEGE_SPECS: Record<string, SolfegeSpec> = {
   Do: { canonicalSyllable: 'Do', glyphType: 'base', rotation: 0, colorHex: '#E13610', semitone: 0, nearestAddress: 0 },

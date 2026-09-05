@@ -189,7 +189,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
               {/* 12-Tone Selection Grid */}
               <div className="space-y-1">
                 <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                  Select Key Center (Do):
+                  Select Key Centre (Do):
                 </span>
                 <div className="grid grid-cols-4 gap-1">
                   {TONIC_PITCHES.map((item) => {
@@ -906,7 +906,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
 
             {copiedLink && (
               <p className="text-[10px] text-emerald-400 text-center font-mono">
-                URL contains customized layout tree!
+                URL contains customised layout tree!
               </p>
             )}
           </div>

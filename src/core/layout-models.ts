@@ -48,7 +48,7 @@ export const PRESET_BALANCED: LayoutDefinition = {
 export const PRESET_MONUMENT: LayoutDefinition = {
   id: 'monument',
   name: 'Clock Monument',
-  description: 'Maximized Pitch Clock display with compact baseline stream',
+  description: 'Maximised Pitch Clock display with compact baseline stream',
   root: {
     id: 'root-monument',
     type: 'container',
@@ -147,7 +147,7 @@ export const PRESET_WATERFALL: LayoutDefinition = {
 export const PRESET_DUAL_STREAM: LayoutDefinition = {
   id: 'dual-stream',
   name: 'Dual Stream (Bass & Treble)',
-  description: 'Center Pitch Clock flanked by Bass Stream and Treble Stream',
+  description: 'Centre Pitch Clock flanked by Bass Stream and Treble Stream',
   root: {
     id: 'root-dual-stream',
     type: 'container',
@@ -432,7 +432,7 @@ export function splitCellInTree(
 
 /**
  * Removes a cell from the layout tree.
- * Automatically prunes empty or single-child container nodes to keep the tree normalized.
+ * Automatically prunes empty or single-child container nodes to keep the tree normalised.
  * Enforces a minimum of 1 cell in the layout.
  */
 export function removeCellFromTree(

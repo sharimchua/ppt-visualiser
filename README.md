@@ -27,20 +27,20 @@ Designed for students, performers, composers, and researchers to explore the geo
   - **Continuous Scrolling Mode**: Real-time scrolling conveyor ribbon with note duration indicators and playhead.
   - **Presentation Formats**:
     - **Uniform Solfège Vector Glyphs** (Base, Sharp, Flat with $0^\circ, 90^\circ, 180^\circ, 270^\circ$ canonical rotations).
-    - **Piano Triangle SVG Notation** (Down, Left, Up, Right silhouette with active colored vertex circle and ghosted companion vertices).
+    - **Piano Triangle SVG Notation** (Down, Left, Up, Right silhouette with active coloured vertex circle and ghosted companion vertices).
     - **Solfège Syllables** (`Do`, `Ra`, `Re`, `Me`, `Mi`, `Fa`, `Fi`, `So`, `Le`, `La`, `Te`, `Ti`).
     - **Pitch Names** (Dual $C\sharp/D\flat$, Sharps, or Flats).
     - **Scale Intervals** ($1, \flat 2, 2, \flat 3, 3, 4, \sharp 4/\flat 5, 5, \dots$).
 
 ### 3. Kinetic Aesthetics & Cosmetics Suite
-- **Procedural Film Grain**: Configurable analog cinematic texture.
+- **Procedural Film Grain**: Configurable analogue cinematic texture.
 - **Background Atmospheres**: *Studio Obsidian*, *Cosmic Abyss*, *Carbon Grid*, and *Velvet Dark*.
-- **Reactive Particle System**: Note-strike sparks erupting in the note's canonical Solfège color with velocity physics.
+- **Reactive Particle System**: Note-strike sparks erupting in the note's canonical Solfège colour with velocity physics.
 - **Neon Glow Bloom & Motion Trails**: Post-processing glow and motion persistence.
 
 ### 4. Input & Audio Integration
 - **Web MIDI API**: Zero-latency plug-and-play input for hardware MIDI keyboards and controllers.
-- **Polyphonic Web Audio Synthesizer**: Built-in expressive sound synthesis (Warm Poly, Sine, Triangle, Sawtooth with dynamic filter envelope).
+- **Polyphonic Web Audio Synthesiser**: Built-in expressive sound synthesis (Warm Poly, Sine, Triangle, Sawtooth with dynamic filter envelope).
 - **Interactive Virtual Keyboard**: On-screen keyboard with QWERTY computer keys mapping (`Z`-`M` and `Q`-`I`) and Piano Triangle labels.
 - **MIDI File Player & Bundled Demo Tracks**:
   - *J.S. Bach — Prelude in C Major (BWV 846)*
@@ -49,11 +49,11 @@ Designed for students, performers, composers, and researchers to explore the geo
   - *Concentric Clock Radial Orbit (88-Key Spiral)*
   - Drag-and-drop support for any standard `.mid` file.
 
-### 5. Viewport-Maximizing Layout & Fullscreen
-- **Responsive Scaling**: High-DPI (`devicePixelRatio`) canvas scaling utilizing 100% of viewport width and height.
+### 5. Viewport-Maximising Layout & Fullscreen
+- **Responsive Scaling**: High-DPI (`devicePixelRatio`) canvas scaling utilising 100% of viewport width and height.
 - **Layout Modes**:
   - *Balanced Duo*: Large pitch clock with integrated note stream.
-  - *Clock Monument*: Maximized concentric clock filling the viewport with compact stream HUD.
+  - *Clock Monument*: Maximised concentric clock filling the viewport with compact stream HUD.
   - *Stream River*: Prominent horizontal scrolling stream with circular pitch clock radar.
 - **Fullscreen Mode**: Complete distraction-free presentation with auto-hiding controls during idle mouse movement.
 
@@ -90,9 +90,9 @@ npm run build
 
 ---
 
-## Canonical PPT Solfège Color Palette
+## Canonical PPT Solfège Colour Palette
 
-| Degree | Syllable | Color | Hex | Nearest-Address |
+| Degree | Syllable | Colour | Hex | Nearest-Address |
 |---|---|---|---|---|
 | 0 | Do | Red | `#E13610` | 0 |
 | 1 | Ra / Di | Orange | `#F98016` | +1 |
