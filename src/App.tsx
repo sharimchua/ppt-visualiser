@@ -18,6 +18,7 @@ import { ControlToolbar } from './components/ControlToolbar';
 import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
+import { InfoModal } from './components/InfoModal';
 import {
   decodeLayoutFromSlug,
   updateCellInTree,
@@ -67,6 +68,20 @@ export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
   const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const dontShow = localStorage.getItem('ppt_dont_show_intro_on_launch_v1') === 'true';
+    const hasSeen = localStorage.getItem('ppt_has_seen_intro_modal_v1') === 'true';
+    return !dontShow && !hasSeen;
+  });
+
+  const handleCloseInfoModal = useCallback(() => {
+    setIsInfoModalOpen(false);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ppt_has_seen_intro_modal_v1', 'true');
+    }
+  }, []);
+
   const [scaleFitInfo, setScaleFitInfo] = useState<ScaleFitInfo>({
     currentTonicFit: 1.0,
     bestTonic: config.tonic,
@@ -327,6 +342,7 @@ export const App: React.FC = () => {
           onToggleFullscreen={toggleFullscreen}
           onToggleSettings={() => setIsSettingsOpen(!isSettingsOpen)}
           onResetState={handleResetSessionState}
+          onOpenInfoModal={() => setIsInfoModalOpen(true)}
         />
       </div>
 
@@ -372,7 +388,14 @@ export const App: React.FC = () => {
         onUpdateConfig={updateConfig}
         onResetConfig={handleResetConfig}
         onResetReveals={handleResetSessionState}
+        onOpenInfoModal={() => setIsInfoModalOpen(true)}
         scaleFitInfo={scaleFitInfo}
+      />
+
+      {/* Introduction & Information Modal */}
+      <InfoModal
+        isOpen={isInfoModalOpen}
+        onClose={handleCloseInfoModal}
       />
     </div>
   );

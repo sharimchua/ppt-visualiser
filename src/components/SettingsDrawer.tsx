@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
@@ -12,6 +12,7 @@ interface SettingsDrawerProps {
   onUpdateConfig: (partial: Partial<VisualiserConfig>) => void;
   onResetConfig?: () => void;
   onResetReveals?: () => void;
+  onOpenInfoModal?: () => void;
   scaleFitInfo?: {
     currentTonicFit: number;
     bestTonic: number;
@@ -28,6 +29,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   onUpdateConfig,
   onResetConfig,
   onResetReveals,
+  onOpenInfoModal,
   scaleFitInfo,
 }) => {
   if (!isOpen) return null;
@@ -50,6 +52,27 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
 
       {/* Settings Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs text-slate-300">
+        {/* Walkthrough & Theory Primer Banner */}
+        <button
+          onClick={onOpenInfoModal}
+          className="w-full flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-red-950/40 via-slate-900/70 to-purple-950/40 border border-slate-700/80 hover:border-red-500/80 text-left transition group shadow-md cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-md bg-red-950/80 border border-red-800/60 text-red-400 group-hover:scale-105 transition-transform shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-white text-xs group-hover:text-red-300 transition-colors truncate">
+                Visualiser Walkthrough & Theory
+              </div>
+              <div className="text-[10px] text-slate-400 truncate">
+                Concepts, customisation & links
+              </div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 group-hover:text-white transition-all shrink-0 ml-1" />
+        </button>
+
         {/* SECTION 1: CONCENTRIC PITCH CLOCK */}
         <section className="space-y-3">
           <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">

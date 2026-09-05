@@ -21,6 +21,7 @@ import {
   Copy,
   MoreHorizontal,
   ChevronDown,
+  HelpCircle,
 } from 'lucide-react';
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
@@ -46,6 +47,7 @@ interface ControlToolbarProps {
   onResetState?: () => void;
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
+  onOpenInfoModal?: () => void;
 }
 
 const TONIC_PITCHES = [
@@ -80,6 +82,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
   onResetState,
   isEditMode = false,
   onToggleEditMode,
+  onOpenInfoModal,
 }) {
   const [showTonicMenu, setShowTonicMenu] = useState(false);
   const [showMidiMenu, setShowMidiMenu] = useState(false);
@@ -102,20 +105,27 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
     <header className="w-full bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-800/80 px-2 sm:px-4 py-1.5 sm:py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-3 select-none z-30 shadow-lg">
       {/* Top Row on Mobile / Left Group on Desktop: Brand + Elegant Tonic Selector */}
       <div className="flex items-center justify-between md:justify-start gap-2 sm:gap-3 min-w-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+        <button
+          onClick={onOpenInfoModal}
+          className="flex items-center gap-1.5 sm:gap-2 min-w-0 text-left hover:opacity-95 transition group cursor-pointer"
+          title="Open Visualiser Primer & Theory Guide"
+        >
           <img
             src="/logo.svg"
             alt="PPT Logo"
-            className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-md drop-shadow-[0_0_8px_rgba(225,54,16,0.35)] flex-shrink-0 select-none hover:scale-105 transition-transform"
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-md drop-shadow-[0_0_8px_rgba(225,54,16,0.35)] flex-shrink-0 select-none group-hover:scale-105 transition-transform"
           />
           <div className="min-w-0">
-            <span className="font-bold text-xs sm:text-sm tracking-wide text-white truncate block">
-              <span className="sm:hidden">PPT</span>
-              <span className="hidden sm:inline">PPT Visualiser</span>
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-xs sm:text-sm tracking-wide text-white truncate block group-hover:text-red-400 transition-colors">
+                <span className="sm:hidden">PPT</span>
+                <span className="hidden sm:inline">PPT Visualiser</span>
+              </span>
+              <HelpCircle className="w-3.5 h-3.5 text-slate-500 group-hover:text-red-400 transition hidden sm:inline-block shrink-0" />
+            </div>
             <p className="text-[10px] text-slate-400 hidden 2xl:block">Prime Period Theory</p>
           </div>
-        </div>
+        </button>
 
         {/* Elegant Collapsible Tonic ("Do") Selector */}
         <div className="relative">

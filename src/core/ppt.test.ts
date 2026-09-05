@@ -1551,3 +1551,26 @@ test('WebGLPostProcessingPipeline: Headless fallback and mock GL execution', () 
   assert.strictEqual(pipeline.supported, false);
 });
 
+test('Information Modal: Storage keys and first-visit display contracts', () => {
+  const STORAGE_KEY_DONT_SHOW_INTRO = 'ppt_dont_show_intro_on_launch_v1';
+  const STORAGE_KEY_HAS_SEEN = 'ppt_has_seen_intro_modal_v1';
+
+  const mockStorage: Record<string, string> = {};
+  const getItem = (key: string) => mockStorage[key] || null;
+  const setItem = (key: string, val: string) => { mockStorage[key] = val; };
+
+  // 1. Initial state for brand new user: neither key set -> should show modal
+  const shouldShowFirstVisit = !getItem(STORAGE_KEY_DONT_SHOW_INTRO) && !getItem(STORAGE_KEY_HAS_SEEN);
+  assert.strictEqual(shouldShowFirstVisit, true, 'Brand new user must see intro modal');
+
+  // 2. User closes modal without ticking dont show again -> hasSeen is set
+  setItem(STORAGE_KEY_HAS_SEEN, 'true');
+  const shouldShowSecondVisit = getItem(STORAGE_KEY_DONT_SHOW_INTRO) !== 'true' && getItem(STORAGE_KEY_HAS_SEEN) !== 'true';
+  assert.strictEqual(shouldShowSecondVisit, false, 'Returning user who saw modal should not auto-open on next launch');
+
+  // 3. User ticks "Don't show this guide automatically on launch"
+  setItem(STORAGE_KEY_DONT_SHOW_INTRO, 'true');
+  const shouldShowWithDontShowTicked = getItem(STORAGE_KEY_DONT_SHOW_INTRO) !== 'true' && getItem(STORAGE_KEY_HAS_SEEN) !== 'true';
+  assert.strictEqual(shouldShowWithDontShowTicked, false, 'Users with dontShow ticked must not auto-open modal');
+});
+
