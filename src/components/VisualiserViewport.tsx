@@ -10,6 +10,7 @@ import {
 } from '../core/types';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { FlexLayoutRenderer } from './FlexLayoutRenderer';
 import { getAllCellNodes } from '../core/layout-models';
@@ -59,6 +60,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
 
   const pitchClockRendererRef = useRef(new PitchClockRenderer());
   const streamRendererRef = useRef(new StreamRenderer());
+  const pianoTrianglesRendererRef = useRef(new PianoTrianglesRenderer());
 
   useEffect(() => {
     if (resetSessionCount > 0) {
@@ -273,6 +275,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
             streamItems={streamItems}
             pitchClockRenderer={pitchClockRendererRef.current}
             streamRenderer={streamRendererRef.current}
+            pianoTrianglesRenderer={pianoTrianglesRendererRef.current}
             onUpdateCell={onUpdateCell}
             isEditMode={isEditMode}
             canDelete={canDelete}

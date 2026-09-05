@@ -30,6 +30,7 @@ import {
 import {
   PRESET_BALANCED,
   PRESET_MONUMENT,
+  PRESET_SIGNATURE,
   PRESET_LAYOUTS,
   splitCellInTree,
   removeCellFromTree,
@@ -40,6 +41,11 @@ import {
   encodeLayoutToSlug,
   decodeLayoutFromSlug,
 } from './layout-models';
+import {
+  getScaleTetrachordChainTriangles,
+  PIANO_TRIANGLE_POINT_TO_PITCH_CLASS,
+  PianoTrianglesRenderer,
+} from '../renderers/piano-triangles-canvas';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -1218,6 +1224,138 @@ test('Layout Models: URL Slug round-trip encoding and decoding with and without 
   const corrupted = decodeLayoutFromSlug('not-a-valid-base64-json-slug!!!');
   assert.strictEqual(corrupted, null, 'Corrupted slug should return null gracefully');
 });
+
+test('Piano Triangles: Deterministic point-to-pitch-class mapping for all 4 triangles', () => {
+  // Down triangle: C# (1), D (2), D# (3)
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.D[1], 1);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.D[2], 2);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.D[3], 3);
+
+  // Left triangle: E (4), F (5), F# (6)
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.L[1], 4);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.L[2], 5);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.L[3], 6);
+
+  // Up triangle: G (7), G# (8), A (9)
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.U[1], 7);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.U[2], 8);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.U[3], 9);
+
+  // Right triangle: A# (10), B (11), C (0)
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.R[1], 10);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.R[2], 11);
+  assert.strictEqual(PIANO_TRIANGLE_POINT_TO_PITCH_CLASS.R[3], 0);
+});
+
+test('Piano Triangles (Scale Signature): Tetrachord chaining algorithm creates 4 or 5 triangles with Do centered', () => {
+  // 1. D Major (Do = D, tonic = 2):
+  // Notes: So(A/U3), La(B/R2), Ti(C#/D1), Do(D/D2), Re(E/L1), Mi(F#/L3), Fa(G/U1)
+  // Segments: U, R, D (with Ti & Do), L (with Re & Mi), U -> 5 triangles
+  const dMajorSegs = getScaleTetrachordChainTriangles(2);
+  assert.strictEqual(dMajorSegs.length, 5, 'D Major must produce 5 chained triangles');
+  assert.strictEqual(dMajorSegs[0].triangle, 'U');
+  assert.strictEqual(dMajorSegs[1].triangle, 'R');
+  assert.strictEqual(dMajorSegs[2].triangle, 'D');
+  assert.strictEqual(dMajorSegs[3].triangle, 'L');
+  assert.strictEqual(dMajorSegs[4].triangle, 'U');
+
+  // Do must be in the 3rd segment (middle of the 5 triangles)
+  assert.strictEqual(dMajorSegs[2].hasDo, true);
+  assert.strictEqual(dMajorSegs[2].doPoint, 2);
+  assert.strictEqual(dMajorSegs[2].points.length, 2); // points 1 and 2 (Ti and Do)
+
+  // 2. C Major (Do = C, tonic = 0):
+  // Notes: So(G/U1), La(A/U3), Ti(B/R2), Do(C/R3), Re(D/D2), Mi(E/L1), Fa(F/L2)
+  // Segments: U (So, La), R (Ti, Do), D (Re), L (Mi, Fa) -> 4 triangles
+  const cMajorSegs = getScaleTetrachordChainTriangles(0);
+  assert.strictEqual(cMajorSegs.length, 4, 'C Major must produce 4 chained triangles');
+  assert.strictEqual(cMajorSegs[0].triangle, 'U');
+  assert.strictEqual(cMajorSegs[1].triangle, 'R');
+  assert.strictEqual(cMajorSegs[2].triangle, 'D');
+  assert.strictEqual(cMajorSegs[3].triangle, 'L');
+
+  // Do must be in segment 1 (triangle R, point 3)
+  assert.strictEqual(cMajorSegs[1].hasDo, true);
+  assert.strictEqual(cMajorSegs[1].doPoint, 3);
+
+  // 3. Verify all 12 keys produce either 4 or 5 triangles, and exactly 1 segment has hasDo = true
+  for (let tonic = 0; tonic < 12; tonic++) {
+    const segs = getScaleTetrachordChainTriangles(tonic);
+    assert.ok(segs.length === 4 || segs.length === 5, `Tonic ${tonic} must produce 4 or 5 triangles, got ${segs.length}`);
+    const doCount = segs.filter(s => s.hasDo).length;
+    assert.strictEqual(doCount, 1, `Tonic ${tonic} must have exactly one Do segment`);
+  }
+});
+
+test('Piano Triangles Renderer: Canvas drawing execution with octave-agnostic active notes and decay', () => {
+  const renderer = new PianoTrianglesRenderer();
+  assert.ok(renderer);
+
+  let arcCount = 0;
+  let fillCount = 0;
+  let strokeCount = 0;
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+    arc: () => { arcCount++; },
+    fill: () => { fillCount++; },
+    stroke: () => { strokeCount++; },
+    translate: () => {},
+    scale: () => {},
+    setLineDash: () => {},
+    fillText: () => {},
+  };
+
+  // Active note: D5 (MIDI 74, pitch class 2, velocity 0.9) - played in high octave
+  const activeNotes = new Map<number, any>([
+    [74, { midi: 74, velocity: 0.9, colorHex: '#e13610', pitchClass: 2, octave: 5 }],
+  ]);
+
+  // Decaying note: A2 (MIDI 45, pitch class 9) - released in bass octave
+  const decayingNotes = new Map<number, any>([
+    [45, { note: { midi: 45, velocity: 0.7, colorHex: '#0032a4', pitchClass: 9, octave: 2 }, decayProgress: 0.3 }],
+  ]);
+
+  renderer.render(
+    mockCtx,
+    800,
+    300,
+    activeNotes,
+    decayingNotes,
+    DEFAULT_CONFIG,
+    1000
+  );
+
+  assert.ok(arcCount > 0, 'Vertices and markers must render circles');
+  assert.ok(fillCount > 0, 'Silhouettes and vertices must fill');
+  assert.ok(strokeCount > 0, 'Triangle edges and vertex rims must stroke');
+});
+
+test('Piano Triangles Layout: PRESET_SIGNATURE trio tree and URL slug round-trip', () => {
+  assert.strictEqual(PRESET_SIGNATURE.id, 'signature');
+  assert.ok(PRESET_LAYOUTS['signature']);
+
+  const cells = getAllCellNodes(PRESET_SIGNATURE.root);
+  assert.strictEqual(cells.length, 3, 'Signature layout must contain 3 cells');
+  assert.strictEqual(cells[0].module, 'orbital');
+  assert.strictEqual(cells[1].module, 'triangles');
+  assert.strictEqual(cells[2].module, 'stream');
+
+  // Slug round-trip
+  const slug = encodeLayoutToSlug(PRESET_SIGNATURE, false);
+  assert.ok(slug.length > 20);
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded);
+  assert.strictEqual(decoded.layout.id, 'signature');
+  const decodedCells = getAllCellNodes(decoded.layout.root);
+  assert.strictEqual(decodedCells.length, 3);
+  assert.strictEqual(decodedCells[1].module, 'triangles');
+});
+
 
 
 

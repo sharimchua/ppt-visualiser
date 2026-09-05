@@ -361,7 +361,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
                   <span className="text-purple-400 font-bold">✓</span>
                 </div>
               )}
-              {(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
+              {(['balanced', 'signature', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
                 const preset = PRESET_LAYOUTS[mode];
                 const isSelected = !config.activeLayout?.id.startsWith('custom') && config.layoutMode === mode;
                 return (

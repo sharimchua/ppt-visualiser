@@ -52,6 +52,11 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   streamFilterRegister: 'all',
   streamMinVelocity: 0.05,
 
+  // Piano Triangles (Scale Signature)
+  showVertexLabels: true,
+  vertexLabelType: 'syllables',
+  showCenterAnchor: true,
+
   // Cosmetics & Aesthetics
   backgroundTheme: 'studio-obsidian',
   filmGrainIntensity: 0.25,
@@ -167,8 +172,14 @@ export function loadSavedConfig(): VisualiserConfig {
     merged.showRadialMovementTrails = typeof merged.showRadialMovementTrails === 'boolean' ? merged.showRadialMovementTrails : true;
 
     // Sanitize layout mode and activeLayout
-    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus']);
+    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature']);
     if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'balanced';
+
+    // Sanitize Piano Triangles (Scale Signature)
+    merged.showVertexLabels = typeof merged.showVertexLabels === 'boolean' ? merged.showVertexLabels : true;
+    const validVertexLabels = new Set(['syllables', 'pitches', 'triPitches', 'intervals', 'none']);
+    if (!validVertexLabels.has(merged.vertexLabelType)) merged.vertexLabelType = 'syllables';
+    merged.showCenterAnchor = typeof merged.showCenterAnchor === 'boolean' ? merged.showCenterAnchor : true;
 
     if (!merged.activeLayout || !merged.activeLayout.root) {
       merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_BALANCED;

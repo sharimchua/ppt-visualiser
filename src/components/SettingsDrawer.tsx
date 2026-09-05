@@ -1405,7 +1405,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <label className="block font-medium text-slate-300">Active Layout Preset</label>
             <div className="grid grid-cols-2 gap-1.5">
-              {(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
+              {(['balanced', 'signature', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => onUpdateConfig({ layoutMode: mode, activeLayout: PRESET_LAYOUTS[mode] })}

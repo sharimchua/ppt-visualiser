@@ -211,6 +211,47 @@ export const PRESET_ORBITAL_FOCUS: LayoutDefinition = {
   },
 };
 
+export const PRESET_SIGNATURE: LayoutDefinition = {
+  id: 'signature',
+  name: 'Scale Signature Trio',
+  description: 'Concentric Pitch Clock, centered Piano Triangles Scale Signature, and Note Stream ribbon',
+  root: {
+    id: 'root-signature',
+    type: 'container',
+    direction: 'column',
+    gap: 8,
+    children: [
+      {
+        id: 'cell-clock-sig',
+        type: 'cell',
+        module: 'orbital',
+        flex: 3,
+        title: 'Pitch Clock',
+      },
+      {
+        id: 'cell-triangles-sig',
+        type: 'cell',
+        module: 'triangles',
+        flex: 1.4,
+        minSize: 90,
+        title: 'Piano Triangles (Scale Signature)',
+      },
+      {
+        id: 'cell-stream-sig',
+        type: 'cell',
+        module: 'stream',
+        flex: 1.1,
+        minSize: 75,
+        title: 'Note Stream',
+        configOverrides: {
+          orientation: 'horizontal',
+          direction: 'rtl',
+        },
+      },
+    ],
+  },
+};
+
 export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'balanced': PRESET_BALANCED,
   'monument': PRESET_MONUMENT,
@@ -218,6 +259,7 @@ export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'waterfall': PRESET_WATERFALL,
   'dual-stream': PRESET_DUAL_STREAM,
   'orbital-focus': PRESET_ORBITAL_FOCUS,
+  'signature': PRESET_SIGNATURE,
 };
 
 /**
@@ -312,7 +354,7 @@ export function splitCellInTree(
         type: 'cell',
         module: newModule,
         flex: 1,
-        title: newModule === 'orbital' ? 'Pitch Clock' : 'Note Stream',
+        title: newModule === 'orbital' ? 'Pitch Clock' : newModule === 'triangles' ? 'Piano Triangles' : 'Note Stream',
         configOverrides:
           newModule === 'stream'
             ? {
@@ -504,7 +546,7 @@ export function addCellToTree(
     type: 'cell',
     module,
     flex: 1,
-    title: module === 'orbital' ? 'Pitch Clock' : 'Note Stream',
+    title: module === 'orbital' ? 'Pitch Clock' : module === 'triangles' ? 'Piano Triangles' : 'Note Stream',
     configOverrides:
       module === 'stream'
         ? {

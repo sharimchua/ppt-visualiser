@@ -10,6 +10,7 @@ import {
 } from '../core/types';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { CellViewport } from './CellViewport';
 
 interface FlexLayoutRendererProps {
@@ -20,6 +21,7 @@ interface FlexLayoutRendererProps {
   streamItems: StreamItem[];
   pitchClockRenderer: PitchClockRenderer;
   streamRenderer: StreamRenderer;
+  pianoTrianglesRenderer: PianoTrianglesRenderer;
   onUpdateCell?: (updated: LayoutCellNode) => void;
   isEditMode?: boolean;
   canDelete?: boolean;
@@ -36,6 +38,7 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
   streamItems,
   pitchClockRenderer,
   streamRenderer,
+  pianoTrianglesRenderer,
   onUpdateCell,
   isEditMode = false,
   canDelete = false,
@@ -63,6 +66,7 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
           streamItems={streamItems}
           pitchClockRenderer={pitchClockRenderer}
           streamRenderer={streamRenderer}
+          pianoTrianglesRenderer={pianoTrianglesRenderer}
           onUpdateCell={onUpdateCell}
           isEditMode={isEditMode}
           canDelete={canDelete}
@@ -98,6 +102,7 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
           streamItems={streamItems}
           pitchClockRenderer={pitchClockRenderer}
           streamRenderer={streamRenderer}
+          pianoTrianglesRenderer={pianoTrianglesRenderer}
           onUpdateCell={onUpdateCell}
           isEditMode={isEditMode}
           canDelete={canDelete}

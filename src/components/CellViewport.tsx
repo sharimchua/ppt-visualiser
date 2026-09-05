@@ -11,8 +11,10 @@ import {
 } from '../core/types';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import {
   Waves,
+  Triangle,
   ArrowRight,
   ArrowLeft,
   ArrowDown,
@@ -35,6 +37,7 @@ interface CellViewportProps {
   streamItems: StreamItem[];
   pitchClockRenderer: PitchClockRenderer;
   streamRenderer: StreamRenderer;
+  pianoTrianglesRenderer: PianoTrianglesRenderer;
   onUpdateCell?: (updated: LayoutCellNode) => void;
   // Edit Mode Props
   isEditMode?: boolean;
@@ -52,6 +55,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
   streamItems,
   pitchClockRenderer,
   streamRenderer,
+  pianoTrianglesRenderer,
   onUpdateCell,
   isEditMode = false,
   canDelete = false,
@@ -103,6 +107,16 @@ export const CellViewport: React.FC<CellViewportProps> = ({
           effectiveConfig,
           time
         );
+      } else if (cell.module === 'triangles') {
+        pianoTrianglesRenderer.render(
+          ctx,
+          width,
+          height,
+          activeNotes,
+          decayingNotes,
+          effectiveConfig,
+          time
+        );
       } else {
         streamRenderer.render(
           ctx,
@@ -122,7 +136,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [cell, effectiveConfig, activeNotes, decayingNotes, streamItems, pitchClockRenderer, streamRenderer]);
+  }, [cell, effectiveConfig, activeNotes, decayingNotes, streamItems, pitchClockRenderer, streamRenderer, pianoTrianglesRenderer]);
 
   // Handle high-DPI canvas resizing
   useEffect(() => {
@@ -189,7 +203,12 @@ export const CellViewport: React.FC<CellViewportProps> = ({
     onUpdateCell({
       ...cell,
       module: nextModule,
-      title: nextModule === 'orbital' ? 'Pitch Clock' : 'Note Stream',
+      title:
+        nextModule === 'orbital'
+          ? 'Pitch Clock'
+          : nextModule === 'triangles'
+          ? 'Piano Triangles'
+          : 'Note Stream',
       configOverrides:
         nextModule === 'stream'
           ? {
@@ -223,8 +242,9 @@ export const CellViewport: React.FC<CellViewportProps> = ({
       {/* NORMAL MODE: Floating Mini Cell Badge / Controls on Hover */}
       {!isEditMode && (
         <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/80 backdrop-blur-md px-1.5 py-0.5 rounded border border-slate-700/60 text-[10px] text-slate-300 pointer-events-auto z-10">
-          <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400">
-            {cell.title || (cell.module === 'orbital' ? 'Orbital' : 'Stream')}
+          <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 flex items-center">
+            {cell.module === 'triangles' && <Triangle className="w-2.5 h-2.5 text-red-400 mr-1 fill-red-500/40" />}
+            {cell.title || (cell.module === 'orbital' ? 'Orbital' : cell.module === 'triangles' ? 'Scale Signature' : 'Stream')}
           </span>
 
           {cell.module === 'stream' && onUpdateCell && (
@@ -267,6 +287,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
             >
               <option value="orbital">🪐 Clock</option>
               <option value="stream">🌊 Stream</option>
+              <option value="triangles">▲ Triangles</option>
             </select>
 
             {/* Flex weight adjuster */}
@@ -626,6 +647,74 @@ export const CellViewport: React.FC<CellViewportProps> = ({
                     </button>
                   ))}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Piano Triangles-Specific Options */}
+          {cell.module === 'triangles' && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <label className="text-[11px] text-red-400 font-medium block uppercase tracking-wider">
+                Piano Triangles (Scale Signature)
+              </label>
+
+              {/* Vertex Label Selection */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Vertex Labels:</label>
+                <div className="grid grid-cols-3 gap-1">
+                  {[
+                    { id: 'syllables', label: 'Solfège (Do)' },
+                    { id: 'pitches', label: 'Pitches (D)' },
+                    { id: 'triPitches', label: 'Tri-Pitch' },
+                    { id: 'intervals', label: 'Degrees (1..7)' },
+                    { id: 'none', label: 'None (Pure)' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            vertexLabelType: opt.id as any,
+                            showVertexLabels: opt.id !== 'none',
+                          },
+                        })
+                      }
+                      className={`py-1 px-1.5 rounded border text-[10px] font-medium transition ${
+                        (effectiveConfig.vertexLabelType === opt.id && effectiveConfig.showVertexLabels) ||
+                        (opt.id === 'none' && !effectiveConfig.showVertexLabels)
+                          ? 'bg-purple-600/30 border-purple-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Center Anchor Guide Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[11px] text-slate-300 font-medium">Center Do Guide Axis:</span>
+                <button
+                  onClick={() =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        showCenterAnchor: !effectiveConfig.showCenterAnchor,
+                      },
+                    })
+                  }
+                  className={`px-2.5 py-0.5 rounded border text-xs font-semibold transition ${
+                    effectiveConfig.showCenterAnchor
+                      ? 'bg-red-950/60 border-red-500/70 text-red-300'
+                      : 'bg-slate-900 border-slate-700 text-slate-500'
+                  }`}
+                >
+                  {effectiveConfig.showCenterAnchor ? 'Active' : 'Hidden'}
+                </button>
               </div>
             </div>
           )}
