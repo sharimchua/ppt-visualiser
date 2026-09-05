@@ -65,7 +65,7 @@ export const App: React.FC = () => {
     return saved;
   });
   const [activeNotes, setActiveNotes] = useState<Map<number, ActiveNote>>(new Map());
-  const [decayingNotes, setDecayingNotes] = useState<Map<number, { note: ActiveNote; decayProgress: number }>>(new Map());
+  const decayingNotesRef = useRef<Map<number, { note: ActiveNote; decayProgress: number }>>(new Map());
   const [streamItems, setStreamItems] = useState<StreamItem[]>([]);
   const [playbackState, setPlaybackState] = useState<MidiPlaybackState>(midiPlayerInstance.getState());
   const [deviceState, setDeviceState] = useState<MidiDeviceState>(midiManagerInstance.state);
@@ -95,8 +95,6 @@ export const App: React.FC = () => {
 
   const activeNotesRef = useRef(activeNotes);
   activeNotesRef.current = activeNotes;
-  const decayingNotesRef = useRef(decayingNotes);
-  decayingNotesRef.current = decayingNotes;
   const toneCoordLookupRef = useRef<((midi: number) => { x: number; y: number; radius: number; angle: number } | null) | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
@@ -199,7 +197,7 @@ export const App: React.FC = () => {
   // Reset session state: clears discovered tones, tone pop scales, organic activity, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
     setActiveNotes(new Map());
-    setDecayingNotes(new Map());
+    decayingNotesRef.current.clear();
     setStreamItems([]);
     setResetNonce((n) => n + 1);
     scaleTrackerRef.current.reset();
@@ -278,14 +276,7 @@ export const App: React.FC = () => {
     });
 
     // Remove from decaying notes if retriggered
-    setDecayingNotes((prev) => {
-      if (prev.has(midi)) {
-        const next = new Map(prev);
-        next.delete(midi);
-        return next;
-      }
-      return prev;
-    });
+    decayingNotesRef.current.delete(midi);
 
     // Spawn cosmetic particles using exact tone circle coordinates if available
     const exact = toneCoordLookupRef.current?.(midi);
@@ -392,13 +383,9 @@ export const App: React.FC = () => {
       const next = new Map(prev);
       next.delete(midi);
 
-      // Begin decay animation
+      // Begin decay animation in mutable map (zero React state overhead)
       const noteCopy = { ...active, releaseTime: now };
-      setDecayingNotes((dPrev) => {
-        const dNext = new Map(dPrev);
-        dNext.set(midi, { note: noteCopy, decayProgress: 0 });
-        return dNext;
-      });
+      decayingNotesRef.current.set(midi, { note: noteCopy, decayProgress: 0 });
 
       return next;
     });
@@ -414,7 +401,7 @@ export const App: React.FC = () => {
     };
   }, [handleNoteOn, handleNoteOff]);
 
-  // Decay Progress Animation Loop
+  // Decay Progress Animation Loop (runs in-place on mutable map without triggering React re-renders)
   useEffect(() => {
     let animId: number;
 
@@ -423,11 +410,26 @@ export const App: React.FC = () => {
       const currentConfig = configRef.current;
       const decayDuration = currentConfig.decayDurationMs;
 
+      // In-place decay update on mutable map
+      const decayingMap = decayingNotesRef.current;
+      if (decayingMap.size > 0) {
+        for (const [midi, data] of decayingMap.entries()) {
+          const elapsed = now - (data.note.releaseTime || now);
+          const progress = Math.min(1.0, elapsed / decayDuration);
+
+          if (progress >= 1.0) {
+            decayingMap.delete(midi);
+          } else {
+            data.decayProgress = progress;
+          }
+        }
+      }
+
       // Update scale alignment tracker with active and decaying notes
       const alignRes = scaleTrackerRef.current.update(
         now,
         activeNotesRef.current.values(),
-        decayingNotesRef.current.values(),
+        decayingMap.values(),
         currentConfig
       );
 
@@ -452,27 +454,6 @@ export const App: React.FC = () => {
           shouldShift: alignRes.shouldShift,
         });
       }
-
-      setDecayingNotes((prev) => {
-        if (prev.size === 0) return prev;
-        const next = new Map(prev);
-        let changed = false;
-
-        for (const [midi, data] of prev.entries()) {
-          const elapsed = now - (data.note.releaseTime || now);
-          const progress = Math.min(1.0, elapsed / decayDuration);
-
-          if (progress >= 1.0) {
-            next.delete(midi);
-            changed = true;
-          } else {
-            next.set(midi, { note: data.note, decayProgress: progress });
-            changed = true;
-          }
-        }
-
-        return changed ? next : prev;
-      });
 
       animId = requestAnimationFrame(tickDecay);
     };
@@ -571,7 +552,7 @@ export const App: React.FC = () => {
         <VisualiserViewport
           config={config}
           activeNotes={activeNotes}
-          decayingNotes={decayingNotes}
+          decayingNotes={decayingNotesRef.current}
           streamItems={streamItems}
           cosmeticsEngine={cosmeticsEngineRef.current}
           resetSessionCount={resetNonce}

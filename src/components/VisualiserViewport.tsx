@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback, memo } from 'react';
 import {
   VisualiserConfig,
   ActiveNote,
@@ -36,7 +36,7 @@ interface VisualiserViewportProps {
   onShareLayout?: () => void;
 }
 
-export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
+export const VisualiserViewport = memo<VisualiserViewportProps>(function VisualiserViewport({
   config,
   activeNotes,
   decayingNotes,
@@ -53,7 +53,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
   onAddCell,
   onResetLayout,
   onShareLayout,
-}) => {
+}) {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -120,39 +120,27 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     cosmeticsEngine,
   };
 
-  // Unified global background canvas render loop
-  useEffect(() => {
+  // Draw static background on mount, theme change, or viewport resize
+  const drawBackground = useCallback(() => {
     const canvas = bgCanvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animId: number;
+    const dpr = window.devicePixelRatio || 1;
+    const width = canvas.width / dpr;
+    const height = canvas.height / dpr;
+    if (width <= 0 || height <= 0) return;
 
-    const render = () => {
-      const { config: curConfig, cosmeticsEngine: curEngine } = bgDataRef.current;
-      const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
+    ctx.save();
+    ctx.scale(dpr, dpr);
+    cosmeticsEngine.renderBackground(ctx, width, height, config.backgroundTheme);
+    ctx.restore();
+  }, [config.backgroundTheme, cosmeticsEngine]);
 
-      if (width <= 0 || height <= 0) {
-        animId = requestAnimationFrame(render);
-        return;
-      }
-
-      ctx.save();
-      ctx.scale(dpr, dpr);
-
-      // Render seamless global theme gradient
-      curEngine.renderBackground(ctx, width, height, curConfig.backgroundTheme);
-
-      ctx.restore();
-      animId = requestAnimationFrame(render);
-    };
-
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, []);
+  useEffect(() => {
+    drawBackground();
+  }, [drawBackground]);
 
   // Unified whole-display cosmetics overlay loop (film grain, CRT scanlines, optical lens flares)
   useEffect(() => {
@@ -258,6 +246,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
         overlayCanvasRef.current.style.width = `${rect.width}px`;
         overlayCanvasRef.current.style.height = `${rect.height}px`;
       }
+      drawBackground();
     };
 
     handleResize();
@@ -378,4 +367,4 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
       )}
     </div>
   );
-};
+});

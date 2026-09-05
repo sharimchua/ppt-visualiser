@@ -418,14 +418,9 @@ export class CosmeticsEngine {
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
 
-    // Prioritize top prominent light sources during dense chords to avoid linear gradient & blur explosion
-    const prominentSources = sources.length > 4
-      ? sources.slice().sort((a, b) => b.velocity - a.velocity).slice(0, 4)
-      : sources;
-
     // 1. Light Bleed: Radial Halation & Anamorphic Lens Streaks
-    if (bleed > 0.01 && prominentSources.length > 0) {
-      for (const src of prominentSources) {
+    if (bleed > 0.01 && sources.length > 0) {
+      for (const src of sources) {
         const velAlpha = Math.min(1.0, src.velocity * bleed);
         if (velAlpha <= 0.02) continue;
 
@@ -489,8 +484,8 @@ export class CosmeticsEngine {
 
     // 3. Multi-Element Optical Lens Flare & Diffraction Starburst Rays
     const flare = config.lensFlareIntensity ?? 0;
-    if (flare > 0.01 && prominentSources.length > 0) {
-      this.renderOpticalLensFlares(ctx, width, _height, prominentSources, flare, config.lensFlareStyle ?? 'cinematic');
+    if (flare > 0.01 && sources.length > 0) {
+      this.renderOpticalLensFlares(ctx, width, _height, sources, flare, config.lensFlareStyle ?? 'cinematic');
     }
 
     ctx.restore();
@@ -513,63 +508,72 @@ export class CosmeticsEngine {
     const opticalCx = width / 2;
     const opticalCy = height / 2;
 
-    // Optical flare sources capped to the top 3 loudest notes to guarantee 60 FPS
-    const topSources = sources.length > 3
-      ? sources.slice().sort((a, b) => b.velocity - a.velocity).slice(0, 3)
+    // Up to 8 simultaneous flare sources smoothly prioritized by velocity
+    const activeSources = sources.length > 8
+      ? sources.slice().sort((a, b) => b.velocity - a.velocity).slice(0, 8)
       : sources;
 
-    for (const src of topSources) {
+    for (const src of activeSources) {
       const alpha = Math.min(1.0, src.velocity * intensity);
       if (alpha <= 0.02) continue;
 
-      // 1. Starburst diffraction rays
+      // 1. Starburst diffraction rays with feathered falloff
       if (style === 'starburst' || style === 'cinematic') {
         const rayCount = 6;
-        const rayLen = Math.min(width * 0.32, 60 + 140 * intensity * src.velocity);
-        const rayWidth = 1.5 + src.velocity;
+        const rayLen = Math.min(width * 0.35, 70 + 160 * intensity * src.velocity);
+        const rayWidth = 1.6 + src.velocity * 1.2;
 
         ctx.save();
         ctx.translate(src.x, src.y);
 
-        // Soft diffraction halo ray fan
+        // Radiant central optical core disc (luminous bloom at the center)
+        const coreR = Math.max(8, 18 * intensity * (0.6 + src.velocity * 0.6));
+        const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR);
+        coreGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`);
+        coreGrad.addColorStop(0.25, hexToRgba(src.color, alpha * 0.65));
+        coreGrad.addColorStop(0.65, hexToRgba(src.color, alpha * 0.25));
+        coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = coreGrad;
         ctx.beginPath();
+        ctx.arc(0, 0, coreR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 6 diffraction rays with smooth feathered tip fade (zero hard cutoffs)
         for (let i = 0; i < rayCount; i++) {
           const angle = (i * Math.PI) / rayCount + (Math.PI / 12);
           const cos = Math.cos(angle) * rayLen;
           const sin = Math.sin(angle) * rayLen;
-          ctx.moveTo(-cos, -sin);
-          ctx.lineTo(cos, sin);
-        }
-        ctx.strokeStyle = hexToRgba(src.color, alpha * 0.4);
-        ctx.lineWidth = rayWidth * 2.2;
-        ctx.stroke();
 
-        // Brilliant ray center cores
-        ctx.beginPath();
-        for (let i = 0; i < rayCount; i++) {
-          const angle = (i * Math.PI) / rayCount + (Math.PI / 12);
-          const cos = Math.cos(angle) * rayLen * 0.75;
-          const sin = Math.sin(angle) * rayLen * 0.75;
+          const grad = ctx.createLinearGradient(-cos, -sin, cos, sin);
+          grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          grad.addColorStop(0.32, hexToRgba(src.color, alpha * 0.35));
+          grad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.92})`);
+          grad.addColorStop(0.68, hexToRgba(src.color, alpha * 0.35));
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          ctx.beginPath();
           ctx.moveTo(-cos, -sin);
           ctx.lineTo(cos, sin);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = rayWidth;
+          ctx.stroke();
         }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
-        ctx.lineWidth = Math.max(1, rayWidth * 0.75);
-        ctx.stroke();
 
         ctx.restore();
       }
 
       // 2. Anamorphic horizontal flare
       if (style === 'anamorphic' || style === 'cinematic') {
-        const streakW = Math.min(width * 0.65, 200 + 400 * intensity);
-        const streakH = Math.max(2, 4 * src.velocity);
+        const streakW = Math.min(width * 0.72, 220 + 460 * intensity);
+        const streakH = Math.max(3, 5 * src.velocity);
 
         const streakGrad = ctx.createLinearGradient(src.x - streakW, src.y, src.x + streakW, src.y);
         streakGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        streakGrad.addColorStop(0.3, hexToRgba('#38bdf8', alpha * 0.22)); // Sci-fi cyan anamorphic tint
-        streakGrad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.9) + ')');
-        streakGrad.addColorStop(0.7, hexToRgba('#818cf8', alpha * 0.22));
+        streakGrad.addColorStop(0.2, hexToRgba('#38bdf8', alpha * 0.25)); // Sci-fi cyan anamorphic tint
+        streakGrad.addColorStop(0.42, hexToRgba(src.color, alpha * 0.45));
+        streakGrad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.95})`);
+        streakGrad.addColorStop(0.58, hexToRgba(src.color, alpha * 0.45));
+        streakGrad.addColorStop(0.8, hexToRgba('#818cf8', alpha * 0.25));
         streakGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = streakGrad;
@@ -581,7 +585,7 @@ export class CosmeticsEngine {
         const dx = opticalCx - src.x;
         const dy = opticalCy - src.y;
 
-        // Reflection offsets: 0.4x, 0.75x, 1.25x along optical axis
+        // Reflection offsets: 0.4x, 0.75x, 1.35x along optical axis
         const ghostScales = [0.4, 0.75, 1.35];
         const ghostSizes = [12, 22, 38];
 
@@ -589,7 +593,7 @@ export class CosmeticsEngine {
           const gx = src.x + dx * (1 + ghostScales[g]);
           const gy = src.y + dy * (1 + ghostScales[g]);
           const gr = ghostSizes[g] * (0.8 + src.velocity * 0.4) * intensity;
-          const ga = alpha * (0.15 / (g + 1));
+          const ga = alpha * (0.18 / (g + 1));
 
           ctx.beginPath();
           ctx.arc(gx, gy, gr, 0, Math.PI * 2);

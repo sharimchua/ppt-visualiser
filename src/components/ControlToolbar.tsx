@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState, memo } from 'react';
 import {
   Play,
   Pause,
@@ -63,7 +63,7 @@ const TONIC_PITCHES = [
   { value: 11, label: 'B', short: 'B' },
 ];
 
-export const ControlToolbar: React.FC<ControlToolbarProps> = ({
+export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar({
   config,
   playbackState,
   deviceState,
@@ -80,7 +80,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   onResetState,
   isEditMode = false,
   onToggleEditMode,
-}) => {
+}) {
   const [showTonicMenu, setShowTonicMenu] = useState(false);
   const [showMidiMenu, setShowMidiMenu] = useState(false);
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
@@ -894,4 +894,4 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
       )}
     </header>
   );
-};
+});

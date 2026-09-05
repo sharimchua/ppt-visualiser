@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, memo } from 'react';
 import {
   LayoutCellNode,
   VisualiserConfig,
@@ -47,7 +47,7 @@ interface CellViewportProps {
   onDuplicateCell?: (targetCellId: string) => void;
 }
 
-export const CellViewport: React.FC<CellViewportProps> = ({
+export const CellViewport = memo<CellViewportProps>(function CellViewport({
   cell,
   config,
   activeNotes,
@@ -62,7 +62,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
   onSplitCell,
   onRemoveCell,
   onDuplicateCell,
-}) => {
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -756,4 +756,4 @@ export const CellViewport: React.FC<CellViewportProps> = ({
       )}
     </div>
   );
-};
+});

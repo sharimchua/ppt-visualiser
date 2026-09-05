@@ -16,6 +16,7 @@ export class MidiFilePlayer {
   private activeNoteTimeouts: Set<number> = new Set();
   private currentlySoundingMidi: Set<number> = new Set();
   private stateListeners: Set<(state: MidiPlaybackState) => void> = new Set();
+  private lastStateNotifyTime: number = 0;
 
   constructor() {
     // Default to Concentric Clock Radial Orbit demo track
@@ -179,13 +180,19 @@ export class MidiFilePlayer {
     if (this.currentTime >= this.duration) {
       if (this.loop) {
         this.currentTime = 0;
+        this.notifyState();
       } else {
         this.stop();
         return;
       }
+    } else {
+      const perfNow = performance.now();
+      if (perfNow - this.lastStateNotifyTime >= 50) {
+        this.lastStateNotifyTime = perfNow;
+        this.notifyState();
+      }
     }
 
-    this.notifyState();
     this.animFrameId = requestAnimationFrame(this.tick);
   };
 
