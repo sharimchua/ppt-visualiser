@@ -63,10 +63,31 @@ export type InactiveRegisterDisplay = 'hidden' | 'faint' | 'equal';
 export type GlyphContrastMode = 'high' | 'solfege';
 export type ClockLabelType = 'glyphs' | 'triangles' | 'syllables' | 'pitches' | 'triPitches' | 'intervals' | 'none';
 
+export type AutoTonicMode =
+  | 'ionian'
+  | 'aeolian'
+  | 'dorian'
+  | 'mixolydian'
+  | 'lydian'
+  | 'phrygian'
+  | 'locrian'
+  | 'harmonic-minor'
+  | 'melodic-minor'
+  | 'pentatonic-major'
+  | 'pentatonic-minor'
+  | 'blues'
+  | 'custom';
+
+export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
+
 export interface VisualiserConfig {
   // General & Tonic
   tonic: number; // 0=C, 1=C#, 2=D ...
   accidentalStyle: AccidentalStyle;
+  autoTonicEnabled: boolean;
+  autoTonicMode: AutoTonicMode;
+  autoTonicCustomDegrees: number[]; // e.g. [0, 2, 4, 5, 7, 9, 11]
+  autoTonicSensitivity: AutoTonicSensitivity;
   
   // Pitch Clock
   octaveMode: 'dynamic' | 'fixed8';

@@ -17,6 +17,13 @@ import { DEMO_TRACKS } from './demo-tracks';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { compute2DConvexHull } from './convex-hull';
 import { clusterSimultaneousNotes, resolveChordVoicingGroups } from './chord-clustering';
+import {
+  SCALE_MODE_DEFINITIONS,
+  getEffectiveModeIntervals,
+  calculateDiatonicFitScore,
+  evaluateAllTonicCandidates,
+  ScaleAlignmentTracker,
+} from './scale-alignment';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -664,6 +671,134 @@ test('Tri Pitch-Class Configuration & Persistence: Clock labels and stream forma
   clearSavedConfig();
   const reverted = loadSavedConfig();
   assert.strictEqual(reverted.presentationFormat, 'glyphs');
+});
+
+test('Scale Mode Definitions: All 12 modes and custom scale degrees', () => {
+  // 1. Check Ionian
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS.ionian.intervals, [0, 2, 4, 5, 7, 9, 11]);
+  // 2. Check Aeolian
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS.aeolian.intervals, [0, 2, 3, 5, 7, 8, 10]);
+  // 3. Check Dorian
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS.dorian.intervals, [0, 2, 3, 5, 7, 9, 10]);
+  // 4. Check Mixolydian
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS.mixolydian.intervals, [0, 2, 4, 5, 7, 9, 10]);
+  // 5. Check Pentatonic
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS['pentatonic-major'].intervals, [0, 2, 4, 7, 9]);
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS['pentatonic-minor'].intervals, [0, 3, 5, 7, 10]);
+  // 6. Check Blues
+  assert.deepStrictEqual(SCALE_MODE_DEFINITIONS.blues.intervals, [0, 3, 5, 6, 7, 10]);
+
+  // Check getEffectiveModeIntervals
+  assert.deepStrictEqual(getEffectiveModeIntervals('ionian'), [0, 2, 4, 5, 7, 9, 11]);
+  assert.deepStrictEqual(getEffectiveModeIntervals('custom', [0, 4, 7]), [0, 4, 7]);
+});
+
+test('Auto-Alignment Diatonic Fit Scoring: Correctly ranks candidate keys and identifies best fit', () => {
+  const ionian = SCALE_MODE_DEFINITIONS.ionian.intervals;
+
+  // Case 1: Pure C Major chord (C=0, E=4, G=7)
+  const cMajorActivity = Array(12).fill(0);
+  cMajorActivity[0] = 1.0; // C
+  cMajorActivity[4] = 0.9; // E
+  cMajorActivity[7] = 0.9; // G
+
+  const scoreC = calculateDiatonicFitScore(cMajorActivity, 0, ionian);
+  assert.strictEqual(scoreC.diatonicFitRatio, 1.0, 'All notes in C major chord must be 100% diatonic to C Ionian');
+  assert.ok(scoreC.score > 0);
+
+  // Under C# (tonic 1), C(0)=Ti(11), E(4)=Me(3), G(7)=Fi(6) -> E and G are non-diatonic to C# Major!
+  const scoreCsharp = calculateDiatonicFitScore(cMajorActivity, 1, ionian);
+  assert.ok(scoreC.score > scoreCsharp.score, 'C must score significantly higher than C# for C Major triad');
+
+  // Case 2: Pure G Major scale notes (G=7, A=9, B=11, C=0, D=2, E=4, F#=6)
+  const gMajorActivity = Array(12).fill(0);
+  [7, 9, 11, 0, 2, 4, 6].forEach(pc => { gMajorActivity[pc] = 0.8; });
+
+  const rankedG = evaluateAllTonicCandidates(gMajorActivity, ionian);
+  assert.strictEqual(rankedG[0].tonic, 7, 'Best candidate for G Major notes must be G (tonic 7)');
+  assert.strictEqual(rankedG[0].diatonicFitRatio, 1.0);
+
+  // G has F# (6) which is non-diatonic to C Major (where 6 is Fi / #4). So C Major rank must be lower.
+  const cRankInG = rankedG.find(r => r.tonic === 0);
+  assert.ok(rankedG[0].score > cRankInG!.score, 'G tonic must beat C tonic when F# is present');
+});
+
+test('ScaleAlignmentTracker: Hysteresis and Debounce prevent thrashing on passing tones', () => {
+  const tracker = new ScaleAlignmentTracker();
+  const config = {
+    ...DEFAULT_CONFIG,
+    tonic: 0, // Current tonic is C (0)
+    autoTonicEnabled: true,
+    autoTonicMode: 'ionian' as const,
+    autoTonicSensitivity: 'balanced' as const, // 900ms debounce
+  };
+
+  // 1. Initial play in C Major at t = 1000ms
+  const activeC = [
+    { pitchClass: 0, velocity: 0.8 }, // C
+    { pitchClass: 4, velocity: 0.8 }, // E
+    { pitchClass: 7, velocity: 0.8 }, // G
+  ];
+  let res = tracker.update(1000, activeC, [], config);
+  assert.strictEqual(res.currentTonic, 0);
+  assert.strictEqual(res.bestTonic, 0);
+  assert.strictEqual(res.shouldShift, false, 'Should stay in C');
+
+  // 2. Play a brief chromatic passing tone (F# = 6) at t = 1200ms
+  // While C, E, G are still sounding or recent
+  const activeWithPassing = [
+    { pitchClass: 6, velocity: 0.7 }, // F# (passing)
+    { pitchClass: 7, velocity: 0.8 }, // G
+  ];
+  res = tracker.update(1200, activeWithPassing, [], config);
+  // Passing tone occurs at 1200ms (elapsed 0ms for candidate) -> must NOT trigger immediate shift!
+  assert.strictEqual(res.shouldShift, false, 'Single passing note must NOT trigger immediate key shift');
+
+  // 3. Modulate decisively to G Major with sustained notes over > 900ms
+  // G, B, D, F# played at t = 1500ms
+  const activeGMajor = [
+    { pitchClass: 7, velocity: 0.9 },  // G
+    { pitchClass: 11, velocity: 0.9 }, // B
+    { pitchClass: 2, velocity: 0.9 },  // D
+    { pitchClass: 6, velocity: 0.9 },  // F#
+  ];
+
+  res = tracker.update(1500, activeGMajor, [], config);
+  assert.strictEqual(res.bestTonic, 7, 'G (7) is now the best candidate');
+  assert.strictEqual(res.shouldShift, false, 'Debounce window (900ms) has not elapsed yet at 1500ms');
+
+  // At t = 2000ms (500ms elapsed) -> still within debounce
+  res = tracker.update(2000, activeGMajor, [], config);
+  assert.strictEqual(res.shouldShift, false);
+
+  // At t = 2500ms (1000ms elapsed >= 900ms debounce) -> triggers shift!
+  res = tracker.update(2500, activeGMajor, [], config);
+  assert.strictEqual(res.shouldShift, true, 'Sustained G Major modulation triggers shift');
+  assert.strictEqual(res.newTonic, 7, 'New tonic must be G (7)');
+});
+
+test('Auto-Tonic Configuration Persistence: Save, load, and sanitize', () => {
+  const customConfig = {
+    ...DEFAULT_CONFIG,
+    autoTonicEnabled: true,
+    autoTonicMode: 'dorian' as const,
+    autoTonicCustomDegrees: [0, 2, 3, 5, 7, 9, 10],
+    autoTonicSensitivity: 'fast' as const,
+  };
+  saveConfig(customConfig);
+
+  const loaded = loadSavedConfig();
+  assert.strictEqual(loaded.autoTonicEnabled, true);
+  assert.strictEqual(loaded.autoTonicMode, 'dorian');
+  assert.deepStrictEqual(loaded.autoTonicCustomDegrees, [0, 2, 3, 5, 7, 9, 10]);
+  assert.strictEqual(loaded.autoTonicSensitivity, 'fast');
+
+  // Clear config back to defaults
+  clearSavedConfig();
+  const reverted = loadSavedConfig();
+  assert.strictEqual(reverted.autoTonicEnabled, false);
+  assert.strictEqual(reverted.autoTonicMode, 'ionian');
+  assert.strictEqual(reverted.autoTonicSensitivity, 'balanced');
 });
 
 

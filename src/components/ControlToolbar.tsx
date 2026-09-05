@@ -19,6 +19,7 @@ import {
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
 import { midiManagerInstance } from '../core/midi-manager';
+import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 
 interface ControlToolbarProps {
   config: VisualiserConfig;
@@ -110,6 +111,18 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
               </option>
             ))}
           </select>
+          {/* Quick Auto-Alignment Toggle */}
+          <button
+            onClick={() => onUpdateConfig({ autoTonicEnabled: !config.autoTonicEnabled })}
+            className={`ml-1 px-1.5 py-0.5 rounded text-[10px] font-mono transition border ${
+              config.autoTonicEnabled
+                ? 'bg-red-600/30 border-red-500 text-red-300 font-bold shadow-sm shadow-red-900/40'
+                : 'bg-slate-900/60 border-slate-700 text-slate-400 hover:text-slate-300'
+            }`}
+            title={config.autoTonicEnabled ? `Auto-Alignment active (${SCALE_MODE_DEFINITIONS[config.autoTonicMode]?.name || 'Mode'})` : 'Enable Auto-Alignment of Do'}
+          >
+            {config.autoTonicEnabled ? '⚡ Auto' : 'Auto'}
+          </button>
         </div>
       </div>
 

@@ -1,6 +1,8 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw } from 'lucide-react';
-import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType } from '../core/types';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass } from 'lucide-react';
+import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity } from '../core/types';
+import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
+import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -9,6 +11,13 @@ interface SettingsDrawerProps {
   onUpdateConfig: (partial: Partial<VisualiserConfig>) => void;
   onResetConfig?: () => void;
   onResetReveals?: () => void;
+  scaleFitInfo?: {
+    currentTonicFit: number;
+    bestTonic: number;
+    bestTonicFit: number;
+    scoreMargin: number;
+    shouldShift: boolean;
+  };
 }
 
 export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
@@ -18,6 +27,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   onUpdateConfig,
   onResetConfig,
   onResetReveals,
+  scaleFitInfo,
 }) => {
   if (!isOpen) return null;
 
@@ -44,6 +54,153 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
             <Eye className="w-4 h-4 text-red-400" />
             <span>8-Octave Pitch Clock</span>
+          </div>
+
+          {/* Auto-Alignment of Do (Scale / Key Tracking) */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-red-400" />
+                <label className="block font-medium text-slate-200">Auto-Alignment of Do</label>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.autoTonicEnabled}
+                  onChange={(e) => onUpdateConfig({ autoTonicEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+
+            {config.autoTonicEnabled && (
+              <div className="space-y-3 pt-1 border-t border-slate-800/60 animate-in fade-in duration-150">
+                {/* Mode Selector */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-400 font-medium">Target Mode / Scale:</span>
+                    <span className="font-mono text-red-400 text-[10px]">
+                      {SCALE_MODE_DEFINITIONS[config.autoTonicMode]?.intervals.length} notes
+                    </span>
+                  </div>
+                  <select
+                    value={config.autoTonicMode}
+                    onChange={(e) => onUpdateConfig({ autoTonicMode: e.target.value as AutoTonicMode })}
+                    className="w-full bg-slate-900 text-[11px] text-slate-200 rounded px-2 py-1.5 border border-slate-700 focus:outline-none focus:border-red-500 cursor-pointer"
+                  >
+                    {Object.entries(SCALE_MODE_DEFINITIONS).map(([key, def]) => (
+                      <option key={key} value={key} className="bg-slate-900 text-slate-200">
+                        {def.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500 italic">
+                    {SCALE_MODE_DEFINITIONS[config.autoTonicMode]?.description}
+                  </p>
+                </div>
+
+                {/* Custom 12-Tone Scale Degree Checkboxes (if mode is custom) */}
+                {config.autoTonicMode === 'custom' && (
+                  <div className="space-y-1.5 p-2 bg-slate-800/40 rounded border border-slate-700/60">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block">
+                      Custom Scale Degrees relative to Do:
+                    </span>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((st) => {
+                        const isChecked = config.autoTonicCustomDegrees?.includes(st) ?? false;
+                        const syllable = SOLFEGE_SYLLABLES[st];
+                        const interval = INTERVAL_NAMES[st];
+                        return (
+                          <button
+                            key={st}
+                            type="button"
+                            onClick={() => {
+                              const current = config.autoTonicCustomDegrees ?? [0, 2, 4, 5, 7, 9, 11];
+                              let next: number[];
+                              if (isChecked) {
+                                if (current.length <= 1) return;
+                                next = current.filter((d) => d !== st);
+                              } else {
+                                next = [...current, st].sort((a, b) => a - b);
+                              }
+                              onUpdateConfig({ autoTonicCustomDegrees: next });
+                            }}
+                            className={`py-1 px-1 rounded text-center text-[10px] font-mono transition border ${
+                              isChecked
+                                ? 'bg-red-600/30 border-red-500 text-white font-bold'
+                                : 'bg-slate-900/60 border-slate-700 text-slate-500 hover:text-slate-300'
+                            }`}
+                          >
+                            <div>{syllable}</div>
+                            <div className="text-[8px] opacity-75">{interval}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alignment Sensitivity / Inertia */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="text-slate-400 font-medium">Hysteresis & Stability:</span>
+                    <span className="text-slate-400 font-mono text-[10px] capitalize">
+                      {config.autoTonicSensitivity}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { id: 'fast', label: 'Fast', desc: '450ms debounce, agile for modulation' },
+                      { id: 'balanced', label: 'Balanced', desc: '900ms debounce, standard stability' },
+                      { id: 'conservative', label: 'Conservative', desc: '1500ms debounce, high inertia' },
+                    ].map((sens) => (
+                      <button
+                        key={sens.id}
+                        type="button"
+                        onClick={() => onUpdateConfig({ autoTonicSensitivity: sens.id as AutoTonicSensitivity })}
+                        className={`py-1 px-1.5 rounded border text-[10px] text-center transition ${
+                          config.autoTonicSensitivity === sens.id
+                            ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                            : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        }`}
+                        title={sens.desc}
+                      >
+                        {sens.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Diatonic Fit Meter */}
+                {scaleFitInfo && (
+                  <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="text-slate-400">Current Diatonic Fit ({['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][config.tonic]}):</span>
+                      <span className="font-mono font-bold text-red-400">
+                        {Math.round(scaleFitInfo.currentTonicFit * 100)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                      <div
+                        className="bg-red-500 h-full transition-all duration-300 rounded-full"
+                        style={{ width: `${Math.round(scaleFitInfo.currentTonicFit * 100)}%` }}
+                      />
+                    </div>
+                    {scaleFitInfo.bestTonic !== config.tonic && (
+                      <div className="flex justify-between items-center text-[9px] text-amber-400/90 font-mono">
+                        <span>Candidate: {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][scaleFitInfo.bestTonic]} ({Math.round(scaleFitInfo.bestTonicFit * 100)}% fit)</span>
+                        <span>Evaluating...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-500 italic">
+              When enabled, the system continuously analyzes active notes. If non-diatonic notes increase, Do automatically shifts to align with the target mode, with musical hysteresis preventing thrashing on passing tones.
+            </p>
           </div>
 
           {/* Dynamic Tone Reveal Mode */}

@@ -23,6 +23,7 @@ import { midiManagerInstance } from './core/midi-manager';
 import { midiPlayerInstance } from './core/midi-file-player';
 import { synthInstance } from './core/audio-synth';
 import { CosmeticsEngine } from './renderers/cosmetics';
+import { ScaleAlignmentTracker } from './core/scale-alignment';
 import { ControlToolbar } from './components/ControlToolbar';
 import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
@@ -39,16 +40,39 @@ export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
   const [resetNonce, setResetNonce] = useState(0);
+  const [scaleFitInfo, setScaleFitInfo] = useState<{
+    currentTonicFit: number;
+    bestTonic: number;
+    bestTonicFit: number;
+    scoreMargin: number;
+    shouldShift: boolean;
+  }>({
+    currentTonicFit: 1.0,
+    bestTonic: config.tonic,
+    bestTonicFit: 1.0,
+    scoreMargin: 0,
+    shouldShift: false,
+  });
 
   const cosmeticsEngineRef = useRef(new CosmeticsEngine());
+  const scaleTrackerRef = useRef(new ScaleAlignmentTracker());
   const idleTimerRef = useRef<number | null>(null);
+  const lastFitUpdateRef = useRef<number>(0);
 
-  // Reset session state: clears discovered tones, tone pop scales, organic activity, and note stream
+  const activeNotesRef = useRef(activeNotes);
+  activeNotesRef.current = activeNotes;
+  const decayingNotesRef = useRef(decayingNotes);
+  decayingNotesRef.current = decayingNotes;
+  const configRef = useRef(config);
+  configRef.current = config;
+
+  // Reset session state: clears discovered tones, tone pop scales, organic activity, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
     setActiveNotes(new Map());
     setDecayingNotes(new Map());
     setStreamItems([]);
     setResetNonce((n) => n + 1);
+    scaleTrackerRef.current.reset();
   }, []);
 
   // Automatically persist config changes to localStorage
@@ -237,7 +261,38 @@ export const App: React.FC = () => {
 
     const tickDecay = () => {
       const now = performance.now();
-      const decayDuration = config.decayDurationMs;
+      const currentConfig = configRef.current;
+      const decayDuration = currentConfig.decayDurationMs;
+
+      // Update scale alignment tracker with active and decaying notes
+      const alignRes = scaleTrackerRef.current.update(
+        now,
+        activeNotesRef.current.values(),
+        decayingNotesRef.current.values(),
+        currentConfig
+      );
+
+      // Trigger automatic tonic shift if auto-alignment is enabled and recommended
+      if (
+        currentConfig.autoTonicEnabled &&
+        alignRes.shouldShift &&
+        alignRes.newTonic !== undefined &&
+        alignRes.newTonic !== currentConfig.tonic
+      ) {
+        setConfig((prev) => ({ ...prev, tonic: alignRes.newTonic! }));
+      }
+
+      // Periodically update UI fit status (throttled ~180ms)
+      if (now - lastFitUpdateRef.current > 180) {
+        lastFitUpdateRef.current = now;
+        setScaleFitInfo({
+          currentTonicFit: alignRes.currentTonicFit,
+          bestTonic: alignRes.bestTonic,
+          bestTonicFit: alignRes.bestTonicFit,
+          scoreMargin: alignRes.scoreMargin,
+          shouldShift: alignRes.shouldShift,
+        });
+      }
 
       setDecayingNotes((prev) => {
         if (prev.size === 0) return prev;
@@ -388,6 +443,7 @@ export const App: React.FC = () => {
         onUpdateConfig={updateConfig}
         onResetConfig={handleResetConfig}
         onResetReveals={handleResetSessionState}
+        scaleFitInfo={scaleFitInfo}
       />
     </div>
   );

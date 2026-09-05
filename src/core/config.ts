@@ -11,6 +11,10 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   // General & Tonic: Do is D (2) by default
   tonic: 2, // 2 = D
   accidentalStyle: 'dual',
+  autoTonicEnabled: false,
+  autoTonicMode: 'ionian',
+  autoTonicCustomDegrees: [0, 2, 4, 5, 7, 9, 11],
+  autoTonicSensitivity: 'balanced',
 
   // Pitch Clock (Concentric rings)
   octaveMode: 'dynamic', // Starts with dynamic organic discovery
@@ -128,6 +132,25 @@ export function loadSavedConfig(): VisualiserConfig {
     // Sanitize chord geometry & radial movement trails
     merged.chordRayMode = merged.chordRayMode === 'web' ? 'web' : 'hull';
     merged.showRadialMovementTrails = typeof merged.showRadialMovementTrails === 'boolean' ? merged.showRadialMovementTrails : true;
+
+    // Sanitize auto-tonic settings
+    merged.autoTonicEnabled = typeof merged.autoTonicEnabled === 'boolean' ? merged.autoTonicEnabled : false;
+    const validAutoModes = new Set([
+      'ionian', 'aeolian', 'dorian', 'mixolydian', 'lydian', 'phrygian', 'locrian',
+      'harmonic-minor', 'melodic-minor', 'pentatonic-major', 'pentatonic-minor', 'blues', 'custom',
+    ]);
+    if (!validAutoModes.has(merged.autoTonicMode)) merged.autoTonicMode = 'ionian';
+    if (!Array.isArray(merged.autoTonicCustomDegrees) || merged.autoTonicCustomDegrees.length === 0) {
+      merged.autoTonicCustomDegrees = [0, 2, 4, 5, 7, 9, 11];
+    } else {
+      const degrees = merged.autoTonicCustomDegrees
+        .filter((d: any): d is number => typeof d === 'number' && d >= 0 && d <= 11)
+        .map((d: number) => Math.round(d));
+      merged.autoTonicCustomDegrees = Array.from(new Set<number>(degrees)).sort((a, b) => a - b);
+      if (merged.autoTonicCustomDegrees.length === 0) merged.autoTonicCustomDegrees = [0, 2, 4, 5, 7, 9, 11];
+    }
+    const validSensitivities = new Set(['fast', 'balanced', 'conservative']);
+    if (!validSensitivities.has(merged.autoTonicSensitivity)) merged.autoTonicSensitivity = 'balanced';
 
     return merged;
   } catch (err) {
