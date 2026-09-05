@@ -21,6 +21,7 @@ import {
   Link,
   Copy,
   MoreHorizontal,
+  ChevronDown,
 } from 'lucide-react';
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
@@ -48,19 +49,19 @@ interface ControlToolbarProps {
   onToggleEditMode?: () => void;
 }
 
-const TONIC_OPTIONS = [
-  { label: 'D (Default PPT)', value: 2 },
-  { label: 'C', value: 0 },
-  { label: 'C♯ / D♭', value: 1 },
-  { label: 'D♯ / E♭', value: 3 },
-  { label: 'E', value: 4 },
-  { label: 'F', value: 5 },
-  { label: 'F♯ / G♭', value: 6 },
-  { label: 'G', value: 7 },
-  { label: 'G♯ / A♭', value: 8 },
-  { label: 'A', value: 9 },
-  { label: 'A♯ / B♭', value: 10 },
-  { label: 'B', value: 11 },
+const TONIC_PITCHES = [
+  { value: 0, label: 'C', short: 'C' },
+  { value: 1, label: 'C♯ / D♭', short: 'C♯' },
+  { value: 2, label: 'D (Default PPT)', short: 'D' },
+  { value: 3, label: 'D♯ / E♭', short: 'E♭' },
+  { value: 4, label: 'E', short: 'E' },
+  { value: 5, label: 'F', short: 'F' },
+  { value: 6, label: 'F♯ / G♭', short: 'F♯' },
+  { value: 7, label: 'G', short: 'G' },
+  { value: 8, label: 'G♯ / A♭', short: 'A♭' },
+  { value: 9, label: 'A', short: 'A' },
+  { value: 10, label: 'A♯ / B♭', short: 'B♭' },
+  { value: 11, label: 'B', short: 'B' },
 ];
 
 export const ControlToolbar: React.FC<ControlToolbarProps> = ({
@@ -81,6 +82,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   isEditMode = false,
   onToggleEditMode,
 }) => {
+  const [showTonicMenu, setShowTonicMenu] = useState(false);
   const [showMidiMenu, setShowMidiMenu] = useState(false);
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -89,6 +91,8 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   const [copiedLink, setCopiedLink] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const currentTonic = TONIC_PITCHES.find((t) => t.value === config.tonic) || TONIC_PITCHES[2];
+
   const formatTime = (sec: number) => {
     const mins = Math.floor(sec / 60);
     const s = Math.floor(sec % 60);
@@ -96,53 +100,114 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   };
 
   return (
-    <header className="w-full bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-800/80 px-2.5 sm:px-4 py-1.5 sm:py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-3 select-none z-30 shadow-lg">
-      {/* Top Row on Mobile / Left Group on Desktop: Brand + Tonic Selector */}
+    <header className="w-full bg-[#0b0f19]/95 backdrop-blur-md border-b border-slate-800/80 px-2 sm:px-4 py-1.5 sm:py-2 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2 md:gap-3 select-none z-30 shadow-lg">
+      {/* Top Row on Mobile / Left Group on Desktop: Brand + Elegant Tonic Selector */}
       <div className="flex items-center justify-between md:justify-start gap-2 sm:gap-3 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
           <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-red-500/20 flex-shrink-0">
             <Disc3 className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-spin-slow" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-xs sm:text-sm tracking-wide text-white truncate">
-                <span className="sm:hidden">PPT</span>
-                <span className="hidden sm:inline">PPT Visualiser</span>
-              </span>
-              <span className="text-[9px] sm:text-[10px] uppercase font-bold tracking-wider px-1 sm:px-1.5 py-0.2 bg-red-950/80 text-red-400 border border-red-800/50 rounded flex-shrink-0">
-                Do = D
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 hidden xl:block">Prime Period Theory Visualiser</p>
+            <span className="font-bold text-xs sm:text-sm tracking-wide text-white truncate block">
+              <span className="sm:hidden">PPT</span>
+              <span className="hidden sm:inline">PPT Visualiser</span>
+            </span>
+            <p className="text-[10px] text-slate-400 hidden 2xl:block">Prime Period Theory</p>
           </div>
         </div>
 
-        {/* Tonic Selector */}
-        <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-800/60 rounded-lg px-1.5 sm:px-2 py-1 border border-slate-700/50 flex-shrink-0">
-          <span className="text-[11px] sm:text-xs text-slate-400 font-medium">Do:</span>
-          <select
-            value={config.tonic}
-            onChange={(e) => onUpdateConfig({ tonic: parseInt(e.target.value, 10) })}
-            className="bg-transparent text-[11px] sm:text-xs font-semibold text-red-400 focus:outline-none cursor-pointer"
-          >
-            {TONIC_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value} className="bg-slate-900 text-slate-200">
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {/* Quick Auto-Alignment Toggle */}
+        {/* Elegant Collapsible Tonic ("Do") Selector */}
+        <div className="relative">
           <button
-            onClick={() => onUpdateConfig({ autoTonicEnabled: !config.autoTonicEnabled })}
-            className={`px-1 sm:px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-mono transition border ${
+            onClick={() => setShowTonicMenu((prev) => !prev)}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded-md text-xs font-semibold border transition shrink-0 ${
               config.autoTonicEnabled
-                ? 'bg-red-600/30 border-red-500 text-red-300 font-bold shadow-sm shadow-red-900/40'
-                : 'bg-slate-900/60 border-slate-700 text-slate-400 hover:text-slate-300'
+                ? 'bg-red-950/70 border-red-500/80 text-red-300 shadow-sm shadow-red-900/30'
+                : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/80 text-slate-200'
             }`}
-            title={config.autoTonicEnabled ? `Auto-Alignment active (${SCALE_MODE_DEFINITIONS[config.autoTonicMode]?.name || 'Mode'})` : 'Enable Auto-Alignment of Do'}
+            title={`Current Tonic (Do): ${currentTonic.label}. Click to change key or toggle auto-alignment.`}
           >
-            {config.autoTonicEnabled ? '⚡ Auto' : 'Auto'}
+            <span className="text-slate-400 font-normal text-[11px]">Do:</span>
+            <span className="text-red-400 font-bold">{currentTonic.short}</span>
+            {config.autoTonicEnabled && (
+              <span className="text-[10px] text-amber-400 font-bold" title="Auto-alignment active">⚡</span>
+            )}
+            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showTonicMenu ? 'rotate-180' : ''}`} />
           </button>
+
+          {/* Elegant Tonic & Scale Auto-Alignment Popover */}
+          {showTonicMenu && (
+            <div className="absolute left-0 top-full mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-3 z-50 text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                  <Disc3 className="w-3.5 h-3.5 text-red-400" />
+                  <span>Tonic / Key ("Do")</span>
+                </div>
+                <button
+                  onClick={() => setShowTonicMenu(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Auto-Alignment Toggle */}
+              <div className="flex items-center justify-between p-2 rounded-md bg-slate-800/60 border border-slate-700/60">
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-1 text-[11px] font-semibold text-slate-200">
+                    <span>⚡ Auto-Align Tonic</span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 truncate">
+                    {config.autoTonicEnabled
+                      ? `Active (${SCALE_MODE_DEFINITIONS[config.autoTonicMode]?.name || 'Ionian'})`
+                      : 'Off (Manual selection)'}
+                  </div>
+                </div>
+                <button
+                  onClick={() => onUpdateConfig({ autoTonicEnabled: !config.autoTonicEnabled })}
+                  className={`px-2 py-1 rounded text-xs font-semibold transition border ${
+                    config.autoTonicEnabled
+                      ? 'bg-red-600 border-red-500 text-white shadow-sm'
+                      : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {config.autoTonicEnabled ? 'Enabled' : 'Enable'}
+                </button>
+              </div>
+
+              {/* 12-Tone Selection Grid */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                  Select Key Center (Do):
+                </span>
+                <div className="grid grid-cols-4 gap-1">
+                  {TONIC_PITCHES.map((item) => {
+                    const isCurrent = config.tonic === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        onClick={() => {
+                          onUpdateConfig({ tonic: item.value, autoTonicEnabled: false });
+                          setShowTonicMenu(false);
+                        }}
+                        className={`py-1.5 px-1 rounded text-center text-xs font-semibold transition border ${
+                          isCurrent
+                            ? 'bg-red-600 border-red-400 text-white shadow-[0_0_8px_rgba(225,54,16,0.4)]'
+                            : 'bg-slate-900/80 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
+                        }`}
+                        title={item.label}
+                      >
+                        <div>{item.short}</div>
+                        {item.value === 2 && (
+                          <div className="text-[8px] font-normal text-red-200 opacity-80">PPT</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Mobile-Only Top Right Tools: Edit Layout + More Menu + Settings */}
@@ -225,6 +290,44 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
                   <span>Share Layout Link</span>
                 </button>
 
+                {/* Virtual Keyboard */}
+                <button
+                  onClick={() => {
+                    onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard });
+                    setShowMoreMenu(false);
+                  }}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+                >
+                  <div className="flex items-center gap-2">
+                    <Music2 className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Virtual Keyboard</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    {config.showVirtualKeyboard ? 'Hide' : 'Show'}
+                  </span>
+                </button>
+
+                {/* Download Demo Track MIDI */}
+                {DEMO_TRACKS.some((t) => t.title === playbackState.trackName) && (
+                  <button
+                    onClick={() => {
+                      const currentTrack = DEMO_TRACKS.find((t) => t.title === playbackState.trackName);
+                      if (currentTrack) {
+                        downloadNotesAsMidiFile(
+                          currentTrack.notes,
+                          `${currentTrack.id}.mid`,
+                          `${currentTrack.title} (${currentTrack.composer})`
+                        );
+                      }
+                      setShowMoreMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Download Demo MIDI</span>
+                  </button>
+                )}
+
                 {/* Fullscreen Toggle */}
                 <button
                   onClick={() => {
@@ -290,7 +393,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
         </button>
 
         {/* Track selector */}
-        <div className="relative flex-1 min-w-0 max-w-full md:max-w-[210px] lg:max-w-[240px]">
+        <div className="relative flex-1 min-w-0 max-w-full md:max-w-[180px] lg:max-w-[210px] xl:max-w-[240px]">
           <select
             value={DEMO_TRACKS.some(t => t.title === playbackState.trackName) ? DEMO_TRACKS.find(t => t.title === playbackState.trackName)?.id : ''}
             onChange={(e) => onSelectTrack(e.target.value)}
@@ -317,7 +420,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
 
-        {/* Download Current Track MIDI File */}
+        {/* Download Current Track MIDI File (Desktop / Tablet only; on mobile it's in More menu) */}
         {DEMO_TRACKS.some((t) => t.title === playbackState.trackName) && (
           <button
             onClick={() => {
@@ -331,7 +434,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
               }
             }}
             title="Download demo track (.mid)"
-            className="p-1 sm:p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition flex-shrink-0"
+            className="hidden sm:block p-1 sm:p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition flex-shrink-0"
           >
             <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
@@ -347,10 +450,10 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           }}
         />
 
-        {/* Mobile Sound & Keyboard quick toggles */}
+        {/* Sound toggle */}
         <button
           onClick={() => onUpdateConfig({ soundEnabled: !config.soundEnabled })}
-          className={`md:hidden p-1 sm:p-1.5 rounded-md border transition flex-shrink-0 ${
+          className={`p-1 sm:p-1.5 rounded-md border transition flex-shrink-0 ${
             config.soundEnabled
               ? 'bg-slate-800 border-slate-600 text-slate-200'
               : 'border-slate-700 text-slate-500 hover:text-slate-300'
@@ -360,19 +463,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           {config.soundEnabled ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
         </button>
 
-        <button
-          onClick={() => onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard })}
-          className={`md:hidden p-1 sm:p-1.5 rounded-md border transition flex-shrink-0 ${
-            config.showVirtualKeyboard
-              ? 'bg-slate-800 border-slate-600 text-white'
-              : 'border-slate-700 text-slate-400 hover:text-slate-200'
-          }`}
-          title="Toggle On-Screen Keyboard"
-        >
-          <Music2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-        </button>
-
-        {/* Progress Bar & Time (Desktop only) */}
+        {/* Progress Bar & Time (Shown only on wide desktop to prevent crampedness) */}
         <div className="hidden xl:flex items-center gap-2 flex-1 min-w-[110px]">
           <span className="text-[11px] font-mono text-slate-400 w-9 text-right">
             {formatTime(playbackState.currentTime)}
@@ -392,98 +483,37 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
         </div>
       </div>
 
-      {/* Desktop Right Group: Layout Switcher, Sound & Settings */}
+      {/* Desktop Right Group: Layout Switcher, Edit Mode & Tools */}
       <div className="hidden md:flex items-center gap-1.5 lg:gap-2 flex-shrink-0">
-        {/* MIDI Hardware Status & Device Selector Popover */}
-        <div className="relative">
+        {/* MIDI Hardware Status & Device Selector:
+            - If connected: show compact live status badge
+            - If disconnected: deprioritized from narrow screens, only shown on 2xl+ (accessible via More Tools and Settings)
+        */}
+        {deviceState.isConnected ? (
           <button
             onClick={() => {
               midiManagerInstance.requestAccess();
-              setShowMidiMenu(prev => !prev);
+              setShowMidiMenu(true);
             }}
-            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border transition cursor-pointer ${
-              deviceState.isConnected
-                ? 'bg-emerald-950/70 border-emerald-700/80 text-emerald-300 hover:bg-emerald-900/80'
-                : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-700/60'
-            }`}
-            title="Click to select MIDI input or request permissions"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border bg-emerald-950/70 border-emerald-700/80 text-emerald-300 hover:bg-emerald-900/80 transition cursor-pointer"
+            title={`${deviceState.inputs.length} MIDI Device(s) connected. Click to configure.`}
           >
-            <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'animate-pulse text-emerald-400' : 'text-slate-400'}`} />
-            <span className="hidden xl:inline">{deviceState.isConnected ? `${deviceState.inputs.length} MIDI In` : 'Connect MIDI'}</span>
-            {deviceState.isConnected && <span className="xl:hidden w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+            <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+            <span className="hidden 2xl:inline">{deviceState.inputs.length} MIDI In</span>
           </button>
-
-          {showMidiMenu && (
-            <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-3 z-50 text-xs space-y-2.5">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="font-bold text-slate-200">MIDI Input Ports</span>
-                <button
-                  onClick={() => setShowMidiMenu(false)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-
-              {deviceState.inputs.length === 0 ? (
-                <div className="text-slate-400 space-y-2 py-1">
-                  <p className="text-[11px] leading-relaxed">
-                    No hardware MIDI devices detected yet. Plug in your USB MIDI keyboard and click below:
-                  </p>
-                  <button
-                    onClick={() => midiManagerInstance.requestAccess()}
-                    className="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white rounded font-medium transition text-center"
-                  >
-                    Rescan / Request MIDI Access
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] text-slate-400">Select active port (or listen to all):</p>
-                  <button
-                    onClick={() => {
-                      midiManagerInstance.selectInput('all');
-                      setShowMidiMenu(false);
-                    }}
-                    className={`w-full text-left px-2 py-1.5 rounded transition flex items-center justify-between ${
-                      deviceState.selectedInputId === 'all'
-                        ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-medium'
-                        : 'hover:bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    <span>All Connected Ports (Recommended)</span>
-                    {deviceState.selectedInputId === 'all' && <span>✓</span>}
-                  </button>
-
-                  {deviceState.inputs.map(input => (
-                    <button
-                      key={input.id}
-                      onClick={() => {
-                        midiManagerInstance.selectInput(input.id);
-                        setShowMidiMenu(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 rounded transition flex items-center justify-between ${
-                        deviceState.selectedInputId === input.id
-                          ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-medium'
-                          : 'hover:bg-slate-800 text-slate-300'
-                      }`}
-                    >
-                      <span className="truncate">{input.name}</span>
-                      {deviceState.selectedInputId === input.id && <span>✓</span>}
-                    </button>
-                  ))}
-
-                  <button
-                    onClick={() => midiManagerInstance.requestAccess()}
-                    className="w-full mt-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] transition text-center"
-                  >
-                    Rescan MIDI Devices
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        ) : (
+          <button
+            onClick={() => {
+              midiManagerInstance.requestAccess();
+              setShowMidiMenu(true);
+            }}
+            className="hidden 2xl:flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-700/60 transition cursor-pointer"
+            title="Connect MIDI hardware controller"
+          >
+            <Radio className="w-3.5 h-3.5 text-slate-400" />
+            <span>Connect MIDI</span>
+          </button>
+        )}
 
         {/* Layout Mode Picker Dropdown */}
         <div className="relative">
@@ -497,7 +527,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
             title="Switch Layout Preset"
           >
             <Layers className="w-3.5 h-3.5 text-red-400" />
-            <span className="capitalize hidden xl:inline">
+            <span className="capitalize hidden lg:inline">
               {config.activeLayout?.id.startsWith('custom')
                 ? (config.activeLayout?.name || 'Custom Layout')
                 : config.layoutMode.replace('-', ' ')}
@@ -505,7 +535,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           </button>
 
           {showLayoutMenu && (
-            <div className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-2 z-50 text-xs space-y-1">
+            <div className="absolute right-0 top-full mt-2 w-56 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-2 z-50 text-xs space-y-1 animate-in fade-in zoom-in-95 duration-150">
               <div className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider px-2 py-1 border-b border-slate-800">
                 Flexbox Layout Presets
               </div>
@@ -555,113 +585,120 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
             title={isEditMode ? 'Exit Layout Edit Mode' : 'Enter Layout Edit Mode (Add, split, configure, and remove cells)'}
           >
             <LayoutGrid className={`w-3.5 h-3.5 ${isEditMode ? 'text-white animate-pulse' : 'text-purple-400'}`} />
-            <span className="hidden lg:inline">{isEditMode ? 'Editing' : 'Edit Layout'}</span>
+            <span className="hidden xl:inline">{isEditMode ? 'Editing' : 'Edit Layout'}</span>
           </button>
         )}
 
-        {/* Share Layout & Deep Link Popover */}
-        <div className="relative">
+        {/* More Tools Menu on Tablet / Narrow Desktop (md:block xl:hidden) */}
+        <div className="relative hidden md:block xl:hidden">
           <button
-            onClick={() => setShowShareMenu((prev) => !prev)}
-            className="p-1.5 rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-700/80 transition cursor-pointer"
-            title="Share Layout & Deep Link"
+            onClick={() => setShowMoreMenu((prev) => !prev)}
+            className="p-1.5 rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-700/80 transition"
+            title="More Tools"
           >
-            <Share2 className="w-3.5 h-3.5" />
+            <MoreHorizontal className="w-4 h-4" />
           </button>
 
-          {showShareMenu && (
-            <div className="absolute right-0 top-full mt-2 w-72 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-3 z-50 text-xs space-y-3">
+          {showMoreMenu && (
+            <div className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-2.5 z-50 text-xs space-y-2 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                  <Link className="w-3.5 h-3.5 text-red-400" />
-                  Share Layout Link
-                </span>
-                <button
-                  onClick={() => setShowShareMenu(false)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
+                <span className="font-bold text-slate-200">More Tools</span>
+                <button onClick={() => setShowMoreMenu(false)} className="text-slate-400 hover:text-white">✕</button>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                Generate a deep-link slug encoding your active layout cells and module settings:
-              </p>
+              {/* MIDI Hardware */}
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  midiManagerInstance.requestAccess();
+                  setShowMidiMenu(true);
+                }}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                  <span>MIDI Hardware</span>
+                </div>
+                <span className={`text-[10px] font-mono px-1 rounded ${deviceState.isConnected ? 'bg-emerald-950 text-emerald-300' : 'text-slate-500'}`}>
+                  {deviceState.isConnected ? `${deviceState.inputs.length} In` : 'Off'}
+                </span>
+              </button>
 
-              <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={includeAestheticsInSlug}
-                  onChange={(e) => setIncludeAestheticsInSlug(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
-                />
-                <span>Include Visual Aesthetics & Theme</span>
-              </label>
+              {/* Share Layout */}
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowShareMenu(true);
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+              >
+                <Share2 className="w-3.5 h-3.5 text-purple-400" />
+                <span>Share Layout Link</span>
+              </button>
 
-              <div className="pt-1">
+              {/* Virtual Keyboard */}
+              <button
+                onClick={() => {
+                  onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard });
+                  setShowMoreMenu(false);
+                }}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+              >
+                <div className="flex items-center gap-2">
+                  <Music2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Virtual Keyboard</span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {config.showVirtualKeyboard ? 'Hide' : 'Show'}
+                </span>
+              </button>
+
+              {/* Fullscreen */}
+              <button
+                onClick={() => {
+                  onToggleFullscreen();
+                  setShowMoreMenu(false);
+                }}
+                className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
+              >
+                <div className="flex items-center gap-2">
+                  {isFullscreen ? <Minimize2 className="w-3.5 h-3.5 text-amber-400" /> : <Maximize2 className="w-3.5 h-3.5 text-amber-400" />}
+                  <span>Fullscreen</span>
+                </div>
+                <span className="text-[10px] text-slate-400">
+                  {isFullscreen ? 'Exit' : 'Enter'}
+                </span>
+              </button>
+
+              {/* Reset State */}
+              {onResetState && (
                 <button
                   onClick={() => {
-                    const layout = {
-                      ...config.activeLayout,
-                      aesthetics: includeAestheticsInSlug
-                        ? {
-                            backgroundTheme: config.backgroundTheme,
-                            filmGrainIntensity: config.filmGrainIntensity,
-                            filmGrainSize: config.filmGrainSize,
-                            filmGrainContrast: config.filmGrainContrast,
-                            particleIntensity: config.particleIntensity,
-                            glowBloom: config.glowBloom,
-                            motionTrails: config.motionTrails,
-                            ghostingIntensity: config.ghostingIntensity,
-                            lightBleedIntensity: config.lightBleedIntensity,
-                            scanlineIntensity: config.scanlineIntensity,
-                            scanlineDensity: config.scanlineDensity,
-                            crtVignette: config.crtVignette,
-                            lensFlareIntensity: config.lensFlareIntensity,
-                            lensFlareStyle: config.lensFlareStyle,
-                          }
-                        : undefined,
-                    };
-                    const slug = encodeLayoutToSlug(layout, includeAestheticsInSlug);
-                    const url = `${window.location.origin}${window.location.pathname}#layout=${slug}`;
-                    navigator.clipboard.writeText(url).then(() => {
-                      setCopiedLink(true);
-                      setTimeout(() => setCopiedLink(false), 2500);
-                    });
+                    onResetState();
+                    setShowMoreMenu(false);
                   }}
-                  className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded font-medium transition flex items-center justify-center gap-1.5 shadow"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-red-300 hover:text-red-200 transition"
                 >
-                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedLink ? 'Link Copied to Clipboard!' : 'Copy Shareable Link'}</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-red-400" />
+                  <span>Reset Tone Reveals (R)</span>
                 </button>
-              </div>
-
-              {copiedLink && (
-                <p className="text-[10px] text-emerald-400 text-center font-mono">
-                  URL contains customized layout tree!
-                </p>
               )}
             </div>
           )}
         </div>
 
-        {/* Sound Toggle Button */}
+        {/* Direct Tools on Wide Screens (xl+) */}
         <button
-          onClick={() => onUpdateConfig({ soundEnabled: !config.soundEnabled })}
-          className={`p-1.5 rounded-md border transition ${
-            config.soundEnabled
-              ? 'bg-slate-800 border-slate-600 text-slate-200'
-              : 'border-slate-700 text-slate-500 hover:text-slate-300'
-          }`}
-          title={config.soundEnabled ? 'Mute Synthesizer' : 'Unmute Synthesizer'}
+          onClick={() => setShowShareMenu(true)}
+          className="hidden xl:block p-1.5 rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-700/80 transition cursor-pointer"
+          title="Share Layout & Deep Link"
         >
-          {config.soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          <Share2 className="w-3.5 h-3.5" />
         </button>
 
-        {/* Virtual Keyboard Toggle */}
         <button
           onClick={() => onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard })}
-          className={`p-1.5 rounded-md border transition ${
+          className={`hidden xl:block p-1.5 rounded-md border transition ${
             config.showVirtualKeyboard
               ? 'bg-slate-800 border-slate-600 text-white'
               : 'border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -671,24 +708,22 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           <Music2 className="w-4 h-4" />
         </button>
 
-        {/* Fullscreen Button */}
         <button
           onClick={onToggleFullscreen}
-          className="p-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 transition"
+          className="hidden xl:block p-1.5 rounded-md border border-slate-700 text-slate-300 hover:bg-slate-800 transition"
           title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Mode'}
         >
           {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
         </button>
 
-        {/* Reset State & Reveals Button */}
         {onResetState && (
           <button
             onClick={onResetState}
-            className="p-1.5 rounded-md border border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-red-400 hover:border-red-500/50 transition flex items-center gap-1"
+            className="hidden 2xl:flex p-1.5 rounded-md border border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-red-400 hover:border-red-500/50 transition items-center gap-1"
             title="Reset Tone Reveals & Organic Activity (Shortcut: R)"
           >
             <RotateCcw className="w-4 h-4 text-red-400" />
-            <span className="hidden xl:inline text-[11px] font-medium text-slate-300">Reset</span>
+            <span className="text-[11px] font-medium text-slate-300">Reset</span>
           </button>
         )}
 
@@ -701,6 +736,161 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           <Settings className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Floating Dialog: MIDI Input Devices (Accessible from both desktop and mobile without boundary clipping) */}
+      {showMidiMenu && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 px-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-80 max-w-full bg-[#0e1320] border border-slate-700 rounded-xl shadow-2xl p-3.5 text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="font-bold text-slate-200 flex items-center gap-2">
+                <Radio className={`w-4 h-4 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                MIDI Hardware Input Ports
+              </span>
+              <button
+                onClick={() => setShowMidiMenu(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            {deviceState.inputs.length === 0 ? (
+              <div className="text-slate-400 space-y-2.5 py-1">
+                <p className="text-[11px] leading-relaxed">
+                  No hardware MIDI devices detected yet. Plug in your USB MIDI keyboard and click below:
+                </p>
+                <button
+                  onClick={() => midiManagerInstance.requestAccess()}
+                  className="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition text-center shadow"
+                >
+                  Rescan / Request MIDI Access
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[10px] text-slate-400">Select active port (or listen to all):</p>
+                <button
+                  onClick={() => {
+                    midiManagerInstance.selectInput('all');
+                    setShowMidiMenu(false);
+                  }}
+                  className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between ${
+                    deviceState.selectedInputId === 'all'
+                      ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-medium'
+                      : 'hover:bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  <span>All Connected Ports (Recommended)</span>
+                  {deviceState.selectedInputId === 'all' && <span>✓</span>}
+                </button>
+
+                {deviceState.inputs.map(input => (
+                  <button
+                    key={input.id}
+                    onClick={() => {
+                      midiManagerInstance.selectInput(input.id);
+                      setShowMidiMenu(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded-lg transition flex items-center justify-between ${
+                      deviceState.selectedInputId === input.id
+                        ? 'bg-emerald-950/80 border border-emerald-700 text-emerald-300 font-medium'
+                        : 'hover:bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <span className="truncate">{input.name}</span>
+                    {deviceState.selectedInputId === input.id && <span>✓</span>}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => midiManagerInstance.requestAccess()}
+                  className="w-full mt-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[11px] transition text-center"
+                >
+                  Rescan MIDI Devices
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Floating Dialog: Share Layout Deep Link (Accessible from all breakpoints) */}
+      {showShareMenu && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 px-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-80 max-w-full bg-[#0e1320] border border-slate-700 rounded-xl shadow-2xl p-3.5 text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                <Link className="w-3.5 h-3.5 text-purple-400" />
+                Share Layout Link
+              </span>
+              <button
+                onClick={() => setShowShareMenu(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed">
+              Generate a deep-link URL encoding your active layout cells and module settings:
+            </p>
+
+            <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeAestheticsInSlug}
+                onChange={(e) => setIncludeAestheticsInSlug(e.target.checked)}
+                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
+              />
+              <span>Include Visual Aesthetics & Theme</span>
+            </label>
+
+            <div className="pt-1">
+              <button
+                onClick={() => {
+                  const layout = {
+                    ...config.activeLayout,
+                    aesthetics: includeAestheticsInSlug
+                      ? {
+                          backgroundTheme: config.backgroundTheme,
+                          filmGrainIntensity: config.filmGrainIntensity,
+                          filmGrainSize: config.filmGrainSize,
+                          filmGrainContrast: config.filmGrainContrast,
+                          particleIntensity: config.particleIntensity,
+                          glowBloom: config.glowBloom,
+                          motionTrails: config.motionTrails,
+                          ghostingIntensity: config.ghostingIntensity,
+                          lightBleedIntensity: config.lightBleedIntensity,
+                          scanlineIntensity: config.scanlineIntensity,
+                          scanlineDensity: config.scanlineDensity,
+                          crtVignette: config.crtVignette,
+                          lensFlareIntensity: config.lensFlareIntensity,
+                          lensFlareStyle: config.lensFlareStyle,
+                        }
+                      : undefined,
+                  };
+                  const slug = encodeLayoutToSlug(layout, includeAestheticsInSlug);
+                  const url = `${window.location.origin}${window.location.pathname}#layout=${slug}`;
+                  navigator.clipboard.writeText(url).then(() => {
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  });
+                }}
+                className="w-full py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition flex items-center justify-center gap-1.5 shadow"
+              >
+                {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-300" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copiedLink ? 'Link Copied to Clipboard!' : 'Copy Shareable Link'}</span>
+              </button>
+            </div>
+
+            {copiedLink && (
+              <p className="text-[10px] text-emerald-400 text-center font-mono">
+                URL contains customized layout tree!
+              </p>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };
