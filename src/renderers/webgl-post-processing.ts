@@ -374,6 +374,7 @@ export class WebGLPostProcessingPipeline {
     time: number
   ) {
     if (!this.isSupported || !this.gl || !this.program || !this.quadBuffer) return;
+    if (config.webglEnabled === false) return;
 
     const gl = this.gl;
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -385,6 +386,18 @@ export class WebGLPostProcessingPipeline {
     gl.viewport(0, 0, width, height);
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+    const grainOn = (config.filmGrainEnabled ?? true) && (config.filmGrainIntensity > 0);
+    const scanlinesOn = (config.scanlinesEnabled ?? true) && ((config.scanlineIntensity ?? 0) > 0);
+    const vignetteOn = (config.scanlinesEnabled ?? true) && ((config.crtVignette ?? 0) > 0);
+    const lightBleedOn = (config.lightBleedEnabled ?? true) && ((config.lightBleedIntensity ?? 0) > 0);
+    const lensFlareOn = (config.lensFlareEnabled ?? true) && ((config.lensFlareIntensity ?? 0) > 0);
+
+    // If all visual post-processing effects are toggled off, exit immediately!
+    // Low-end GPUs incur ZERO rasterization or fragment shader load.
+    if (!grainOn && !scanlinesOn && !vignetteOn && !lightBleedOn && !lensFlareOn) {
+      return;
+    }
 
     // Alpha blending (Premultiplied alpha pipeline)
     gl.enable(gl.BLEND);
@@ -402,17 +415,17 @@ export class WebGLPostProcessingPipeline {
     gl.uniform2f(this.uResolutionLoc, width, height);
     gl.uniform1f(this.uTimeLoc, time / 1000);
 
-    gl.uniform1f(this.uGrainIntensityLoc, config.filmGrainIntensity ?? 0);
+    gl.uniform1f(this.uGrainIntensityLoc, grainOn ? (config.filmGrainIntensity ?? 0) : 0);
     gl.uniform1f(this.uGrainSizeLoc, config.filmGrainSize ?? 1);
     gl.uniform1f(this.uGrainContrastLoc, config.filmGrainContrast ?? 0.5);
 
-    gl.uniform1f(this.uScanlineIntensityLoc, config.scanlineIntensity ?? 0);
+    gl.uniform1f(this.uScanlineIntensityLoc, scanlinesOn ? (config.scanlineIntensity ?? 0) : 0);
     gl.uniform1f(this.uScanlineDensityLoc, config.scanlineDensity ?? 2);
-    gl.uniform1f(this.uCrtVignetteLoc, config.crtVignette ?? 0);
-    gl.uniform1f(this.uCrtCurvatureLoc, config.crtVignette ? 0.35 : 0.0);
+    gl.uniform1f(this.uCrtVignetteLoc, vignetteOn ? (config.crtVignette ?? 0) : 0);
+    gl.uniform1f(this.uCrtCurvatureLoc, vignetteOn ? 0.35 : 0.0);
 
-    gl.uniform1f(this.uLightBleedLoc, config.lightBleedIntensity ?? 0);
-    gl.uniform1f(this.uLensFlareLoc, config.lensFlareIntensity ?? 0);
+    gl.uniform1f(this.uLightBleedLoc, lightBleedOn ? (config.lightBleedIntensity ?? 0) : 0);
+    gl.uniform1f(this.uLensFlareLoc, lensFlareOn ? (config.lensFlareIntensity ?? 0) : 0);
 
     const styleIdx =
       config.lensFlareStyle === 'starburst'
@@ -424,8 +437,8 @@ export class WebGLPostProcessingPipeline {
 
     gl.uniform2f(this.uOpticalCenterLoc, width / 2, height / 2);
 
-    // Pack up to 8 lights into uniform arrays
-    const maxLights = Math.min(8, lights.length);
+    // Pack up to 8 lights into uniform arrays (only if flares or light bleed are active)
+    const maxLights = (lensFlareOn || lightBleedOn) ? Math.min(8, lights.length) : 0;
     gl.uniform1i(this.uLightCountLoc, maxLights);
 
     if (maxLights > 0) {

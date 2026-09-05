@@ -239,6 +239,13 @@ export class CosmeticsEngine {
   }
 
   /**
+   * Checks if there are any active particles, shockwaves, or ghosts being simulated
+   */
+  public hasActiveParticles(): boolean {
+    return this.particles.length > 0 || this.shockwaves.length > 0 || this.ghosts.length > 0;
+  }
+
+  /**
    * Spawns a CRT phosphor ghost echo with chromatic aberration
    */
   public spawnGhost(x: number, y: number, color: string, radius: number = 14, velocity: number = 0.5) {

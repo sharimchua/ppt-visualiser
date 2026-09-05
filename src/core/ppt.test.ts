@@ -934,9 +934,29 @@ test('Cosmetics Configuration & Persistence: CRT Scanlines, Optical Lens Flares,
   assert.strictEqual(DEFAULT_CONFIG.particleGravity, 0.15);
   assert.strictEqual(DEFAULT_CONFIG.particleOriginDistance, 0);
 
-  // Test loading and sanitization with custom config
+  // Test display option enable toggles
+  assert.strictEqual(DEFAULT_CONFIG.filmGrainEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.sparksEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.glowBloomEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.motionTrailsEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.ghostingEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.lightBleedEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.scanlinesEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.lensFlareEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.webglEnabled, true);
+
+  // Test loading and sanitization with custom config and Eco Mode (all effects disabled)
   const customConfig = {
     ...DEFAULT_CONFIG,
+    filmGrainEnabled: false,
+    sparksEnabled: false,
+    glowBloomEnabled: false,
+    motionTrailsEnabled: false,
+    ghostingEnabled: false,
+    lightBleedEnabled: false,
+    scanlinesEnabled: false,
+    lensFlareEnabled: false,
+    webglEnabled: false,
     scanlineIntensity: 0.6,
     scanlineDensity: 3,
     crtVignette: 0.45,
@@ -949,6 +969,15 @@ test('Cosmetics Configuration & Persistence: CRT Scanlines, Optical Lens Flares,
   };
   saveConfig(customConfig);
   const loaded = loadSavedConfig();
+  assert.strictEqual(loaded.filmGrainEnabled, false);
+  assert.strictEqual(loaded.sparksEnabled, false);
+  assert.strictEqual(loaded.glowBloomEnabled, false);
+  assert.strictEqual(loaded.motionTrailsEnabled, false);
+  assert.strictEqual(loaded.ghostingEnabled, false);
+  assert.strictEqual(loaded.lightBleedEnabled, false);
+  assert.strictEqual(loaded.scanlinesEnabled, false);
+  assert.strictEqual(loaded.lensFlareEnabled, false);
+  assert.strictEqual(loaded.webglEnabled, false);
   assert.strictEqual(loaded.scanlineIntensity, 0.6);
   assert.strictEqual(loaded.scanlineDensity, 3);
   assert.strictEqual(loaded.crtVignette, 0.45);

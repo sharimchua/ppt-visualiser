@@ -154,23 +154,32 @@ export type LensFlareStyle = 'anamorphic' | 'starburst' | 'cinematic';
 
 export interface AestheticsConfig {
   backgroundTheme: BackgroundTheme;
+  filmGrainEnabled?: boolean;
   filmGrainIntensity: number; // 0..1
   filmGrainSize: number; // 1..4
   filmGrainContrast: number; // 0..1
+  sparksEnabled?: boolean;
   particleIntensity: number; // 0..1
   particleSize: number; // 0.5..3.0
   particleVolume: number; // 0.2..3.0
   particleGravity: number; // -2.0..+2.0 (buoyancy to gravity)
   particleOriginDistance: number; // 0..60px offset from tone circle edge
+  glowBloomEnabled?: boolean;
   glowBloom: number; // 0..1
+  motionTrailsEnabled?: boolean;
   motionTrails: number; // 0..0.8
+  ghostingEnabled?: boolean;
   ghostingIntensity: number; // 0..1
+  lightBleedEnabled?: boolean;
   lightBleedIntensity: number; // 0..1
+  scanlinesEnabled?: boolean;
   scanlineIntensity: number; // 0..1
   scanlineDensity: number; // 1..4 (1=Fine, 2=Standard, 3=Retro, 4=Coarse Arcade)
   crtVignette: number; // 0..1
+  lensFlareEnabled?: boolean;
   lensFlareIntensity: number; // 0..1
   lensFlareStyle: LensFlareStyle;
+  webglEnabled?: boolean;
   clockLabelPriorities: ClockLabelType[];
   glyphContrastMode: GlyphContrastMode;
   soundEnabled: boolean;

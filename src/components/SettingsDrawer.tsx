@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
@@ -980,9 +980,107 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
 
         {/* SECTION 3: COSMETICS & KINETIC AESTHETICS */}
         <section className="space-y-3">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-purple-400" />
-            <span>Cosmetics & Kinetic Effects</span>
+          <div className="flex items-center justify-between font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              <span>Cosmetics & Kinetic Effects</span>
+            </div>
+            <span className="font-mono text-[10px] text-purple-400 font-normal">
+              {[
+                config.filmGrainEnabled ?? true,
+                config.lightBleedEnabled ?? true,
+                config.ghostingEnabled ?? true,
+                config.scanlinesEnabled ?? true,
+                config.lensFlareEnabled ?? true,
+                config.sparksEnabled ?? true,
+                config.glowBloomEnabled ?? true,
+                config.motionTrailsEnabled ?? true,
+              ].filter(Boolean).length}/8 active
+            </span>
+          </div>
+
+          {/* Quick Performance Profiles & Hardware Accel */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2.5">
+            <div className="flex justify-between items-center text-slate-300">
+              <div className="flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-purple-400" />
+                <span className="text-[11px] font-medium text-slate-300">Rendering Cost Control</span>
+              </div>
+              <span className="text-[9px] text-slate-500 font-mono">Quick Profiles</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateConfig({
+                    filmGrainEnabled: true,
+                    lightBleedEnabled: true,
+                    ghostingEnabled: true,
+                    scanlinesEnabled: true,
+                    lensFlareEnabled: true,
+                    sparksEnabled: true,
+                    glowBloomEnabled: true,
+                    motionTrailsEnabled: true,
+                  })
+                }
+                className="py-1.5 px-1 rounded border border-purple-500/50 bg-purple-600/20 hover:bg-purple-600/30 text-[10px] text-purple-300 font-medium transition text-center"
+              >
+                Max Effects
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateConfig({
+                    filmGrainEnabled: true,
+                    lightBleedEnabled: true,
+                    ghostingEnabled: false,
+                    scanlinesEnabled: true,
+                    lensFlareEnabled: true,
+                    sparksEnabled: true,
+                    glowBloomEnabled: true,
+                    motionTrailsEnabled: true,
+                  })
+                }
+                className="py-1.5 px-1 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 font-medium transition text-center"
+              >
+                Balanced
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateConfig({
+                    filmGrainEnabled: false,
+                    lightBleedEnabled: false,
+                    ghostingEnabled: false,
+                    scanlinesEnabled: false,
+                    lensFlareEnabled: false,
+                    sparksEnabled: false,
+                    glowBloomEnabled: false,
+                    motionTrailsEnabled: false,
+                  })
+                }
+                className="py-1.5 px-1 rounded border border-emerald-500/50 bg-emerald-600/20 hover:bg-emerald-600/30 text-[10px] text-emerald-300 font-medium transition text-center"
+              >
+                Eco Mode
+              </button>
+            </div>
+
+            {/* Hardware WebGL Pipeline Switch */}
+            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] text-slate-300 block font-medium">Hardware WebGL Pipeline</span>
+                <span className="text-[9px] text-slate-500 block">GPU fragment shaders for fullscreen optics</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
+                <input
+                  type="checkbox"
+                  checked={config.webglEnabled ?? true}
+                  onChange={(e) => onUpdateConfig({ webglEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
           </div>
 
           {/* Background Theme */}
@@ -1010,374 +1108,550 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
           </div>
 
-          {/* Film Grain Controls (Intensity, Size, Contrast) */}
+          {/* 1. Procedural Film Grain */}
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="font-medium">Procedural Film Grain</span>
-              <span className="font-mono text-purple-400">{Math.round(config.filmGrainIntensity * 100)}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={config.filmGrainIntensity}
-              onChange={(e) => onUpdateConfig({ filmGrainIntensity: parseFloat(e.target.value) })}
-              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-            />
-
-            {/* Grain Size / Gauge */}
-            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
-              <label className="text-[11px] text-slate-400 block font-medium">Grain Gauge / Scale:</label>
-              <div className="grid grid-cols-4 gap-1">
-                {[
-                  { size: 1, label: '35mm' },
-                  { size: 2, label: '16mm' },
-                  { size: 3, label: '8mm' },
-                  { size: 4, label: 'Chunky' },
-                ].map((g) => (
-                  <button
-                    key={g.size}
-                    onClick={() => onUpdateConfig({ filmGrainSize: g.size })}
-                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
-                      (config.filmGrainSize ?? 1) === g.size
-                        ? 'bg-purple-600/30 border-purple-500 text-white'
-                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {g.label}
-                  </button>
-                ))}
+              <div>
+                <span className="font-medium block">Procedural Film Grain</span>
+                <span className="text-[10px] text-slate-400 block">Analog 24fps film emulsion texture</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.filmGrainEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.filmGrainEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ filmGrainEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
               </div>
             </div>
 
-            {/* Grain Contrast Slider */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Grain Contrast / Grit:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.filmGrainContrast ?? 0.5) * 100)}%
-                </span>
+            {(config.filmGrainEnabled ?? true) && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Grain Opacity:</span>
+                    <span className="font-mono text-purple-400">{Math.round(config.filmGrainIntensity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.filmGrainIntensity}
+                    onChange={(e) => onUpdateConfig({ filmGrainIntensity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Grain Size / Gauge */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+                  <label className="text-[11px] text-slate-400 block font-medium">Grain Gauge / Scale:</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { size: 1, label: '35mm' },
+                      { size: 2, label: '16mm' },
+                      { size: 3, label: '8mm' },
+                      { size: 4, label: 'Chunky' },
+                    ].map((g) => (
+                      <button
+                        key={g.size}
+                        onClick={() => onUpdateConfig({ filmGrainSize: g.size })}
+                        className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                          (config.filmGrainSize ?? 1) === g.size
+                            ? 'bg-purple-600/30 border-purple-500 text-white'
+                            : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Grain Contrast Slider */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Grain Contrast / Grit:</span>
+                    <span className="font-mono text-purple-400">
+                      {Math.round((config.filmGrainContrast ?? 0.5) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.filmGrainContrast ?? 0.5}
+                    onChange={(e) => onUpdateConfig({ filmGrainContrast: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500">
+                    <span>Soft Organic</span>
+                    <span>Gritty High-Contrast</span>
+                  </div>
+                </div>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.filmGrainContrast ?? 0.5}
-                onChange={(e) => onUpdateConfig({ filmGrainContrast: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <div className="flex justify-between text-[9px] text-slate-500">
-                <span>Soft Organic</span>
-                <span>Gritty High-Contrast</span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Analog Artifacts & Degradation (Light Bleed & Phosphor Ghosting) */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
-            <label className="block font-medium text-slate-300">Analog Artifacts & Stylized Degradation</label>
-
-            {/* Light Bleed / Halation Slider */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Light Bleed / Halation:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.lightBleedIntensity ?? 0.25) * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.lightBleedIntensity ?? 0.25}
-                onChange={(e) => onUpdateConfig({ lightBleedIntensity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <p className="text-[10px] text-slate-500 italic">
-                Emulates 35mm film halation and horizontal anamorphic lens streaks radiating from active tones.
-              </p>
-            </div>
-
-            {/* Phosphor Ghosting Slider */}
-            <div className="space-y-1 pt-2 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Phosphor Ghosting:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.ghostingIntensity ?? 0.0) * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.ghostingIntensity ?? 0.0}
-                onChange={(e) => onUpdateConfig({ ghostingIntensity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <p className="text-[10px] text-slate-500 italic">
-                Emulates vintage oscilloscope / CRT phosphor decay with chromatic aberration trails.
-              </p>
-            </div>
-          </div>
-
-          {/* CRT Scanlines & Glass Optics */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
-            <div className="flex items-center gap-1.5 text-slate-300 font-medium">
-              <Tv className="w-3.5 h-3.5 text-purple-400" />
-              <span>CRT Scanlines & Glass Curvature</span>
-            </div>
-
-            {/* Scanline Intensity */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Scanline Opacity:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.scanlineIntensity ?? 0) * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.scanlineIntensity ?? 0}
-                onChange={(e) => onUpdateConfig({ scanlineIntensity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-            </div>
-
-            {/* Scanline Density */}
-            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
-              <label className="text-[11px] text-slate-400 block font-medium">Line Pitch / Density:</label>
-              <div className="grid grid-cols-4 gap-1">
-                {[
-                  { density: 1, label: 'Fine (1px)' },
-                  { density: 2, label: 'Standard' },
-                  { density: 3, label: 'Retro' },
-                  { density: 4, label: 'Arcade' },
-                ].map((d) => (
-                  <button
-                    key={d.density}
-                    onClick={() => onUpdateConfig({ scanlineDensity: d.density })}
-                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
-                      (config.scanlineDensity ?? 2) === d.density
-                        ? 'bg-purple-600/30 border-purple-500 text-white'
-                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* CRT Screen Vignette */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>CRT Screen Curvature Vignette:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.crtVignette ?? 0.2) * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.crtVignette ?? 0.2}
-                onChange={(e) => onUpdateConfig({ crtVignette: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <p className="text-[10px] text-slate-500 italic">
-                Simulates spherical CRT cathode ray tube edge darkening and curved glass refraction.
-              </p>
-            </div>
-          </div>
-
-          {/* Optical Lens Flare & Starburst */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
-            <label className="block font-medium text-slate-300">Optical Lens Flare & Artifacts</label>
-
-            {/* Lens Flare Intensity */}
-            <div className="space-y-1">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Lens Flare Brightness:</span>
-                <span className="font-mono text-purple-400">
-                  {Math.round((config.lensFlareIntensity ?? 0.35) * 100)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={config.lensFlareIntensity ?? 0.35}
-                onChange={(e) => onUpdateConfig({ lensFlareIntensity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-            </div>
-
-            {/* Flare Style Buttons */}
-            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
-              <label className="text-[11px] text-slate-400 block font-medium">Optical Optics Preset:</label>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { style: 'cinematic' as LensFlareStyle, label: 'Cinematic' },
-                  { style: 'anamorphic' as LensFlareStyle, label: 'Anamorphic' },
-                  { style: 'starburst' as LensFlareStyle, label: 'Starburst' },
-                ].map((item) => (
-                  <button
-                    key={item.style}
-                    onClick={() => onUpdateConfig({ lensFlareStyle: item.style })}
-                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
-                      (config.lensFlareStyle ?? 'cinematic') === item.style
-                        ? 'bg-purple-600/30 border-purple-500 text-white'
-                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[10px] text-slate-500 italic">
-                Projects multi-element aperture ghosts, horizontal streak flares, and diffraction starburst rays.
-              </p>
-            </div>
-          </div>
-
-          {/* Reactive Note Sparks Physics */}
+          {/* 2. Light Bleed & Halation */}
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="font-medium">Reactive Note Sparks</span>
-              <span className="font-mono text-purple-400">{Math.round(config.particleIntensity * 100)}%</span>
-            </div>
-
-            {/* Spark Master Intensity */}
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={config.particleIntensity}
-              onChange={(e) => onUpdateConfig({ particleIntensity: parseFloat(e.target.value) })}
-              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-            />
-
-            {/* Particle Size Multiplier */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Particle Size:</span>
-                <span className="font-mono text-purple-400">{(config.particleSize ?? 1.0).toFixed(1)}x</span>
+              <div>
+                <span className="font-medium block">Light Bleed & Halation</span>
+                <span className="text-[10px] text-slate-400 block">Warm film corona & anamorphic streaks</span>
               </div>
-              <input
-                type="range"
-                min={0.5}
-                max={3.0}
-                step={0.1}
-                value={config.particleSize ?? 1.0}
-                onChange={(e) => onUpdateConfig({ particleSize: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-            </div>
-
-            {/* Particle Volume / Count Multiplier */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Sparks Volume / Count:</span>
-                <span className="font-mono text-purple-400">{(config.particleVolume ?? 1.0).toFixed(1)}x</span>
-              </div>
-              <input
-                type="range"
-                min={0.2}
-                max={3.0}
-                step={0.1}
-                value={config.particleVolume ?? 1.0}
-                onChange={(e) => onUpdateConfig({ particleVolume: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-            </div>
-
-            {/* Particle Gravity */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Physics Gravity:</span>
-                <span className="font-mono text-purple-400">
-                  {(config.particleGravity ?? 0.15) > 0 ? '+' : ''}{(config.particleGravity ?? 0.15).toFixed(2)}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={-2.0}
-                max={2.0}
-                step={0.05}
-                value={config.particleGravity ?? 0.15}
-                onChange={(e) => onUpdateConfig({ particleGravity: parseFloat(e.target.value) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <div className="flex justify-between text-[9px] text-slate-500">
-                <span>Float Upwards</span>
-                <span>Zero-G</span>
-                <span>Downward Fall</span>
+              <div className="flex items-center gap-2">
+                {!(config.lightBleedEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.lightBleedEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ lightBleedEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
               </div>
             </div>
 
-            {/* Origin Distance Offset */}
-            <div className="space-y-1 pt-1 border-t border-slate-800/60">
-              <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                <span>Origin Offset from Tone Node:</span>
-                <span className="font-mono text-purple-400">{config.particleOriginDistance ?? 0}px</span>
+            {(config.lightBleedEnabled ?? true) && (
+              <div className="space-y-1 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                  <span>Light Bleed Intensity:</span>
+                  <span className="font-mono text-purple-400">
+                    {Math.round((config.lightBleedIntensity ?? 0.25) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={config.lightBleedIntensity ?? 0.25}
+                  onChange={(e) => onUpdateConfig({ lightBleedIntensity: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                />
               </div>
-              <input
-                type="range"
-                min={0}
-                max={60}
-                step={2}
-                value={config.particleOriginDistance ?? 0}
-                onChange={(e) => onUpdateConfig({ particleOriginDistance: parseInt(e.target.value, 10) })}
-                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-              />
-              <p className="text-[10px] text-slate-500 italic">
-                Emanates bursts outward from the exact orbital tone circle perimeter.
-              </p>
-            </div>
+            )}
           </div>
 
-          {/* Glow Bloom Slider */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+          {/* 3. Phosphor Ghosting */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="font-medium">Neon Glow Bloom:</span>
-              <span className="font-mono text-purple-400">{Math.round(config.glowBloom * 100)}%</span>
+              <div>
+                <span className="font-medium block">Phosphor Ghosting</span>
+                <span className="text-[10px] text-slate-400 block">Oscilloscope CRT chromatic decay trails</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.ghostingEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.ghostingEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ ghostingEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0.1}
-              max={1.5}
-              step={0.05}
-              value={config.glowBloom}
-              onChange={(e) => onUpdateConfig({ glowBloom: parseFloat(e.target.value) })}
-              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-            />
+
+            {(config.ghostingEnabled ?? true) && (
+              <div className="space-y-1 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                  <span>Phosphor Persistence:</span>
+                  <span className="font-mono text-purple-400">
+                    {Math.round((config.ghostingIntensity ?? 0.0) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={config.ghostingIntensity ?? 0.0}
+                  onChange={(e) => onUpdateConfig({ ghostingIntensity: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Motion Trails Slider */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+          {/* 4. CRT Scanlines & Glass Optics */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="font-medium">Motion Trail Persistence:</span>
-              <span className="font-mono text-purple-400">{Math.round(config.motionTrails * 100)}%</span>
+              <div className="flex items-center gap-1.5">
+                <Tv className="w-3.5 h-3.5 text-purple-400" />
+                <div>
+                  <span className="font-medium block">CRT Scanlines & Glass Optics</span>
+                  <span className="text-[10px] text-slate-400 block">Subpixel raster lines & tube curvature</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.scanlinesEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.scanlinesEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ scanlinesEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={0.7}
-              step={0.05}
-              value={config.motionTrails}
-              onChange={(e) => onUpdateConfig({ motionTrails: parseFloat(e.target.value) })}
-              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-            />
+
+            {(config.scanlinesEnabled ?? true) && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Scanline Opacity:</span>
+                    <span className="font-mono text-purple-400">
+                      {Math.round((config.scanlineIntensity ?? 0) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.scanlineIntensity ?? 0}
+                    onChange={(e) => onUpdateConfig({ scanlineIntensity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Scanline Density */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+                  <label className="text-[11px] text-slate-400 block font-medium">Line Pitch / Density:</label>
+                  <div className="grid grid-cols-4 gap-1">
+                    {[
+                      { density: 1, label: 'Fine (1px)' },
+                      { density: 2, label: 'Standard' },
+                      { density: 3, label: 'Retro' },
+                      { density: 4, label: 'Arcade' },
+                    ].map((d) => (
+                      <button
+                        key={d.density}
+                        onClick={() => onUpdateConfig({ scanlineDensity: d.density })}
+                        className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                          (config.scanlineDensity ?? 2) === d.density
+                            ? 'bg-purple-600/30 border-purple-500 text-white'
+                            : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CRT Screen Vignette */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>CRT Screen Curvature Vignette:</span>
+                    <span className="font-mono text-purple-400">
+                      {Math.round((config.crtVignette ?? 0.2) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.crtVignette ?? 0.2}
+                    onChange={(e) => onUpdateConfig({ crtVignette: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Optical Lens Flare & Starburst */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Optical Lens Flare & Starburst</span>
+                <span className="text-[10px] text-slate-400 block">Diffraction starbursts, streaks & ghosts</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.lensFlareEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.lensFlareEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ lensFlareEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {(config.lensFlareEnabled ?? true) && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Lens Flare Brightness:</span>
+                    <span className="font-mono text-purple-400">
+                      {Math.round((config.lensFlareIntensity ?? 0.35) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.lensFlareIntensity ?? 0.35}
+                    onChange={(e) => onUpdateConfig({ lensFlareIntensity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Flare Style Buttons */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+                  <label className="text-[11px] text-slate-400 block font-medium">Optical Optics Preset:</label>
+                  <div className="grid grid-cols-3 gap-1">
+                    {[
+                      { style: 'cinematic' as LensFlareStyle, label: 'Cinematic' },
+                      { style: 'anamorphic' as LensFlareStyle, label: 'Anamorphic' },
+                      { style: 'starburst' as LensFlareStyle, label: 'Starburst' },
+                    ].map((item) => (
+                      <button
+                        key={item.style}
+                        onClick={() => onUpdateConfig({ lensFlareStyle: item.style })}
+                        className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                          (config.lensFlareStyle ?? 'cinematic') === item.style
+                            ? 'bg-purple-600/30 border-purple-500 text-white'
+                            : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 6. Reactive Note Sparks Physics */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Reactive Note Sparks Physics</span>
+                <span className="text-[10px] text-slate-400 block">Dynamic kinetic particle bursts</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.sparksEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.sparksEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ sparksEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {(config.sparksEnabled ?? true) && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Sparks Master Intensity:</span>
+                    <span className="font-mono text-purple-400">{Math.round(config.particleIntensity * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.particleIntensity}
+                    onChange={(e) => onUpdateConfig({ particleIntensity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Particle Size Multiplier */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Particle Size:</span>
+                    <span className="font-mono text-purple-400">{(config.particleSize ?? 1.0).toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={3.0}
+                    step={0.1}
+                    value={config.particleSize ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ particleSize: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Particle Volume / Count Multiplier */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Sparks Volume / Count:</span>
+                    <span className="font-mono text-purple-400">{(config.particleVolume ?? 1.0).toFixed(1)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={3.0}
+                    step={0.1}
+                    value={config.particleVolume ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ particleVolume: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Particle Gravity */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Physics Gravity:</span>
+                    <span className="font-mono text-purple-400">
+                      {(config.particleGravity ?? 0.15) > 0 ? '+' : ''}{(config.particleGravity ?? 0.15).toFixed(2)}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={-2.0}
+                    max={2.0}
+                    step={0.05}
+                    value={config.particleGravity ?? 0.15}
+                    onChange={(e) => onUpdateConfig({ particleGravity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-500">
+                    <span>Float Upwards</span>
+                    <span>Zero-G</span>
+                    <span>Downward Fall</span>
+                  </div>
+                </div>
+
+                {/* Origin Distance Offset */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Origin Offset from Tone Node:</span>
+                    <span className="font-mono text-purple-400">{config.particleOriginDistance ?? 0}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={60}
+                    step={2}
+                    value={config.particleOriginDistance ?? 0}
+                    onChange={(e) => onUpdateConfig({ particleOriginDistance: parseInt(e.target.value, 10) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 7. Neon Glow Bloom */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Neon Glow Bloom</span>
+                <span className="text-[10px] text-slate-400 block">Radial radiant bloom around active nodes</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.glowBloomEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.glowBloomEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ glowBloomEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {(config.glowBloomEnabled ?? true) && (
+              <div className="space-y-1 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                  <span>Bloom Intensity:</span>
+                  <span className="font-mono text-purple-400">{Math.round(config.glowBloom * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0.1}
+                  max={1.5}
+                  step={0.05}
+                  value={config.glowBloom}
+                  onChange={(e) => onUpdateConfig({ glowBloom: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 8. Motion Trail Persistence */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Motion Trail Persistence</span>
+                <span className="text-[10px] text-slate-400 block">Smooth frame-to-frame persistence trails</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.motionTrailsEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.motionTrailsEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ motionTrailsEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {(config.motionTrailsEnabled ?? true) && (
+              <div className="space-y-1 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                  <span>Trail Persistence:</span>
+                  <span className="font-mono text-purple-400">{Math.round(config.motionTrails * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={0.7}
+                  step={0.05}
+                  value={config.motionTrails}
+                  onChange={(e) => onUpdateConfig({ motionTrails: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                />
+              </div>
+            )}
           </div>
         </section>
 

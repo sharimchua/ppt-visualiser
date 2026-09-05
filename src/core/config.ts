@@ -59,23 +59,32 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
 
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
+  filmGrainEnabled: true,
   filmGrainIntensity: 0.35,
   filmGrainSize: 3,
   filmGrainContrast: 0.45,
+  sparksEnabled: true,
   particleIntensity: 0.9,
   particleSize: 1.0,
   particleVolume: 1.0,
   particleGravity: 0.15,
   particleOriginDistance: 0,
+  glowBloomEnabled: true,
   glowBloom: 0.8,
+  motionTrailsEnabled: true,
   motionTrails: 0.6,
+  ghostingEnabled: true,
   ghostingIntensity: 0.3,
+  lightBleedEnabled: true,
   lightBleedIntensity: 0.45,
+  scanlinesEnabled: true,
   scanlineIntensity: 0.4,
   scanlineDensity: 2,
   crtVignette: 0.3,
+  lensFlareEnabled: true,
   lensFlareIntensity: 0.55,
   lensFlareStyle: 'cinematic',
+  webglEnabled: true,
 
   // Layout & Sound
   layoutMode: 'signature',
@@ -148,18 +157,29 @@ export function loadSavedConfig(): VisualiserConfig {
     }
 
     // Sanitize film grain & artifact settings
+    merged.filmGrainEnabled = typeof merged.filmGrainEnabled === 'boolean' ? merged.filmGrainEnabled : (merged.filmGrainIntensity > 0);
     merged.filmGrainSize = Math.max(1, Math.min(4, Math.round(typeof merged.filmGrainSize === 'number' ? merged.filmGrainSize : 1)));
     merged.filmGrainContrast = Math.max(0, Math.min(1, typeof merged.filmGrainContrast === 'number' ? merged.filmGrainContrast : 0.5));
+    merged.ghostingEnabled = typeof merged.ghostingEnabled === 'boolean' ? merged.ghostingEnabled : (merged.ghostingIntensity > 0);
     merged.ghostingIntensity = Math.max(0, Math.min(1, typeof merged.ghostingIntensity === 'number' ? merged.ghostingIntensity : 0.0));
+    merged.lightBleedEnabled = typeof merged.lightBleedEnabled === 'boolean' ? merged.lightBleedEnabled : (merged.lightBleedIntensity > 0);
     merged.lightBleedIntensity = Math.max(0, Math.min(1, typeof merged.lightBleedIntensity === 'number' ? merged.lightBleedIntensity : 0.25));
 
     // Sanitize CRT scanlines & lens flare
+    merged.scanlinesEnabled = typeof merged.scanlinesEnabled === 'boolean' ? merged.scanlinesEnabled : ((merged.scanlineIntensity ?? 0) > 0 || (merged.crtVignette ?? 0) > 0);
     merged.scanlineIntensity = Math.max(0, Math.min(1, typeof merged.scanlineIntensity === 'number' ? merged.scanlineIntensity : 0.0));
     merged.scanlineDensity = Math.max(1, Math.min(4, Math.round(typeof merged.scanlineDensity === 'number' ? merged.scanlineDensity : 2)));
     merged.crtVignette = Math.max(0, Math.min(1, typeof merged.crtVignette === 'number' ? merged.crtVignette : 0.2));
+    merged.lensFlareEnabled = typeof merged.lensFlareEnabled === 'boolean' ? merged.lensFlareEnabled : ((merged.lensFlareIntensity ?? 0) > 0);
     merged.lensFlareIntensity = Math.max(0, Math.min(1, typeof merged.lensFlareIntensity === 'number' ? merged.lensFlareIntensity : 0.35));
     const validFlareStyles = new Set(['anamorphic', 'starburst', 'cinematic']);
     if (!validFlareStyles.has(merged.lensFlareStyle)) merged.lensFlareStyle = 'cinematic';
+
+    // Sanitize Note Sparks & Bloom
+    merged.sparksEnabled = typeof merged.sparksEnabled === 'boolean' ? merged.sparksEnabled : ((merged.particleIntensity ?? 0) > 0);
+    merged.glowBloomEnabled = typeof merged.glowBloomEnabled === 'boolean' ? merged.glowBloomEnabled : ((merged.glowBloom ?? 0) > 0);
+    merged.motionTrailsEnabled = typeof merged.motionTrailsEnabled === 'boolean' ? merged.motionTrailsEnabled : ((merged.motionTrails ?? 0) > 0);
+    merged.webglEnabled = typeof merged.webglEnabled === 'boolean' ? merged.webglEnabled : true;
 
     // Sanitize Note Sparks physics
     merged.particleSize = Math.max(0.5, Math.min(3.0, typeof merged.particleSize === 'number' ? merged.particleSize : 1.0));

@@ -367,7 +367,8 @@ export class RenderCoordinator {
       radialAngle = angle;
     }
 
-    if (this.config.particleIntensity > 0) {
+    const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
+    if (sparksOn) {
       this.cosmeticsEngine.spawnNoteSparks(
         sparkX,
         sparkY,
@@ -561,8 +562,13 @@ export class RenderCoordinator {
       ctx.restore();
     }
 
-    // 4. Update procedural kinetics, sparks, and phosphor physics
-    this.cosmeticsEngine.update();
+    // 4. Update procedural kinetics, sparks, and phosphor physics (if any are active)
+    const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
+    const shockwavesOn = this.config.pulseShockwaves;
+    const hasKinetics = sparksOn || shockwavesOn || this.cosmeticsEngine.hasActiveParticles();
+    if (hasKinetics) {
+      this.cosmeticsEngine.update();
+    }
 
     // 5. Render 2D kinetic sparks & expanding shockwave rings (+ 2D post-processing fallback if WebGL unavailable)
     const effCanvas = this.effectsCanvas || this.overlayCanvas;
@@ -578,11 +584,15 @@ export class RenderCoordinator {
         effCtx.scale(dpr, dpr);
         effCtx.clearRect(0, 0, width, height);
 
-        // A. Kinetic sparks & shockwaves
-        this.cosmeticsEngine.renderEffects(effCtx, this.config.glowBloom);
+        // A. Kinetic sparks & shockwaves (only if active)
+        if (hasKinetics) {
+          const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
+          this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow);
+        }
 
-        // B. If WebGL is not active/supported, render 2D post-processing fallback directly on this context
-        if (!this.webglPipeline || !this.webglPipeline.supported) {
+        // B. If WebGL is not active/supported or disabled, render 2D post-processing fallback directly on this context
+        const webglActive = this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false;
+        if (!webglActive) {
           const lights = this.collectFlareLightSources();
           this.render2DPostProcessingFallback(effCtx, width, height, lights);
         }
@@ -591,8 +601,8 @@ export class RenderCoordinator {
       }
     }
 
-    // 6. Render Fullscreen Atmospheric Post-Processing on WebGL (if hardware pipeline active)
-    if (this.webglPipeline && this.webglPipeline.supported) {
+    // 6. Render Fullscreen Atmospheric Post-Processing on WebGL (if hardware pipeline active and enabled)
+    if (this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false) {
       const lights = this.collectFlareLightSources();
       this.webglPipeline.render(this.config, lights, time);
     }
@@ -602,8 +612,11 @@ export class RenderCoordinator {
 
   private collectFlareLightSources(): PostProcessingLight[] {
     const lights: PostProcessingLight[] = [];
+    const flaresOn = (this.config.lensFlareEnabled ?? true) && (this.config.lensFlareIntensity ?? 0) > 0.01;
+    const bleedOn = (this.config.lightBleedEnabled ?? true) && (this.config.lightBleedIntensity ?? 0) > 0.01;
+
     if (
-      (this.config.lightBleedIntensity <= 0.01 && this.config.lensFlareIntensity <= 0.01) ||
+      (!flaresOn && !bleedOn) ||
       (this.activeNotes.size === 0 && this.decayingNotes.size === 0)
     ) {
       return lights;
@@ -699,9 +712,15 @@ export class RenderCoordinator {
     height: number,
     lights: PostProcessingLight[]
   ) {
-    const bleed = this.config.lightBleedIntensity ?? 0;
-    const flare = this.config.lensFlareIntensity ?? 0;
-    const ghost = this.config.ghostingIntensity ?? 0;
+    const bleedOn = (this.config.lightBleedEnabled ?? true) && (this.config.lightBleedIntensity ?? 0) > 0.01;
+    const flareOn = (this.config.lensFlareEnabled ?? true) && (this.config.lensFlareIntensity ?? 0) > 0.01;
+    const ghostOn = (this.config.ghostingEnabled ?? true) && (this.config.ghostingIntensity ?? 0) > 0.01;
+    const scanlinesOn = (this.config.scanlinesEnabled ?? true) && ((this.config.scanlineIntensity ?? 0) > 0.01 || (this.config.crtVignette ?? 0) > 0.01);
+    const grainOn = (this.config.filmGrainEnabled ?? true) && (this.config.filmGrainIntensity ?? 0) > 0.01;
+
+    const bleed = bleedOn ? (this.config.lightBleedIntensity ?? 0) : 0;
+    const flare = flareOn ? (this.config.lensFlareIntensity ?? 0) : 0;
+    const ghost = ghostOn ? (this.config.ghostingIntensity ?? 0) : 0;
 
     // 1. Analog halation, phosphor ghosts & photorealistic lens flares
     if ((bleed > 0.01 || flare > 0.01 || ghost > 0.01) && lights.length > 0) {
@@ -753,24 +772,28 @@ export class RenderCoordinator {
     }
 
     // 2. Whole-display CRT scanlines & glass curvature vignette
-    this.cosmeticsEngine.renderScanlines(
-      ctx,
-      width,
-      height,
-      this.config.scanlineIntensity,
-      this.config.scanlineDensity,
-      this.config.crtVignette
-    );
+    if (scanlinesOn) {
+      this.cosmeticsEngine.renderScanlines(
+        ctx,
+        width,
+        height,
+        this.config.scanlineIntensity,
+        this.config.scanlineDensity,
+        this.config.crtVignette
+      );
+    }
 
     // 3. Whole-display film grain overlay
-    this.cosmeticsEngine.renderFilmGrain(
-      ctx,
-      width,
-      height,
-      this.config.filmGrainIntensity,
-      this.config.filmGrainSize,
-      this.config.filmGrainContrast
-    );
+    if (grainOn) {
+      this.cosmeticsEngine.renderFilmGrain(
+        ctx,
+        width,
+        height,
+        this.config.filmGrainIntensity,
+        this.config.filmGrainSize,
+        this.config.filmGrainContrast
+      );
+    }
   }
 }
 

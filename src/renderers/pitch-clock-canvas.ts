@@ -96,6 +96,8 @@ export class PitchClockRenderer {
     const minClockRadius = maxClockRadius * 0.22;
 
     const tonic = config.tonic;
+    const glowBloomOn = (config.glowBloomEnabled ?? true) && config.glowBloom > 0;
+    const effectiveConfig = glowBloomOn ? config : { ...config, glowBloom: 0 };
 
     // Delta time calculation
     const dt = this.lastTime === 0 ? 0.016 : Math.min(0.1, (now - this.lastTime) / 1000);
@@ -226,16 +228,16 @@ export class PitchClockRenderer {
     }
 
     // 3. Draw Concentric Octave Rings
-    this.drawConcentricRings(ctx, cx, cy, this.currentRadii, this.currentAlphas, activeRegisters, config);
+    this.drawConcentricRings(ctx, cx, cy, this.currentRadii, this.currentAlphas, activeRegisters, effectiveConfig);
 
     // 3b. Draw Radial Movement Trails along octave rings
-    if (config.showRadialMovementTrails) {
-      this.drawRadialMovementTrails(ctx, cx, cy, this.currentRadii, now, config);
+    if (effectiveConfig.showRadialMovementTrails) {
+      this.drawRadialMovementTrails(ctx, cx, cy, this.currentRadii, now, effectiveConfig);
     }
 
     // 4. Draw Active Chord Connection Rays / Webbing
-    if (config.connectChordRays && (activeNotes.size > 1 || decayingNotes.size > 0)) {
-      this.drawChordConnections(ctx, cx, cy, this.currentRadii, activeNotes, decayingNotes, config);
+    if (effectiveConfig.connectChordRays && (activeNotes.size > 1 || decayingNotes.size > 0)) {
+      this.drawChordConnections(ctx, cx, cy, this.currentRadii, activeNotes, decayingNotes, effectiveConfig);
     }
 
     // 5. Draw Pitch Clock Nodes
@@ -250,7 +252,7 @@ export class PitchClockRenderer {
       activeRegisters,
       activeNotes,
       decayingNotes,
-      config,
+      effectiveConfig,
       now
     );
   }
