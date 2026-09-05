@@ -3,25 +3,16 @@ import {
   LayoutNode,
   LayoutCellNode,
   VisualiserConfig,
-  ActiveNote,
-  StreamItem,
   LayoutFlexDirection,
   VisualiserModuleType,
 } from '../core/types';
-import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
-import { StreamRenderer } from '../renderers/stream-canvas';
-import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
+import { RenderCoordinator } from '../core/render-coordinator';
 import { CellViewport } from './CellViewport';
 
 interface FlexLayoutRendererProps {
   node: LayoutNode;
   config: VisualiserConfig;
-  activeNotes: Map<number, ActiveNote>;
-  decayingNotes: Map<number, { note: ActiveNote; decayProgress: number }>;
-  streamItems: StreamItem[];
-  pitchClockRenderer: PitchClockRenderer;
-  streamRenderer: StreamRenderer;
-  pianoTrianglesRenderer: PianoTrianglesRenderer;
+  coordinator?: RenderCoordinator;
   onUpdateCell?: (updated: LayoutCellNode) => void;
   isEditMode?: boolean;
   canDelete?: boolean;
@@ -33,12 +24,7 @@ interface FlexLayoutRendererProps {
 export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
   node,
   config,
-  activeNotes,
-  decayingNotes,
-  streamItems,
-  pitchClockRenderer,
-  streamRenderer,
-  pianoTrianglesRenderer,
+  coordinator,
   onUpdateCell,
   isEditMode = false,
   canDelete = false,
@@ -61,12 +47,7 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
         <CellViewport
           cell={node}
           config={config}
-          activeNotes={activeNotes}
-          decayingNotes={decayingNotes}
-          streamItems={streamItems}
-          pitchClockRenderer={pitchClockRenderer}
-          streamRenderer={streamRenderer}
-          pianoTrianglesRenderer={pianoTrianglesRenderer}
+          coordinator={coordinator}
           onUpdateCell={onUpdateCell}
           isEditMode={isEditMode}
           canDelete={canDelete}
@@ -97,12 +78,7 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
           key={child.id}
           node={child}
           config={config}
-          activeNotes={activeNotes}
-          decayingNotes={decayingNotes}
-          streamItems={streamItems}
-          pitchClockRenderer={pitchClockRenderer}
-          streamRenderer={streamRenderer}
-          pianoTrianglesRenderer={pianoTrianglesRenderer}
+          coordinator={coordinator}
           onUpdateCell={onUpdateCell}
           isEditMode={isEditMode}
           canDelete={canDelete}
@@ -114,3 +90,4 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
     </div>
   );
 };
+

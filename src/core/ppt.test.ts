@@ -46,6 +46,7 @@ import {
   PIANO_TRIANGLE_POINT_TO_PITCH_CLASS,
   PianoTrianglesRenderer,
 } from '../renderers/piano-triangles-canvas';
+import { RenderCoordinator } from './render-coordinator';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -1356,10 +1357,51 @@ test('Piano Triangles Layout: PRESET_SIGNATURE trio tree and URL slug round-trip
   assert.strictEqual(decodedCells[1].module, 'triangles');
 });
 
+test('RenderCoordinator: Decoupled note lifecycle, subscriptions, and session reset', () => {
+  const coordinator = new RenderCoordinator(DEFAULT_CONFIG);
+  assert.ok(coordinator);
 
+  // 1. Initial State
+  assert.strictEqual(coordinator.activeNotes.size, 0);
+  assert.strictEqual(coordinator.decayingNotes.size, 0);
+  assert.strictEqual(coordinator.streamItems.length, 0);
 
+  // 2. Active notes subscription
+  let activeNotesSeen = 0;
+  const unsubActive = coordinator.subscribeActiveNotes((notes) => {
+    activeNotesSeen = notes.size;
+  });
+  assert.strictEqual(activeNotesSeen, 0);
 
+  // 3. Trigger Note On: D4 (MIDI 62, tonic D)
+  coordinator.triggerNoteOn(62, 0.9);
+  assert.strictEqual(coordinator.activeNotes.size, 1);
+  assert.strictEqual(activeNotesSeen, 1);
+  assert.ok(coordinator.activeNotes.has(62));
+  assert.strictEqual(coordinator.streamItems.length, 1);
+  assert.strictEqual(coordinator.streamItems[0].midi, 62);
+  assert.strictEqual(coordinator.streamItems[0].solfege, 'Do');
 
+  // 4. Trigger Note Off: moves to decayingNotes
+  coordinator.triggerNoteOff(62);
+  assert.strictEqual(coordinator.activeNotes.size, 0);
+  assert.strictEqual(activeNotesSeen, 0);
+  assert.strictEqual(coordinator.decayingNotes.size, 1);
+  assert.ok(coordinator.decayingNotes.has(62));
 
+  // 5. Retrigger Note: removed from decayingNotes, back in activeNotes
+  coordinator.triggerNoteOn(62, 0.85);
+  assert.strictEqual(coordinator.activeNotes.size, 1);
+  assert.strictEqual(coordinator.decayingNotes.size, 0);
+  assert.strictEqual(coordinator.streamItems.length, 2);
 
+  // 6. Reset Session: clears all notes and stream
+  coordinator.resetSession();
+  assert.strictEqual(coordinator.activeNotes.size, 0);
+  assert.strictEqual(coordinator.decayingNotes.size, 0);
+  assert.strictEqual(coordinator.streamItems.length, 0);
+  assert.strictEqual(activeNotesSeen, 0);
 
+  unsubActive();
+  coordinator.destroy();
+});

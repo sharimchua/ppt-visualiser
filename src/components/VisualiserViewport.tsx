@@ -1,30 +1,20 @@
-import { useRef, useEffect, useCallback, memo } from 'react';
+import { useRef, useEffect, memo } from 'react';
 import {
   VisualiserConfig,
-  ActiveNote,
-  StreamItem,
   LayoutCellNode,
   LayoutFlexDirection,
   VisualiserModuleType,
   LayoutMode,
 } from '../core/types';
-import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
-import { StreamRenderer } from '../renderers/stream-canvas';
-import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
-import { CosmeticsEngine } from '../renderers/cosmetics';
+import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
 import { FlexLayoutRenderer } from './FlexLayoutRenderer';
 import { getAllCellNodes } from '../core/layout-models';
 import { Plus, RotateCcw, Share2, Check } from 'lucide-react';
 
 interface VisualiserViewportProps {
   config: VisualiserConfig;
-  activeNotes: Map<number, ActiveNote>;
-  decayingNotes: Map<number, { note: ActiveNote; decayProgress: number }>;
-  streamItems: StreamItem[];
-  cosmeticsEngine: CosmeticsEngine;
-  resetSessionCount?: number;
+  coordinator?: RenderCoordinator;
   onUpdateCell?: (updated: LayoutCellNode) => void;
-  onToneCoordinatesResolved?: (lookup: (midi: number) => { x: number; y: number; radius: number; angle: number } | null) => void;
   // Layout Edit Mode Props
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
@@ -38,13 +28,8 @@ interface VisualiserViewportProps {
 
 export const VisualiserViewport = memo<VisualiserViewportProps>(function VisualiserViewport({
   config,
-  activeNotes,
-  decayingNotes,
-  streamItems,
-  cosmeticsEngine,
-  resetSessionCount = 0,
+  coordinator,
   onUpdateCell,
-  onToneCoordinatesResolved,
   isEditMode = false,
   onToggleEditMode,
   onSplitCell,
@@ -58,170 +43,29 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const pitchClockRendererRef = useRef(new PitchClockRenderer());
-  const streamRendererRef = useRef(new StreamRenderer());
-  const pianoTrianglesRendererRef = useRef(new PianoTrianglesRenderer());
+  const coord = coordinator || renderCoordinatorInstance;
 
+  // Register background canvas with coordinator
   useEffect(() => {
-    if (resetSessionCount > 0) {
-      pitchClockRendererRef.current.resetRevealsAndActivity();
+    const bg = bgCanvasRef.current;
+    if (bg) {
+      coord.registerBgCanvas(bg);
     }
-  }, [resetSessionCount]);
-
-  useEffect(() => {
-    if (onToneCoordinatesResolved) {
-      onToneCoordinatesResolved((midi: number) => {
-        const container = containerRef.current;
-        if (!container) return null;
-        const coords = pitchClockRendererRef.current.getToneCoordinates(
-          midi,
-          config.tonic,
-          config.keyboardLowestMidi
-        );
-        if (!coords) return null;
-
-        // PitchClockRenderer coordinates are local to its cell. Find the orbital cell element:
-        const orbitalCellEl = container.querySelector('[data-module="orbital"]') as HTMLElement | null;
-        if (orbitalCellEl) {
-          const cellRect = orbitalCellEl.getBoundingClientRect();
-          const vpRect = container.getBoundingClientRect();
-          return {
-            x: (cellRect.left - vpRect.left) + coords.x,
-            y: (cellRect.top - vpRect.top) + coords.y,
-            radius: coords.radius,
-            angle: coords.angle,
-          };
-        }
-
-        // Fallback to container center
-        return {
-          x: coords.x,
-          y: coords.y,
-          radius: coords.radius,
-          angle: coords.angle,
-        };
-      });
-    }
-  }, [config.tonic, config.keyboardLowestMidi, onToneCoordinatesResolved]);
-
-  const bgDataRef = useRef({ config, cosmeticsEngine });
-  bgDataRef.current = { config, cosmeticsEngine };
-
-  const overlayDataRef = useRef({
-    config,
-    activeNotes,
-    decayingNotes,
-    cosmeticsEngine,
-  });
-  overlayDataRef.current = {
-    config,
-    activeNotes,
-    decayingNotes,
-    cosmeticsEngine,
-  };
-
-  // Draw static background on mount, theme change, or viewport resize
-  const drawBackground = useCallback(() => {
-    const canvas = bgCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const width = canvas.width / dpr;
-    const height = canvas.height / dpr;
-    if (width <= 0 || height <= 0) return;
-
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    cosmeticsEngine.renderBackground(ctx, width, height, config.backgroundTheme);
-    ctx.restore();
-  }, [config.backgroundTheme, cosmeticsEngine]);
-
-  useEffect(() => {
-    drawBackground();
-  }, [drawBackground]);
-
-  // Unified whole-display cosmetics overlay loop (film grain, CRT scanlines, optical lens flares)
-  useEffect(() => {
-    const canvas = overlayCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animId: number;
-
-    const render = () => {
-      const {
-        config: curConfig,
-        activeNotes: curActiveNotes,
-        decayingNotes: curDecayingNotes,
-        cosmeticsEngine: curEngine,
-      } = overlayDataRef.current;
-      const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
-
-      if (width <= 0 || height <= 0) {
-        animId = requestAnimationFrame(render);
-        return;
-      }
-
-      // Advance procedural grain, kinetics, and phosphor physics
-      curEngine.update();
-
-      ctx.save();
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, width, height);
-
-      const overlayCtx = ctx;
-
-      // Analog halation & phosphor ghosts
-      const cx = width / 2;
-      const cy = height / 2;
-      const radius = Math.min(width, height) * 0.45;
-      curEngine.renderAnalogArtifacts(
-        overlayCtx,
-        width,
-        height,
-        curActiveNotes,
-        curDecayingNotes,
-        cx,
-        cy,
-        radius,
-        curConfig
-      );
-
-      // Reactive sparks & shockwaves
-      curEngine.renderEffects(overlayCtx, curConfig.glowBloom);
-
-      // Whole-display CRT scanlines & glass curvature vignette
-      curEngine.renderScanlines(
-        overlayCtx,
-        width,
-        height,
-        curConfig.scanlineIntensity,
-        curConfig.scanlineDensity,
-        curConfig.crtVignette
-      );
-
-      // Whole-display film grain overlay (seamlessly spans all cells)
-      curEngine.renderFilmGrain(
-        overlayCtx,
-        width,
-        height,
-        curConfig.filmGrainIntensity,
-        curConfig.filmGrainSize,
-        curConfig.filmGrainContrast
-      );
-
-      ctx.restore();
-      animId = requestAnimationFrame(render);
+    return () => {
+      coord.unregisterBgCanvas();
     };
+  }, [coord]);
 
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, []);
+  // Register whole-display overlay canvas with coordinator
+  useEffect(() => {
+    const overlay = overlayCanvasRef.current;
+    if (overlay) {
+      coord.registerOverlayCanvas(overlay);
+    }
+    return () => {
+      coord.unregisterOverlayCanvas();
+    };
+  }, [coord]);
 
   // High-DPI canvas resizing
   useEffect(() => {
@@ -246,7 +90,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
         overlayCanvasRef.current.style.width = `${rect.width}px`;
         overlayCanvasRef.current.style.height = `${rect.height}px`;
       }
-      drawBackground();
+      coord.renderBackground();
     };
 
     handleResize();
@@ -259,7 +103,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
       observer.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [coord]);
 
   const layoutRoot = config.activeLayout?.root;
   const allCells = layoutRoot ? getAllCellNodes(layoutRoot) : [];
@@ -277,12 +121,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
           <FlexLayoutRenderer
             node={layoutRoot}
             config={config}
-            activeNotes={activeNotes}
-            decayingNotes={decayingNotes}
-            streamItems={streamItems}
-            pitchClockRenderer={pitchClockRendererRef.current}
-            streamRenderer={streamRendererRef.current}
-            pianoTrianglesRenderer={pianoTrianglesRendererRef.current}
+            coordinator={coord}
             onUpdateCell={onUpdateCell}
             isEditMode={isEditMode}
             canDelete={canDelete}

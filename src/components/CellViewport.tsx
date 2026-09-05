@@ -2,16 +2,12 @@ import { useRef, useEffect, useState, memo } from 'react';
 import {
   LayoutCellNode,
   VisualiserConfig,
-  ActiveNote,
-  StreamItem,
   StreamOrientation,
   StreamDirection,
   VisualiserModuleType,
   LayoutFlexDirection,
 } from '../core/types';
-import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
-import { StreamRenderer } from '../renderers/stream-canvas';
-import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
+import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
 import {
   Waves,
   Triangle,
@@ -32,12 +28,7 @@ import {
 interface CellViewportProps {
   cell: LayoutCellNode;
   config: VisualiserConfig;
-  activeNotes: Map<number, ActiveNote>;
-  decayingNotes: Map<number, { note: ActiveNote; decayProgress: number }>;
-  streamItems: StreamItem[];
-  pitchClockRenderer: PitchClockRenderer;
-  streamRenderer: StreamRenderer;
-  pianoTrianglesRenderer: PianoTrianglesRenderer;
+  coordinator?: RenderCoordinator;
   onUpdateCell?: (updated: LayoutCellNode) => void;
   // Edit Mode Props
   isEditMode?: boolean;
@@ -50,12 +41,7 @@ interface CellViewportProps {
 export const CellViewport = memo<CellViewportProps>(function CellViewport({
   cell,
   config,
-  activeNotes,
-  decayingNotes,
-  streamItems,
-  pitchClockRenderer,
-  streamRenderer,
-  pianoTrianglesRenderer,
+  coordinator,
   onUpdateCell,
   isEditMode = false,
   canDelete = false,
@@ -73,93 +59,24 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
     ...(cell.configOverrides || {}),
   };
 
-  // Keep live render data in a mutable ref so the RAF loop runs uninterrupted without restarts
-  const renderStateRef = useRef({
-    cell,
-    effectiveConfig,
-    activeNotes,
-    decayingNotes,
-    streamItems,
-    pitchClockRenderer,
-    pianoTrianglesRenderer,
-    streamRenderer,
-  });
-  renderStateRef.current = {
-    cell,
-    effectiveConfig,
-    activeNotes,
-    decayingNotes,
-    streamItems,
-    pitchClockRenderer,
-    pianoTrianglesRenderer,
-    streamRenderer,
-  };
-
+  // Register cell canvas with central RenderCoordinator
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
 
-    let animId: number;
+    const coord = coordinator || renderCoordinatorInstance;
+    coord.registerCellCanvas(cell.id, canvas, cell.module, cell.configOverrides);
 
-    const render = (time: number) => {
-      const state = renderStateRef.current;
-      const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
-
-      if (width <= 0 || height <= 0) {
-        animId = requestAnimationFrame(render);
-        return;
-      }
-
-      ctx.save();
-      ctx.scale(dpr, dpr);
-
-      // Clear cell canvas (transparent backdrop so global cosmetics shine through)
-      ctx.clearRect(0, 0, width, height);
-
-      if (state.cell.module === 'orbital') {
-        state.pitchClockRenderer.render(
-          ctx,
-          width,
-          height,
-          state.activeNotes,
-          state.decayingNotes,
-          state.effectiveConfig,
-          time
-        );
-      } else if (state.cell.module === 'triangles') {
-        state.pianoTrianglesRenderer.render(
-          ctx,
-          width,
-          height,
-          state.activeNotes,
-          state.decayingNotes,
-          state.effectiveConfig,
-          time
-        );
-      } else {
-        state.streamRenderer.render(
-          ctx,
-          0,
-          0,
-          width,
-          height,
-          state.streamItems,
-          state.effectiveConfig,
-          time
-        );
-      }
-
-      ctx.restore();
-      animId = requestAnimationFrame(render);
+    return () => {
+      coord.unregisterCellCanvas(cell.id);
     };
+  }, [cell.id, coordinator]);
 
-    animId = requestAnimationFrame(render);
-    return () => cancelAnimationFrame(animId);
-  }, [cell.id]);
+  // Keep cell canvas registration updated when module or config overrides change
+  useEffect(() => {
+    const coord = coordinator || renderCoordinatorInstance;
+    coord.updateCellCanvas(cell.id, cell.module, cell.configOverrides);
+  }, [cell.id, cell.module, cell.configOverrides, coordinator]);
 
   // Handle high-DPI canvas resizing
   useEffect(() => {

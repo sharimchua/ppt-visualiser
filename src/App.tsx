@@ -3,27 +3,17 @@ import { DEFAULT_CONFIG, loadSavedConfig, saveConfig, clearSavedConfig } from '.
 import {
   VisualiserConfig,
   ActiveNote,
-  StreamItem,
   MidiPlaybackState,
   MidiDeviceState,
+  LayoutCellNode,
+  LayoutFlexDirection,
+  VisualiserModuleType,
+  LayoutMode,
 } from './core/types';
-import {
-  SOLFEGE_SYLLABLES,
-  SOLFEGE_SPECS,
-  PITCH_NAMES_DUAL,
-  PITCH_NAMES_SHARP,
-  PITCH_NAMES_FLAT,
-  INTERVAL_NAMES,
-  PITCH_CLASS_TO_PIANO_TRIANGLE,
-  TRI_PITCH_CLASSES,
-  resolveMidiToRegisterAndSemitone,
-  getClockAngleRad,
-} from './core/ppt-constants';
 import { midiManagerInstance } from './core/midi-manager';
 import { midiPlayerInstance } from './core/midi-file-player';
 import { synthInstance } from './core/audio-synth';
-import { CosmeticsEngine } from './renderers/cosmetics';
-import { ScaleAlignmentTracker } from './core/scale-alignment';
+import { renderCoordinatorInstance, ScaleFitInfo } from './core/render-coordinator';
 import { ControlToolbar } from './components/ControlToolbar';
 import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
@@ -37,12 +27,6 @@ import {
   addCellToTree,
   PRESET_LAYOUTS,
 } from './core/layout-models';
-import {
-  LayoutCellNode,
-  LayoutFlexDirection,
-  VisualiserModuleType,
-  LayoutMode,
-} from './core/types';
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<VisualiserConfig>(() => {
@@ -64,23 +48,15 @@ export const App: React.FC = () => {
     }
     return saved;
   });
-  const [activeNotes, setActiveNotes] = useState<Map<number, ActiveNote>>(new Map());
-  const decayingNotesRef = useRef<Map<number, { note: ActiveNote; decayProgress: number }>>(new Map());
-  const [streamItems, setStreamItems] = useState<StreamItem[]>([]);
+
+  const [activeNotesForKeyboard, setActiveNotesForKeyboard] = useState<Map<number, ActiveNote>>(new Map());
   const [playbackState, setPlaybackState] = useState<MidiPlaybackState>(midiPlayerInstance.getState());
   const [deviceState, setDeviceState] = useState<MidiDeviceState>(midiManagerInstance.state);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
-  const [resetNonce, setResetNonce] = useState(0);
   const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
-  const [scaleFitInfo, setScaleFitInfo] = useState<{
-    currentTonicFit: number;
-    bestTonic: number;
-    bestTonicFit: number;
-    scoreMargin: number;
-    shouldShift: boolean;
-  }>({
+  const [scaleFitInfo, setScaleFitInfo] = useState<ScaleFitInfo>({
     currentTonicFit: 1.0,
     bestTonic: config.tonic,
     bestTonicFit: 1.0,
@@ -88,16 +64,56 @@ export const App: React.FC = () => {
     shouldShift: false,
   });
 
-  const cosmeticsEngineRef = useRef(new CosmeticsEngine());
-  const scaleTrackerRef = useRef(new ScaleAlignmentTracker());
   const idleTimerRef = useRef<number | null>(null);
-  const lastFitUpdateRef = useRef<number>(0);
 
-  const activeNotesRef = useRef(activeNotes);
-  activeNotesRef.current = activeNotes;
-  const toneCoordLookupRef = useRef<((midi: number) => { x: number; y: number; radius: number; angle: number } | null) | null>(null);
-  const configRef = useRef(config);
-  configRef.current = config;
+  // Synchronize config updates with RenderCoordinator & localStorage
+  useEffect(() => {
+    saveConfig(config);
+    renderCoordinatorInstance.setConfig(config);
+  }, [config]);
+
+  // Subscribe to Scale Alignment updates and handle Auto-Tonic shifting
+  useEffect(() => {
+    renderCoordinatorInstance.onAutoTonicShift = (newTonic: number) => {
+      setConfig((prev) => ({ ...prev, tonic: newTonic }));
+    };
+    return renderCoordinatorInstance.subscribeScaleFit(setScaleFitInfo);
+  }, []);
+
+  // Subscribe to active notes for Virtual Keyboard only when keyboard is shown
+  useEffect(() => {
+    if (!config.showVirtualKeyboard) return;
+    return renderCoordinatorInstance.subscribeActiveNotes((notes) => {
+      setActiveNotesForKeyboard(new Map(notes));
+    });
+  }, [config.showVirtualKeyboard]);
+
+  // Sync Audio Synth settings with config
+  useEffect(() => {
+    synthInstance.setMuted(!config.soundEnabled);
+    synthInstance.setVolume(config.masterVolume);
+    synthInstance.setWaveform(config.synthWaveform);
+  }, [config.soundEnabled, config.masterVolume, config.synthWaveform]);
+
+  // Listen to MIDI playback & device changes
+  useEffect(() => {
+    const unsubPlayback = midiPlayerInstance.onStateChange(setPlaybackState);
+    const unsubDevice = midiManagerInstance.onStateChange(setDeviceState);
+
+    // Prompt/ensure Web MIDI is initialized on user gesture if browser requires it
+    const handleFirstGesture = () => {
+      if (!midiManagerInstance.state.isConnected) {
+        midiManagerInstance.requestAccess();
+      }
+    };
+    window.addEventListener('pointerdown', handleFirstGesture, { once: true });
+
+    return () => {
+      unsubPlayback();
+      unsubDevice();
+      window.removeEventListener('pointerdown', handleFirstGesture);
+    };
+  }, []);
 
   const handleUpdateCell = useCallback((updatedCell: LayoutCellNode) => {
     setConfig((prev) => {
@@ -194,273 +210,10 @@ export const App: React.FC = () => {
     }));
   }, []);
 
-  // Reset session state: clears discovered tones, tone pop scales, organic activity, scale tracker, and note stream
+  // Reset session state: clears discovered tones, active notes, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
-    setActiveNotes(new Map());
-    decayingNotesRef.current.clear();
-    setStreamItems([]);
-    setResetNonce((n) => n + 1);
-    scaleTrackerRef.current.reset();
+    renderCoordinatorInstance.resetSession();
   }, []);
-
-  // Automatically persist config changes to localStorage
-  useEffect(() => {
-    saveConfig(config);
-  }, [config]);
-
-  // Sync Audio Synth settings with config
-  useEffect(() => {
-    synthInstance.setMuted(!config.soundEnabled);
-    synthInstance.setVolume(config.masterVolume);
-    synthInstance.setWaveform(config.synthWaveform);
-  }, [config.soundEnabled, config.masterVolume, config.synthWaveform]);
-
-  // Listen to MIDI playback & device changes
-  useEffect(() => {
-    const unsubPlayback = midiPlayerInstance.onStateChange(setPlaybackState);
-    const unsubDevice = midiManagerInstance.onStateChange(setDeviceState);
-
-    // Prompt/ensure Web MIDI is initialized on user gesture if browser requires it
-    const handleFirstGesture = () => {
-      if (!midiManagerInstance.state.isConnected) {
-        midiManagerInstance.requestAccess();
-      }
-    };
-    window.addEventListener('pointerdown', handleFirstGesture, { once: true });
-
-    return () => {
-      unsubPlayback();
-      unsubDevice();
-      window.removeEventListener('pointerdown', handleFirstGesture);
-    };
-  }, []);
-
-  // Handle Note On
-  const handleNoteOn = useCallback((midi: number, velocity: number = 0.8) => {
-    const now = performance.now();
-    const pc = ((midi % 12) + 12) % 12;
-    const res = resolveMidiToRegisterAndSemitone(midi, config.tonic, config.keyboardLowestMidi);
-    const syllable = SOLFEGE_SYLLABLES[res.semitone];
-    const spec = SOLFEGE_SPECS[syllable];
-    const ptInfo = PITCH_CLASS_TO_PIANO_TRIANGLE[pc];
-
-    let pitchNames = PITCH_NAMES_DUAL;
-    if (config.accidentalStyle === 'sharp') pitchNames = PITCH_NAMES_SHARP;
-    else if (config.accidentalStyle === 'flat') pitchNames = PITCH_NAMES_FLAT;
-
-    const pitchName = pitchNames[pc];
-    const interval = INTERVAL_NAMES[res.semitone];
-
-    const noteObj: ActiveNote = {
-      midi,
-      pitchClass: pc,
-      octave: res.octave,
-      registerIndex: res.registerIndex,
-      velocity,
-      startTime: now,
-      colorHex: spec.colorHex,
-      solfege: syllable,
-      pianoTriangle: ptInfo,
-    };
-
-    // Synthesize audio
-    if (config.soundEnabled) {
-      synthInstance.noteOn(midi, velocity);
-    }
-
-    // Active notes state
-    setActiveNotes((prev) => {
-      const next = new Map(prev);
-      next.set(midi, noteObj);
-      return next;
-    });
-
-    // Remove from decaying notes if retriggered
-    decayingNotesRef.current.delete(midi);
-
-    // Spawn cosmetic particles using exact tone circle coordinates if available
-    const exact = toneCoordLookupRef.current?.(midi);
-    let sparkX: number;
-    let sparkY: number;
-    let radialAngle: number;
-
-    if (exact) {
-      sparkX = exact.x;
-      sparkY = exact.y;
-      radialAngle = exact.angle;
-    } else {
-      const angle = getClockAngleRad(res.semitone);
-      const vpW = window.innerWidth;
-      const vpH = window.innerHeight;
-      const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
-      sparkX = vpW / 2 + radius * Math.cos(angle);
-      sparkY = vpH / 2 + radius * Math.sin(angle);
-      radialAngle = angle;
-    }
-
-    if (config.particleIntensity > 0) {
-      cosmeticsEngineRef.current.spawnNoteSparks(
-        sparkX,
-        sparkY,
-        spec.colorHex,
-        velocity,
-        Math.round(20 * config.particleIntensity),
-        config.particleSize,
-        config.particleVolume,
-        config.particleGravity,
-        config.particleOriginDistance,
-        radialAngle
-      );
-    }
-    if (config.pulseShockwaves) {
-      cosmeticsEngineRef.current.spawnShockwave(sparkX, sparkY, spec.colorHex, 65 + velocity * 30);
-    }
-
-    // Add to Note Stream with mode-aware buffer
-    const streamItem: StreamItem = {
-      id: `${midi}-${now}-${Math.random()}`,
-      midi,
-      pitchClass: pc,
-      octave: res.octave,
-      velocity,
-      timestamp: now / 1000,
-      colorHex: spec.colorHex,
-      solfege: syllable,
-      pitchName,
-      triPitchName: TRI_PITCH_CLASSES[pc],
-      interval,
-      pianoTriangle: ptInfo,
-      glyphType: spec.glyphType,
-      rotation: spec.rotation,
-    };
-
-    setStreamItems((prev) => {
-      const nowSec = now / 1000;
-      if (config.streamMode === 'continuous') {
-        // Continuous mode: keep notes for up to 60 seconds (or up to 1200 items),
-        // ensuring notes are only removed once they have naturally scrolled off-screen.
-        const maxAgeSec = 60;
-        let startIndex = 0;
-        while (startIndex < prev.length && nowSec - prev[startIndex].timestamp > maxAgeSec) {
-          startIndex++;
-        }
-        const activeSlice = startIndex > 0 ? prev.slice(startIndex) : prev;
-        const capped = activeSlice.length >= 1200 ? activeSlice.slice(activeSlice.length - 1199) : activeSlice;
-        return [...capped, streamItem];
-      } else {
-        // Fixed queue mode: retain enough buffer for smooth conveyor transitions
-        const limit = Math.max(48, (config.fixedWindowSize || 8) * 2);
-        const trimmed = prev.length >= limit ? prev.slice(-limit + 1) : prev;
-        return [...trimmed, streamItem];
-      }
-    });
-  }, [
-    config.tonic,
-    config.keyboardLowestMidi,
-    config.accidentalStyle,
-    config.soundEnabled,
-    config.particleIntensity,
-    config.particleSize,
-    config.particleVolume,
-    config.particleGravity,
-    config.particleOriginDistance,
-    config.pulseShockwaves,
-    config.streamMode,
-    config.fixedWindowSize,
-  ]);
-
-  // Handle Note Off
-  const handleNoteOff = useCallback((midi: number) => {
-    const now = performance.now();
-
-    // Release audio synth voice
-    synthInstance.noteOff(midi);
-
-    setActiveNotes((prev) => {
-      const active = prev.get(midi);
-      if (!active) return prev;
-
-      const next = new Map(prev);
-      next.delete(midi);
-
-      // Begin decay animation in mutable map (zero React state overhead)
-      const noteCopy = { ...active, releaseTime: now };
-      decayingNotesRef.current.set(midi, { note: noteCopy, decayProgress: 0 });
-
-      return next;
-    });
-  }, []);
-
-  // Wire MIDI manager to note triggers
-  useEffect(() => {
-    const unsubOn = midiManagerInstance.onNoteOn((midi, vel) => handleNoteOn(midi, vel));
-    const unsubOff = midiManagerInstance.onNoteOff((midi) => handleNoteOff(midi));
-    return () => {
-      unsubOn();
-      unsubOff();
-    };
-  }, [handleNoteOn, handleNoteOff]);
-
-  // Decay Progress Animation Loop (runs in-place on mutable map without triggering React re-renders)
-  useEffect(() => {
-    let animId: number;
-
-    const tickDecay = () => {
-      const now = performance.now();
-      const currentConfig = configRef.current;
-      const decayDuration = currentConfig.decayDurationMs;
-
-      // In-place decay update on mutable map
-      const decayingMap = decayingNotesRef.current;
-      if (decayingMap.size > 0) {
-        for (const [midi, data] of decayingMap.entries()) {
-          const elapsed = now - (data.note.releaseTime || now);
-          const progress = Math.min(1.0, elapsed / decayDuration);
-
-          if (progress >= 1.0) {
-            decayingMap.delete(midi);
-          } else {
-            data.decayProgress = progress;
-          }
-        }
-      }
-
-      // Update scale alignment tracker with active and decaying notes
-      const alignRes = scaleTrackerRef.current.update(
-        now,
-        activeNotesRef.current.values(),
-        decayingMap.values(),
-        currentConfig
-      );
-
-      // Trigger automatic tonic shift if auto-alignment is enabled and recommended
-      if (
-        currentConfig.autoTonicEnabled &&
-        alignRes.shouldShift &&
-        alignRes.newTonic !== undefined &&
-        alignRes.newTonic !== currentConfig.tonic
-      ) {
-        setConfig((prev) => ({ ...prev, tonic: alignRes.newTonic! }));
-      }
-
-      // Periodically update UI fit status (throttled ~180ms)
-      if (now - lastFitUpdateRef.current > 180) {
-        lastFitUpdateRef.current = now;
-        setScaleFitInfo({
-          currentTonicFit: alignRes.currentTonicFit,
-          bestTonic: alignRes.bestTonic,
-          bestTonicFit: alignRes.bestTonicFit,
-          scoreMargin: alignRes.scoreMargin,
-          shouldShift: alignRes.shouldShift,
-        });
-      }
-
-      animId = requestAnimationFrame(tickDecay);
-    };
-
-    animId = requestAnimationFrame(tickDecay);
-    return () => cancelAnimationFrame(animId);
-  }, [config.decayDurationMs]);
 
   // Fullscreen Management
   const toggleFullscreen = useCallback(() => {
@@ -551,11 +304,7 @@ export const App: React.FC = () => {
       <main className="flex-1 w-full h-full relative overflow-hidden flex">
         <VisualiserViewport
           config={config}
-          activeNotes={activeNotes}
-          decayingNotes={decayingNotesRef.current}
-          streamItems={streamItems}
-          cosmeticsEngine={cosmeticsEngineRef.current}
-          resetSessionCount={resetNonce}
+          coordinator={renderCoordinatorInstance}
           isEditMode={isEditLayoutMode}
           onToggleEditMode={() => setIsEditLayoutMode((prev) => !prev)}
           onSplitCell={handleSplitCell}
@@ -564,9 +313,6 @@ export const App: React.FC = () => {
           onAddCell={handleAddCell}
           onResetLayout={handleResetLayout}
           onUpdateCell={handleUpdateCell}
-          onToneCoordinatesResolved={(lookup) => {
-            toneCoordLookupRef.current = lookup;
-          }}
         />
       </main>
 
@@ -581,9 +327,9 @@ export const App: React.FC = () => {
         >
           <VirtualKeyboard
             config={config}
-            activeNotes={activeNotes}
-            onNoteOn={handleNoteOn}
-            onNoteOff={handleNoteOff}
+            activeNotes={activeNotesForKeyboard}
+            onNoteOn={renderCoordinatorInstance.triggerNoteOn}
+            onNoteOff={renderCoordinatorInstance.triggerNoteOff}
           />
         </div>
       )}
@@ -601,3 +347,4 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
