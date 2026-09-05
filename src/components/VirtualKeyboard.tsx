@@ -10,16 +10,39 @@ interface VirtualKeyboardProps {
   onNoteOff: (midi: number) => void;
 }
 
-// 49-key range: C2 (36) to C6 (84), or 3 octaves around Middle C (48 to 72)
+// 25-key range: C3 (48) to C5 (72) (2 octaves)
 const START_MIDI = 48; // C3
 const END_MIDI = 72;   // C5
 
 const KEYBOARD_SHORTCUTS: Record<string, number> = {
   // Lower octave: C3 to B3
   'z': 48, 's': 49, 'x': 50, 'd': 51, 'c': 52, 'v': 53, 'g': 54, 'b': 55, 'h': 56, 'n': 57, 'j': 58, 'm': 59,
-  // Upper octave: C4 to E5
+  // Upper octave: C4 to C5
   'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67, '6': 68, 'y': 69, '7': 70, 'u': 71, 'i': 72
 };
+
+const MIDI_TO_SHORTCUT: Record<number, string> = {
+  48: 'Z', 49: 'S', 50: 'X', 51: 'D', 52: 'C', 53: 'V', 54: 'G', 55: 'B', 56: 'H', 57: 'N', 58: 'J', 59: 'M',
+  60: 'Q', 61: '2', 62: 'W', 63: '3', 64: 'E', 65: 'R', 66: '5', 67: 'T', 68: '6', 69: 'Y', 70: '7', 71: 'U', 72: 'I',
+};
+
+// Subtle acoustic piano key offsets so white key heads (cutouts) have balanced widths
+function getBlackKeyOffset(pc: number): number {
+  switch (pc) {
+    case 1: // C#
+      return -0.06;
+    case 3: // D#
+      return 0.06;
+    case 6: // F#
+      return -0.07;
+    case 8: // G#
+      return 0.0;
+    case 10: // A#
+      return 0.07;
+    default:
+      return 0;
+  }
+}
 
 interface KeyItem {
   midi: number;
@@ -30,6 +53,8 @@ interface KeyItem {
   colorHex: string;
   isActive: boolean;
   ptInfo: any;
+  shortcut?: string;
+  octaveLabel?: string;
 }
 
 export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
@@ -78,6 +103,13 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     const colorHex = SOLFEGE_SPECS[syllable].colorHex;
     const isActive = activeNotes.has(midi);
     const ptInfo = PITCH_CLASS_TO_PIANO_TRIANGLE[pc];
+    const shortcut = MIDI_TO_SHORTCUT[midi];
+
+    let octaveLabel: string | undefined;
+    if (pc === 0) {
+      const octave = Math.floor(midi / 12) - 1;
+      octaveLabel = octave === 4 ? 'C4' : `C${octave}`;
+    }
 
     keys.push({
       midi,
@@ -88,119 +120,244 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
       colorHex,
       isActive,
       ptInfo,
+      shortcut,
+      octaveLabel,
     });
   }
 
+  const whiteKeys = keys.filter((k) => !k.isBlack);
+  const totalWhite = whiteKeys.length;
+  const blackKeyWidthPercent = (1 / totalWhite) * 58;
+
+  const tonicNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
   return (
-    <div className="w-full bg-[#0e121b]/90 backdrop-blur border-t border-slate-800/80 px-4 py-2 flex flex-col items-center select-none shadow-2xl">
-      <div className="flex items-center justify-between w-full max-w-4xl mb-1.5 px-2 text-xs text-slate-400">
+    <div className="w-full bg-[#0e121b]/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-2.5 flex flex-col items-center select-none shadow-2xl">
+      <div className="flex items-center justify-between w-full max-w-4xl mb-2 px-1 text-xs text-slate-400">
         <span className="flex items-center gap-2">
-          <span className="font-semibold text-slate-300">Virtual Keyboard</span>
-          <span className="text-[10px] text-slate-500 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/50">
-            QWERTY Keys: Z-M & Q-I
+          <span className="font-semibold text-slate-200">Virtual Keyboard</span>
+          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">
+            QWERTY: Z–M (C3–B3) & Q–I (C4–C5)
           </span>
         </span>
         <span className="text-[11px] text-slate-400 font-mono">
-          Tonic <span className="text-red-400 font-bold">Do</span> = {SOLFEGE_SYLLABLES[0]} ({['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][config.tonic]})
+          Tonic <span className="text-red-400 font-bold">Do</span> = {tonicNames[config.tonic]}
         </span>
       </div>
 
-      <div className="relative flex justify-center w-full max-w-4xl h-24 overflow-x-auto pb-1">
-        {keys.map((key) => {
-          if (key.isBlack) return null; // Rendered in layer over white keys
+      <div className="w-full flex justify-center overflow-x-auto pb-1 px-1">
+        {/* Exact shared bounding container for both white and black key layers */}
+        <div className="relative flex h-28 w-full max-w-4xl min-w-[560px] select-none rounded-b-md shadow-2xl bg-slate-950">
+          {/* White Keys Row */}
+          <div className="flex w-full h-full">
+            {whiteKeys.map((key, i) => {
+              const isFirst = i === 0;
+              const isLast = i === totalWhite - 1;
 
-          return (
-            <div
-              key={key.midi}
-              onMouseDown={() => onNoteOn(key.midi, 0.9)}
-              onMouseUp={() => onNoteOff(key.midi)}
-              onMouseLeave={() => key.isActive && onNoteOff(key.midi)}
-              onTouchStart={(e) => { e.preventDefault(); onNoteOn(key.midi, 0.9); }}
-              onTouchEnd={(e) => { e.preventDefault(); onNoteOff(key.midi); }}
-              className={`relative flex-1 min-w-[28px] max-w-[42px] h-full rounded-b border-b-2 transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-2 ${
-                key.isActive
-                  ? 'border-white shadow-[0_0_15px_rgba(255,255,255,0.6)] translate-y-[2px]'
-                  : 'bg-gradient-to-b from-slate-200 to-slate-100 hover:from-white hover:to-slate-200 border-slate-400'
-              }`}
-              style={{
-                backgroundColor: key.isActive ? key.colorHex : undefined,
-              }}
-            >
-              {/* Syllable and Piano Triangle SVG Label */}
-              <div className="flex flex-col items-center gap-0.5 pointer-events-none">
-                {config.showPianoTriangles ? (
-                  <div
-                    className="w-4 h-4"
-                    dangerouslySetInnerHTML={{
-                      __html: createPianoTriangleSvg(
-                        key.ptInfo.triangle as PianoTriangleType,
-                        key.ptInfo.point as PianoTrianglePoint,
-                        16,
-                        key.colorHex,
-                        key.isActive ? '#ffffff' : '#334155'
-                      )
-                    }}
-                  />
-                ) : (
-                  <span
-                    className={`text-[9px] font-bold ${
-                      key.isActive ? 'text-white' : 'text-slate-800'
-                    }`}
-                  >
-                    {key.syllable}
-                  </span>
-                )}
-                <span
-                  className={`text-[8px] font-mono ${
-                    key.isActive ? 'text-white/80' : 'text-slate-500'
+              return (
+                <div
+                  key={key.midi}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onNoteOn(key.midi, 0.9);
+                  }}
+                  onMouseUp={() => onNoteOff(key.midi)}
+                  onMouseEnter={(e) => {
+                    if (e.buttons === 1) {
+                      onNoteOn(key.midi, 0.9);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (key.isActive) onNoteOff(key.midi);
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    onNoteOn(key.midi, 0.9);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    onNoteOff(key.midi);
+                  }}
+                  onTouchCancel={(e) => {
+                    e.preventDefault();
+                    onNoteOff(key.midi);
+                  }}
+                  className={`relative flex-1 h-full border-r border-slate-300/80 last:border-r-0 transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-2 select-none ${
+                    isFirst ? 'rounded-bl-md' : ''
+                  } ${isLast ? 'rounded-br-md' : ''} ${
+                    key.isActive
+                      ? 'border-b-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.7)] translate-y-[2px]'
+                      : 'bg-gradient-to-b from-white via-slate-50 to-slate-200 hover:from-white hover:to-slate-100 border-b-4 border-slate-400/90 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1)]'
                   }`}
+                  style={{
+                    backgroundColor: key.isActive ? key.colorHex : undefined,
+                  }}
                 >
-                  {key.semitone === 0 ? '•' : ''}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+                  {/* Octave Marker (C3, C4, C5) */}
+                  {key.octaveLabel && (
+                    <span
+                      className={`absolute top-2 text-[9px] font-bold font-mono tracking-tighter ${
+                        key.isActive ? 'text-white/90' : 'text-slate-400'
+                      }`}
+                    >
+                      {key.octaveLabel}
+                    </span>
+                  )}
 
-        {/* Black Keys Layer */}
-        <div className="absolute inset-0 flex justify-center pointer-events-none max-w-4xl mx-auto">
-          {keys.map((key, idx) => {
-            if (!key.isBlack) return null;
+                  {/* Syllable and Piano Triangle SVG Label */}
+                  <div className="flex flex-col items-center gap-1 pointer-events-none w-full px-0.5">
+                    {config.showPianoTriangles ? (
+                      <div
+                        className="w-4 h-4"
+                        dangerouslySetInnerHTML={{
+                          __html: createPianoTriangleSvg(
+                            key.ptInfo.triangle as PianoTriangleType,
+                            key.ptInfo.point as PianoTrianglePoint,
+                            16,
+                            key.colorHex,
+                            key.isActive ? '#ffffff' : '#334155'
+                          ),
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className={`text-[10px] font-bold leading-none ${
+                          key.isActive ? 'text-white' : 'text-slate-800'
+                        }`}
+                      >
+                        {key.syllable}
+                      </span>
+                    )}
 
-            // Compute offset percentage based on position between adjacent white keys
-            const whiteIndex = keys.slice(0, idx).filter(k => !k.isBlack).length;
-            const totalWhite = keys.filter(k => !k.isBlack).length;
-            const leftPercent = (whiteIndex / totalWhite) * 100;
-
-            return (
-              <div
-                key={key.midi}
-                onMouseDown={() => onNoteOn(key.midi, 0.9)}
-                onMouseUp={() => onNoteOff(key.midi)}
-                onMouseLeave={() => key.isActive && onNoteOff(key.midi)}
-                onTouchStart={(e) => { e.preventDefault(); onNoteOn(key.midi, 0.9); }}
-                onTouchEnd={(e) => { e.preventDefault(); onNoteOff(key.midi); }}
-                className={`absolute pointer-events-auto h-[62%] w-[18px] sm:w-[24px] rounded-b border-b transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-1 z-10 -ml-[9px] sm:-ml-[12px] ${
-                  key.isActive
-                    ? 'border-white shadow-[0_0_16px_rgba(255,255,255,0.7)] translate-y-[2px]'
-                    : 'bg-gradient-to-b from-slate-900 to-[#121620] hover:to-slate-800 border-black'
-                }`}
-                style={{
-                  left: `${leftPercent}%`,
-                  backgroundColor: key.isActive ? key.colorHex : undefined,
-                }}
-              >
-                <div className="flex flex-col items-center gap-0.5 pointer-events-none">
-                  <span
-                    className="text-[8px] font-bold text-white leading-tight"
-                    style={{ color: key.isActive ? '#ffffff' : key.colorHex }}
-                  >
-                    {key.syllable}
-                  </span>
+                    <div className="flex items-center gap-1">
+                      {key.shortcut && (
+                        <span
+                          className={`text-[8.5px] font-mono font-medium px-1 rounded ${
+                            key.isActive
+                              ? 'bg-black/20 text-white'
+                              : 'bg-slate-200/80 text-slate-600'
+                          }`}
+                        >
+                          {key.shortcut}
+                        </span>
+                      )}
+                      {key.semitone === 0 && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]"
+                          title="Tonic (Do)"
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+
+          {/* Black Keys Layer - matching coordinate space with exact centering on seams */}
+          <div className="absolute inset-0 pointer-events-none">
+            {keys.map((key) => {
+              if (!key.isBlack) return null;
+
+              // Compute offset percentage based on white key seam and acoustic offsets
+              const whiteIndex = keys.slice(0, keys.indexOf(key)).filter((k) => !k.isBlack).length;
+              const offset = getBlackKeyOffset(key.pc);
+              const leftPercent = ((whiteIndex + offset) / totalWhite) * 100;
+
+              return (
+                <div
+                  key={key.midi}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNoteOn(key.midi, 0.9);
+                  }}
+                  onMouseUp={(e) => {
+                    e.stopPropagation();
+                    onNoteOff(key.midi);
+                  }}
+                  onMouseEnter={(e) => {
+                    if (e.buttons === 1) {
+                      onNoteOn(key.midi, 0.9);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (key.isActive) onNoteOff(key.midi);
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNoteOn(key.midi, 0.9);
+                  }}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNoteOff(key.midi);
+                  }}
+                  onTouchCancel={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNoteOff(key.midi);
+                  }}
+                  className={`absolute pointer-events-auto h-[63%] rounded-b-[4px] transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-1.5 z-20 -translate-x-1/2 select-none ${
+                    key.isActive
+                      ? 'border-b-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.85)] translate-y-[2px]'
+                      : 'bg-gradient-to-b from-neutral-800 via-neutral-900 to-black hover:from-neutral-700 hover:to-neutral-900 border-x border-b border-black/90 shadow-[0_4px_6px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)]'
+                  }`}
+                  style={{
+                    left: `${leftPercent}%`,
+                    width: `${blackKeyWidthPercent}%`,
+                    backgroundColor: key.isActive ? key.colorHex : undefined,
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-0.5 pointer-events-none w-full px-0.5">
+                    {config.showPianoTriangles ? (
+                      <div
+                        className="w-3.5 h-3.5 mb-0.5"
+                        dangerouslySetInnerHTML={{
+                          __html: createPianoTriangleSvg(
+                            key.ptInfo.triangle as PianoTriangleType,
+                            key.ptInfo.point as PianoTrianglePoint,
+                            13,
+                            key.colorHex,
+                            key.isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
+                            true
+                          ),
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className="text-[8.5px] font-bold leading-tight"
+                        style={{ color: key.isActive ? '#ffffff' : key.colorHex }}
+                      >
+                        {key.syllable}
+                      </span>
+                    )}
+
+                    <div className="flex items-center gap-1">
+                      {key.shortcut && (
+                        <span
+                          className={`text-[8px] font-mono font-medium leading-none px-0.5 rounded ${
+                            key.isActive
+                              ? 'bg-black/30 text-white'
+                              : 'text-slate-400/80'
+                          }`}
+                        >
+                          {key.shortcut}
+                        </span>
+                      )}
+                      {key.semitone === 0 && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.8)]"
+                          title="Tonic (Do)"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
