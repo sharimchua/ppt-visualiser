@@ -47,6 +47,7 @@ import {
   PianoTrianglesRenderer,
 } from '../renderers/piano-triangles-canvas';
 import { RenderCoordinator } from './render-coordinator';
+import { WebGLPostProcessingPipeline } from '../renderers/webgl-post-processing';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -1405,3 +1406,93 @@ test('RenderCoordinator: Decoupled note lifecycle, subscriptions, and session re
   unsubActive();
   coordinator.destroy();
 });
+
+test('WebGLPostProcessingPipeline: Headless fallback and mock GL execution', () => {
+  // 1. Headless Fallback: getContext returns null
+  const nullCanvas: any = { getContext: () => null };
+  const fallbackPipeline = new WebGLPostProcessingPipeline(nullCanvas);
+  assert.strictEqual(fallbackPipeline.supported, false);
+  // Calling render on unsupported pipeline does nothing and does not throw
+  fallbackPipeline.render(DEFAULT_CONFIG, [], 1000);
+  fallbackPipeline.destroy();
+
+  // 2. Mock WebGL Context Execution
+  let drawArraysCalled = false;
+  let useProgramCalled = false;
+  const uniformsSet: Record<string, any> = {};
+
+  const mockGl: any = {
+    VERTEX_SHADER: 35633,
+    FRAGMENT_SHADER: 35632,
+    COMPILE_STATUS: 35713,
+    LINK_STATUS: 35714,
+    ARRAY_BUFFER: 34962,
+    STATIC_DRAW: 35044,
+    FLOAT: 5126,
+    COLOR_BUFFER_BIT: 16384,
+    BLEND: 3042,
+    SRC_ALPHA: 770,
+    ONE_MINUS_SRC_ALPHA: 771,
+    TRIANGLE_STRIP: 5,
+    createShader: () => ({}),
+    shaderSource: () => {},
+    compileShader: () => {},
+    getShaderParameter: () => true,
+    getShaderInfoLog: () => '',
+    deleteShader: () => {},
+    createProgram: () => ({}),
+    attachShader: () => {},
+    linkProgram: () => {},
+    getProgramParameter: () => true,
+    getProgramInfoLog: () => '',
+    deleteProgram: () => {},
+    createBuffer: () => ({}),
+    bindBuffer: () => {},
+    bufferData: () => {},
+    deleteBuffer: () => {},
+    getAttribLocation: () => 0,
+    enableVertexAttribArray: () => {},
+    vertexAttribPointer: () => {},
+    getUniformLocation: (_p: any, name: string) => name,
+    viewport: () => {},
+    clearColor: () => {},
+    clear: () => {},
+    enable: () => {},
+    blendFunc: () => {},
+    useProgram: () => { useProgramCalled = true; },
+    uniform1f: (loc: string, val: number) => { uniformsSet[loc] = val; },
+    uniform2f: (loc: string, x: number, y: number) => { uniformsSet[loc] = [x, y]; },
+    uniform1i: (loc: string, val: number) => { uniformsSet[loc] = val; },
+    uniform4fv: (loc: string, data: any) => { uniformsSet[loc] = data; },
+    uniform3fv: (loc: string, data: any) => { uniformsSet[loc] = data; },
+    drawArrays: (mode: number, _first: number, count: number) => {
+      assert.strictEqual(mode, 5); // TRIANGLE_STRIP
+      assert.strictEqual(count, 4); // 4 vertices for fullscreen quad
+      drawArraysCalled = true;
+    },
+  };
+
+  const mockCanvas: any = {
+    width: 1920,
+    height: 1080,
+    getContext: (type: string) => (type === 'webgl' ? mockGl : null),
+  };
+
+  const pipeline = new WebGLPostProcessingPipeline(mockCanvas);
+  assert.strictEqual(pipeline.supported, true);
+
+  pipeline.render(
+    DEFAULT_CONFIG,
+    [{ x: 960, y: 540, velocity: 0.9, colorHex: '#e13610' }],
+    2500
+  );
+
+  assert.strictEqual(useProgramCalled, true, 'Shader program must be bound');
+  assert.strictEqual(drawArraysCalled, true, 'Fullscreen quad must be drawn');
+  assert.strictEqual(uniformsSet['u_lightCount'], 1, 'Active light count must be passed');
+  assert.ok(uniformsSet['u_time'] > 0, 'Time uniform must be set');
+
+  pipeline.destroy();
+  assert.strictEqual(pipeline.supported, false);
+});
+

@@ -40,7 +40,8 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
   onShareLayout,
 }) {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const effectsCanvasRef = useRef<HTMLCanvasElement>(null);
+  const postProcessingCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const coord = coordinator || renderCoordinatorInstance;
@@ -56,14 +57,27 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
     };
   }, [coord]);
 
-  // Register whole-display overlay canvas with coordinator
+  // Register 2D kinetic effects canvas with coordinator (sparks & shockwaves)
   useEffect(() => {
-    const overlay = overlayCanvasRef.current;
-    if (overlay) {
-      coord.registerOverlayCanvas(overlay);
+    const effects = effectsCanvasRef.current;
+    if (effects) {
+      coord.registerEffectsCanvas(effects);
+      coord.registerOverlayCanvas(effects); // Also serves as 2D fallback
     }
     return () => {
+      coord.unregisterEffectsCanvas();
       coord.unregisterOverlayCanvas();
+    };
+  }, [coord]);
+
+  // Register WebGL hardware post-processing shader canvas with coordinator
+  useEffect(() => {
+    const postProcessing = postProcessingCanvasRef.current;
+    if (postProcessing) {
+      coord.registerPostProcessingCanvas(postProcessing);
+    }
+    return () => {
+      coord.unregisterPostProcessingCanvas();
     };
   }, [coord]);
 
@@ -84,11 +98,17 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
         bgCanvasRef.current.style.width = `${rect.width}px`;
         bgCanvasRef.current.style.height = `${rect.height}px`;
       }
-      if (overlayCanvasRef.current) {
-        overlayCanvasRef.current.width = w;
-        overlayCanvasRef.current.height = h;
-        overlayCanvasRef.current.style.width = `${rect.width}px`;
-        overlayCanvasRef.current.style.height = `${rect.height}px`;
+      if (effectsCanvasRef.current) {
+        effectsCanvasRef.current.width = w;
+        effectsCanvasRef.current.height = h;
+        effectsCanvasRef.current.style.width = `${rect.width}px`;
+        effectsCanvasRef.current.style.height = `${rect.height}px`;
+      }
+      if (postProcessingCanvasRef.current) {
+        postProcessingCanvasRef.current.width = w;
+        postProcessingCanvasRef.current.height = h;
+        postProcessingCanvasRef.current.style.width = `${rect.width}px`;
+        postProcessingCanvasRef.current.style.height = `${rect.height}px`;
       }
       coord.renderBackground();
     };
@@ -132,10 +152,16 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
         )}
       </div>
 
-      {/* 3. Global Whole-Display Cosmetics & Atmosphere Overlay (film grain, light bleed, phosphor ghosting) */}
+      {/* 3. 2D Kinetic Effects Layer (reactive sparks & expanding shockwave rings) */}
       <canvas
-        ref={overlayCanvasRef}
+        ref={effectsCanvasRef}
         className="absolute inset-0 block w-full h-full pointer-events-none z-20"
+      />
+
+      {/* 4. Fullscreen Hardware WebGL Post-Processing Shader (CRT scanlines, barrel curve, lens flares, film grain) */}
+      <canvas
+        ref={postProcessingCanvasRef}
+        className="absolute inset-0 block w-full h-full pointer-events-none z-25"
       />
 
       {/* 4. EDIT MODE: Top Floating Status & Action Pill Bar */}

@@ -24,6 +24,10 @@ import { ScaleAlignmentTracker } from './scale-alignment';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import {
+  WebGLPostProcessingPipeline,
+  PostProcessingLight,
+} from '../renderers/webgl-post-processing';
 
 export interface CellCanvasEntry {
   id: string;
@@ -57,6 +61,14 @@ export class RenderCoordinator {
   public readonly pitchClockRenderer: PitchClockRenderer;
   public readonly pianoTrianglesRenderer: PianoTrianglesRenderer;
   public readonly streamRenderer: StreamRenderer;
+
+  // WebGL Post-Processing Pipeline
+  private postProcessingCanvas: HTMLCanvasElement | null = null;
+  private webglPipeline: WebGLPostProcessingPipeline | null = null;
+
+  // 2D Kinetic Effects Canvas (Sparks & Shockwaves)
+  private effectsCanvas: HTMLCanvasElement | null = null;
+  private effectsCtx: CanvasRenderingContext2D | null = null;
 
   // Configuration
   private config: VisualiserConfig;
@@ -125,6 +137,13 @@ export class RenderCoordinator {
     this.activeNotesListeners.clear();
     this.scaleFitListeners.clear();
     this.cellCanvases.clear();
+    if (this.webglPipeline) {
+      this.webglPipeline.destroy();
+      this.webglPipeline = null;
+    }
+    this.postProcessingCanvas = null;
+    this.effectsCanvas = null;
+    this.effectsCtx = null;
     this.overlayCanvas = null;
     this.overlayCtx = null;
     this.bgCanvas = null;
@@ -179,6 +198,32 @@ export class RenderCoordinator {
     return () => {
       this.scaleFitListeners.delete(listener);
     };
+  }
+
+  public registerPostProcessingCanvas(canvas: HTMLCanvasElement) {
+    this.postProcessingCanvas = canvas;
+    if (this.webglPipeline) {
+      this.webglPipeline.destroy();
+    }
+    this.webglPipeline = new WebGLPostProcessingPipeline(canvas);
+  }
+
+  public unregisterPostProcessingCanvas() {
+    if (this.webglPipeline) {
+      this.webglPipeline.destroy();
+      this.webglPipeline = null;
+    }
+    this.postProcessingCanvas = null;
+  }
+
+  public registerEffectsCanvas(canvas: HTMLCanvasElement) {
+    this.effectsCanvas = canvas;
+    this.effectsCtx = canvas.getContext('2d');
+  }
+
+  public unregisterEffectsCanvas() {
+    this.effectsCanvas = null;
+    this.effectsCtx = null;
   }
 
   public registerOverlayCanvas(canvas: HTMLCanvasElement) {
@@ -515,18 +560,40 @@ export class RenderCoordinator {
       ctx.restore();
     }
 
-    // 4. Update and render overlay cosmetics (analog halation, lens flares, scanlines, film grain)
-    if (this.overlayCanvas && this.overlayCtx) {
-      const canvas = this.overlayCanvas;
-      const ctx = this.overlayCtx;
-      const dpr = window.devicePixelRatio || 1;
+    // 4. Update procedural kinetics, sparks, and phosphor physics
+    this.cosmeticsEngine.update();
+
+    // 5. Render 2D kinetic sparks & expanding shockwave rings
+    if (this.effectsCanvas && this.effectsCtx) {
+      const canvas = this.effectsCanvas;
+      const ctx = this.effectsCtx;
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
 
       if (width > 0 && height > 0) {
-        // Advance procedural grain, kinetics, and phosphor physics
-        this.cosmeticsEngine.update();
+        ctx.save();
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+        this.cosmeticsEngine.renderEffects(ctx, this.config.glowBloom);
+        ctx.restore();
+      }
+    }
 
+    // 6. Render Fullscreen Atmospheric Post-Processing
+    if (this.webglPipeline && this.webglPipeline.supported) {
+      // Hardware GPU Shader Pipeline (WebGL)
+      const lights = this.collectFlareLightSources();
+      this.webglPipeline.render(this.config, lights, time);
+    } else if (this.overlayCanvas && this.overlayCtx) {
+      // Canvas 2D Fallback
+      const canvas = this.overlayCanvas;
+      const ctx = this.overlayCtx;
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+
+      if (width > 0 && height > 0) {
         ctx.save();
         ctx.scale(dpr, dpr);
         ctx.clearRect(0, 0, width, height);
@@ -547,8 +614,10 @@ export class RenderCoordinator {
           this.config
         );
 
-        // Reactive sparks & shockwaves
-        this.cosmeticsEngine.renderEffects(ctx, this.config.glowBloom);
+        // Reactive sparks & shockwaves (if effects canvas not separately rendered)
+        if (!this.effectsCanvas) {
+          this.cosmeticsEngine.renderEffects(ctx, this.config.glowBloom);
+        }
 
         // Whole-display CRT scanlines & glass curvature vignette
         this.cosmeticsEngine.renderScanlines(
@@ -560,7 +629,7 @@ export class RenderCoordinator {
           this.config.crtVignette
         );
 
-        // Whole-display film grain overlay (seamlessly spans all cells)
+        // Whole-display film grain overlay
         this.cosmeticsEngine.renderFilmGrain(
           ctx,
           width,
@@ -576,6 +645,95 @@ export class RenderCoordinator {
 
     this.animId = requestAnimationFrame(this.masterLoop);
   };
+
+  private collectFlareLightSources(): PostProcessingLight[] {
+    const lights: PostProcessingLight[] = [];
+    if (
+      (this.config.lightBleedIntensity <= 0.01 && this.config.lensFlareIntensity <= 0.01) ||
+      (this.activeNotes.size === 0 && this.decayingNotes.size === 0)
+    ) {
+      return lights;
+    }
+
+    const tonic = this.config.tonic;
+    const lowestMidi = this.config.keyboardLowestMidi;
+
+    let orbitalCellCanvas: HTMLCanvasElement | null = null;
+    for (const cell of this.cellCanvases.values()) {
+      if (cell.module === 'orbital') {
+        orbitalCellCanvas = cell.canvas;
+        break;
+      }
+    }
+
+    const targetCanvas = this.postProcessingCanvas || this.overlayCanvas;
+    let offsetLeft = 0;
+    let offsetTop = 0;
+    if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
+      const cellRect = orbitalCellCanvas.getBoundingClientRect();
+      const targetRect = targetCanvas.getBoundingClientRect();
+      offsetLeft = cellRect.left - targetRect.left;
+      offsetTop = cellRect.top - targetRect.top;
+    }
+
+    // 1. Active notes
+    for (const note of this.activeNotes.values()) {
+      const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
+      let lx: number;
+      let ly: number;
+      if (coords) {
+        lx = offsetLeft + coords.x;
+        ly = offsetTop + coords.y;
+      } else {
+        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+        const angle = getClockAngleRad(res.semitone);
+        const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
+        const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+        const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
+        lx = vpW / 2 + radius * Math.cos(angle);
+        ly = vpH / 2 + radius * Math.sin(angle);
+      }
+      lights.push({
+        x: lx,
+        y: ly,
+        velocity: note.velocity,
+        colorHex: note.colorHex,
+      });
+    }
+
+    // 2. Decaying notes
+    for (const { note, decayProgress } of this.decayingNotes.values()) {
+      const vel = note.velocity * (1 - decayProgress);
+      if (vel <= 0.04) continue;
+      const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
+      let lx: number;
+      let ly: number;
+      if (coords) {
+        lx = offsetLeft + coords.x;
+        ly = offsetTop + coords.y;
+      } else {
+        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+        const angle = getClockAngleRad(res.semitone);
+        const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
+        const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+        const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
+        lx = vpW / 2 + radius * Math.cos(angle);
+        ly = vpH / 2 + radius * Math.sin(angle);
+      }
+      lights.push({
+        x: lx,
+        y: ly,
+        velocity: vel,
+        colorHex: note.colorHex,
+      });
+    }
+
+    if (lights.length > 8) {
+      lights.sort((a, b) => b.velocity - a.velocity);
+    }
+
+    return lights;
+  }
 }
 
 export const renderCoordinatorInstance = new RenderCoordinator(DEFAULT_CONFIG);
