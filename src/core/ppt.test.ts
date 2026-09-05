@@ -14,6 +14,8 @@ import {
   getTriPitchClass,
 } from './ppt-constants';
 import { DEMO_TRACKS } from './demo-tracks';
+import { encodeNotesToMidi } from './midi-encoder';
+import { midiPlayerInstance } from './midi-file-player';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { compute2DConvexHull } from './convex-hull';
@@ -1035,6 +1037,61 @@ test('Pitch Clock Renderer: Tone node coordinate query interface', () => {
   // Reset reveals and activity works cleanly
   renderer.resetRevealsAndActivity();
 });
+
+test('Multi-Genre Demo Repertoire: 11 diverse works across 4 distinct categories', () => {
+  assert.strictEqual(DEMO_TRACKS.length, 11);
+
+  const categories = new Set(DEMO_TRACKS.map(t => t.category));
+  assert.ok(categories.has('Classical & Impressionism'));
+  assert.ok(categories.has('Classical & Romantic'));
+  assert.ok(categories.has('Baroque Polyphony'));
+  assert.ok(categories.has('Ragtime & Blues'));
+  assert.ok(categories.has('PPT Theory & Kinetics'));
+
+  for (const track of DEMO_TRACKS) {
+    assert.ok(track.id, 'Track must have unique ID');
+    assert.ok(track.title, 'Track must have title');
+    assert.ok(track.composer, 'Track must have composer');
+    assert.ok(track.description, 'Track must have description');
+    assert.ok(track.notes.length >= 20, `${track.title} must have at least 20 note events`);
+    assert.ok(track.duration > 5, `${track.title} duration must be > 5s`);
+  }
+});
+
+test('Standard MIDI File Encoder: SMF Format 0 binary encoding and round-trip verification', () => {
+  // Test encoding a demo track
+  const satieTrack = DEMO_TRACKS.find(t => t.id === 'satie-gymnopedie');
+  assert.ok(satieTrack);
+
+  const midiBytes = encodeNotesToMidi(satieTrack.notes, satieTrack.title, 120);
+  assert.ok(midiBytes instanceof Uint8Array);
+  assert.ok(midiBytes.length > 100);
+
+  // Verify SMF Header (MThd, length=6, format=0, tracks=1, division=480)
+  const header = String.fromCharCode(...midiBytes.slice(0, 4));
+  assert.strictEqual(header, 'MThd');
+  const view = new DataView(midiBytes.buffer, midiBytes.byteOffset, midiBytes.byteLength);
+  assert.strictEqual(view.getUint32(4), 6); // header length
+  assert.strictEqual(view.getUint16(8), 0); // format 0
+  assert.strictEqual(view.getUint16(10), 1); // 1 track
+  assert.strictEqual(view.getUint16(12), 480); // ticks per beat
+
+  // Verify MTrk chunk tag
+  const trackTag = String.fromCharCode(...midiBytes.slice(14, 18));
+  assert.strictEqual(trackTag, 'MTrk');
+
+  // Verify round-trip parsing via midiPlayerInstance['parseMidiBuffer']
+  const parsed = (midiPlayerInstance as any).parseMidiBuffer(midiBytes.buffer);
+  assert.ok(parsed.length > 0);
+  assert.strictEqual(parsed.length, satieTrack.notes.length);
+
+  // Sort both by time and pitch
+  parsed.sort((a: any, b: any) => a.time - b.time || a.midi - b.midi);
+  const expected = [...satieTrack.notes].sort((a, b) => a.time - b.time || a.midi - b.midi);
+  assert.strictEqual(parsed[0].midi, expected[0].midi);
+  assert.strictEqual(parsed[parsed.length - 1].midi, expected[expected.length - 1].midi);
+});
+
 
 
 

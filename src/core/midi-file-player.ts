@@ -322,16 +322,19 @@ export class MidiFilePlayer {
 
     // Match NoteOn and NoteOff into TimedNoteEvent
     rawNoteEvents.sort((a, b) => a.tick - b.tick);
-    const activeNoteStarts = new Map<number, { tick: number; velocity: number }>();
+    const activeNoteStarts = new Map<number, Array<{ tick: number; velocity: number }>>();
     const finishedNotes: TimedNoteEvent[] = [];
     const secondsPerTick = microsecondsPerBeat / 1000000 / ticksPerBeat;
 
     for (const ev of rawNoteEvents) {
       if (ev.type === 'on') {
-        activeNoteStarts.set(ev.midi, { tick: ev.tick, velocity: ev.velocity });
+        const queue = activeNoteStarts.get(ev.midi) || [];
+        queue.push({ tick: ev.tick, velocity: ev.velocity });
+        activeNoteStarts.set(ev.midi, queue);
       } else if (ev.type === 'off') {
-        const start = activeNoteStarts.get(ev.midi);
-        if (start) {
+        const queue = activeNoteStarts.get(ev.midi);
+        if (queue && queue.length > 0) {
+          const start = queue.shift()!;
           const startTime = start.tick * secondsPerTick;
           const duration = Math.max(0.08, (ev.tick - start.tick) * secondsPerTick);
           finishedNotes.push({
@@ -340,7 +343,9 @@ export class MidiFilePlayer {
             time: startTime,
             duration,
           });
-          activeNoteStarts.delete(ev.midi);
+          if (queue.length === 0) {
+            activeNoteStarts.delete(ev.midi);
+          }
         }
       }
     }

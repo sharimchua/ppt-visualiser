@@ -9,6 +9,7 @@ import {
   Minimize2,
   Settings,
   Upload,
+  Download,
   Layers,
   Radio,
   Music2,
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
+import { downloadNotesAsMidiFile } from '../core/midi-encoder';
 import { midiManagerInstance } from '../core/midi-manager';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { PRESET_LAYOUTS, encodeLayoutToSlug } from '../core/layout-models';
@@ -141,15 +143,17 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           <select
             value={DEMO_TRACKS.some(t => t.title === playbackState.trackName) ? DEMO_TRACKS.find(t => t.title === playbackState.trackName)?.id : ''}
             onChange={(e) => onSelectTrack(e.target.value)}
-            className="bg-slate-800/80 hover:bg-slate-800 text-xs text-slate-200 rounded-md px-2.5 py-1.5 border border-slate-700 focus:outline-none max-w-[170px] sm:max-w-[220px] truncate cursor-pointer"
+            className="bg-slate-800/80 hover:bg-slate-800 text-xs text-slate-200 rounded-md px-2.5 py-1.5 border border-slate-700 focus:outline-none max-w-[170px] sm:max-w-[230px] truncate cursor-pointer"
           >
-            <optgroup label="Bundled PPT Studies">
-              {DEMO_TRACKS.map((t) => (
-                <option key={t.id} value={t.id} className="bg-slate-900 text-slate-200">
-                  {t.title}
-                </option>
-              ))}
-            </optgroup>
+            {Array.from(new Set(DEMO_TRACKS.map((t) => t.category))).map((category) => (
+              <optgroup key={category} label={category} className="bg-slate-900 text-slate-400 font-semibold text-[11px]">
+                {DEMO_TRACKS.filter((t) => t.category === category).map((t) => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-200 font-normal text-xs">
+                    {t.title} – {t.composer}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </div>
 
@@ -161,6 +165,26 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
         >
           <Upload className="w-4 h-4" />
         </button>
+
+        {/* Download Current Track MIDI File */}
+        {DEMO_TRACKS.some((t) => t.title === playbackState.trackName) && (
+          <button
+            onClick={() => {
+              const currentTrack = DEMO_TRACKS.find((t) => t.title === playbackState.trackName);
+              if (currentTrack) {
+                downloadNotesAsMidiFile(
+                  currentTrack.notes,
+                  `${currentTrack.id}.mid`,
+                  `${currentTrack.title} (${currentTrack.composer})`
+                );
+              }
+            }}
+            title="Download this demo track as a Standard MIDI File (.mid)"
+            className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
         <input
           ref={fileInputRef}
           type="file"
