@@ -83,6 +83,7 @@ export const App: React.FC = () => {
   activeNotesRef.current = activeNotes;
   const decayingNotesRef = useRef(decayingNotes);
   decayingNotesRef.current = decayingNotes;
+  const toneCoordLookupRef = useRef<((midi: number) => { x: number; y: number; radius: number; angle: number } | null) | null>(null);
   const configRef = useRef(config);
   configRef.current = config;
 
@@ -191,14 +192,25 @@ export const App: React.FC = () => {
       return prev;
     });
 
-    // Spawn cosmetic particles
-    const angle = getClockAngleRad(res.semitone);
-    // Approximate coordinate on viewport for spark burst
-    const vpW = window.innerWidth;
-    const vpH = window.innerHeight;
-    const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
-    const sparkX = vpW / 2 + radius * Math.cos(angle);
-    const sparkY = vpH / 2 + radius * Math.sin(angle);
+    // Spawn cosmetic particles using exact tone circle coordinates if available
+    const exact = toneCoordLookupRef.current?.(midi);
+    let sparkX: number;
+    let sparkY: number;
+    let radialAngle: number;
+
+    if (exact) {
+      sparkX = exact.x;
+      sparkY = exact.y;
+      radialAngle = exact.angle;
+    } else {
+      const angle = getClockAngleRad(res.semitone);
+      const vpW = window.innerWidth;
+      const vpH = window.innerHeight;
+      const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
+      sparkX = vpW / 2 + radius * Math.cos(angle);
+      sparkY = vpH / 2 + radius * Math.sin(angle);
+      radialAngle = angle;
+    }
 
     if (config.particleIntensity > 0) {
       cosmeticsEngineRef.current.spawnNoteSparks(
@@ -206,7 +218,12 @@ export const App: React.FC = () => {
         sparkY,
         spec.colorHex,
         velocity,
-        Math.round(20 * config.particleIntensity)
+        Math.round(20 * config.particleIntensity),
+        config.particleSize,
+        config.particleVolume,
+        config.particleGravity,
+        config.particleOriginDistance,
+        radialAngle
       );
     }
     if (config.pulseShockwaves) {
@@ -251,7 +268,20 @@ export const App: React.FC = () => {
         return [...trimmed, streamItem];
       }
     });
-  }, [config.tonic, config.keyboardLowestMidi, config.accidentalStyle, config.soundEnabled, config.particleIntensity, config.pulseShockwaves, config.streamMode, config.fixedWindowSize]);
+  }, [
+    config.tonic,
+    config.keyboardLowestMidi,
+    config.accidentalStyle,
+    config.soundEnabled,
+    config.particleIntensity,
+    config.particleSize,
+    config.particleVolume,
+    config.particleGravity,
+    config.particleOriginDistance,
+    config.pulseShockwaves,
+    config.streamMode,
+    config.fixedWindowSize,
+  ]);
 
   // Handle Note Off
   const handleNoteOff = useCallback((midi: number) => {
@@ -449,6 +479,9 @@ export const App: React.FC = () => {
           cosmeticsEngine={cosmeticsEngineRef.current}
           resetSessionCount={resetNonce}
           onUpdateCell={handleUpdateCell}
+          onToneCoordinatesResolved={(lookup) => {
+            toneCoordLookupRef.current = lookup;
+          }}
         />
       </main>
 

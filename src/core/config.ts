@@ -58,10 +58,19 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   filmGrainSize: 1,
   filmGrainContrast: 0.5,
   particleIntensity: 0.7,
+  particleSize: 1.0,
+  particleVolume: 1.0,
+  particleGravity: 0.15,
+  particleOriginDistance: 0,
   glowBloom: 0.85,
   motionTrails: 0.15,
   ghostingIntensity: 0.0,
   lightBleedIntensity: 0.25,
+  scanlineIntensity: 0.0,
+  scanlineDensity: 2,
+  crtVignette: 0.2,
+  lensFlareIntensity: 0.35,
+  lensFlareStyle: 'cinematic',
 
   // Layout & Sound
   layoutMode: 'balanced',
@@ -138,6 +147,20 @@ export function loadSavedConfig(): VisualiserConfig {
     merged.filmGrainContrast = Math.max(0, Math.min(1, typeof merged.filmGrainContrast === 'number' ? merged.filmGrainContrast : 0.5));
     merged.ghostingIntensity = Math.max(0, Math.min(1, typeof merged.ghostingIntensity === 'number' ? merged.ghostingIntensity : 0.0));
     merged.lightBleedIntensity = Math.max(0, Math.min(1, typeof merged.lightBleedIntensity === 'number' ? merged.lightBleedIntensity : 0.25));
+
+    // Sanitize CRT scanlines & lens flare
+    merged.scanlineIntensity = Math.max(0, Math.min(1, typeof merged.scanlineIntensity === 'number' ? merged.scanlineIntensity : 0.0));
+    merged.scanlineDensity = Math.max(1, Math.min(4, Math.round(typeof merged.scanlineDensity === 'number' ? merged.scanlineDensity : 2)));
+    merged.crtVignette = Math.max(0, Math.min(1, typeof merged.crtVignette === 'number' ? merged.crtVignette : 0.2));
+    merged.lensFlareIntensity = Math.max(0, Math.min(1, typeof merged.lensFlareIntensity === 'number' ? merged.lensFlareIntensity : 0.35));
+    const validFlareStyles = new Set(['anamorphic', 'starburst', 'cinematic']);
+    if (!validFlareStyles.has(merged.lensFlareStyle)) merged.lensFlareStyle = 'cinematic';
+
+    // Sanitize Note Sparks physics
+    merged.particleSize = Math.max(0.5, Math.min(3.0, typeof merged.particleSize === 'number' ? merged.particleSize : 1.0));
+    merged.particleVolume = Math.max(0.2, Math.min(3.0, typeof merged.particleVolume === 'number' ? merged.particleVolume : 1.0));
+    merged.particleGravity = Math.max(-2.0, Math.min(2.0, typeof merged.particleGravity === 'number' ? merged.particleGravity : 0.15));
+    merged.particleOriginDistance = Math.max(0, Math.min(60, typeof merged.particleOriginDistance === 'number' ? merged.particleOriginDistance : 0));
 
     // Sanitize chord geometry & radial movement trails
     merged.chordRayMode = merged.chordRayMode === 'web' ? 'web' : 'hull';

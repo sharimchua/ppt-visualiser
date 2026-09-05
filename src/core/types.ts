@@ -144,16 +144,27 @@ export interface LayoutContainerNode {
 
 export type LayoutNode = LayoutContainerNode | LayoutCellNode;
 
+export type LensFlareStyle = 'anamorphic' | 'starburst' | 'cinematic';
+
 export interface AestheticsConfig {
   backgroundTheme: BackgroundTheme;
   filmGrainIntensity: number; // 0..1
   filmGrainSize: number; // 1..4
   filmGrainContrast: number; // 0..1
   particleIntensity: number; // 0..1
+  particleSize: number; // 0.5..3.0
+  particleVolume: number; // 0.2..3.0
+  particleGravity: number; // -2.0..+2.0 (buoyancy to gravity)
+  particleOriginDistance: number; // 0..60px offset from tone circle edge
   glowBloom: number; // 0..1
   motionTrails: number; // 0..0.8
   ghostingIntensity: number; // 0..1
   lightBleedIntensity: number; // 0..1
+  scanlineIntensity: number; // 0..1
+  scanlineDensity: number; // 1..4 (1=Fine, 2=Standard, 3=Retro, 4=Coarse Arcade)
+  crtVignette: number; // 0..1
+  lensFlareIntensity: number; // 0..1
+  lensFlareStyle: LensFlareStyle;
   soundEnabled: boolean;
   masterVolume: number; // 0..1
   synthWaveform: SynthWaveform;

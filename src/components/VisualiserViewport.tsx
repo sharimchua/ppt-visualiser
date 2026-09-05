@@ -13,6 +13,7 @@ interface VisualiserViewportProps {
   cosmeticsEngine: CosmeticsEngine;
   resetSessionCount?: number;
   onUpdateCell?: (updated: LayoutCellNode) => void;
+  onToneCoordinatesResolved?: (lookup: (midi: number) => { x: number; y: number; radius: number; angle: number } | null) => void;
 }
 
 export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
@@ -23,6 +24,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
   cosmeticsEngine,
   resetSessionCount = 0,
   onUpdateCell,
+  onToneCoordinatesResolved,
 }) => {
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,6 +38,42 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
       pitchClockRendererRef.current.resetRevealsAndActivity();
     }
   }, [resetSessionCount]);
+
+  useEffect(() => {
+    if (onToneCoordinatesResolved) {
+      onToneCoordinatesResolved((midi: number) => {
+        const container = containerRef.current;
+        if (!container) return null;
+        const coords = pitchClockRendererRef.current.getToneCoordinates(
+          midi,
+          config.tonic,
+          config.keyboardLowestMidi
+        );
+        if (!coords) return null;
+
+        // PitchClockRenderer coordinates are local to its cell. Find the orbital cell element:
+        const orbitalCellEl = container.querySelector('[data-module="orbital"]') as HTMLElement | null;
+        if (orbitalCellEl) {
+          const cellRect = orbitalCellEl.getBoundingClientRect();
+          const vpRect = container.getBoundingClientRect();
+          return {
+            x: (cellRect.left - vpRect.left) + coords.x,
+            y: (cellRect.top - vpRect.top) + coords.y,
+            radius: coords.radius,
+            angle: coords.angle,
+          };
+        }
+
+        // Fallback to container center
+        return {
+          x: coords.x,
+          y: coords.y,
+          radius: coords.radius,
+          angle: coords.angle,
+        };
+      });
+    }
+  }, [onToneCoordinatesResolved, config.tonic, config.keyboardLowestMidi]);
 
   // Global whole-display cosmetics & atmosphere rendering loop
   useEffect(() => {
@@ -92,6 +130,16 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
 
       // Reactive sparks & shockwaves
       cosmeticsEngine.renderEffects(overlayCtx, config.glowBloom);
+
+      // Whole-display CRT scanlines & glass curvature vignette
+      cosmeticsEngine.renderScanlines(
+        overlayCtx,
+        width,
+        height,
+        config.scanlineIntensity,
+        config.scanlineDensity,
+        config.crtVignette
+      );
 
       // Whole-display film grain overlay (seamlessly spans all cells)
       cosmeticsEngine.renderFilmGrain(

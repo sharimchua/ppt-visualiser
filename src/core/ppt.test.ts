@@ -15,6 +15,7 @@ import {
 } from './ppt-constants';
 import { DEMO_TRACKS } from './demo-tracks';
 import { CosmeticsEngine } from '../renderers/cosmetics';
+import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { compute2DConvexHull } from './convex-hull';
 import { clusterSimultaneousNotes, resolveChordVoicingGroups } from './chord-clustering';
 import {
@@ -431,6 +432,9 @@ test('Analog Artifacts & Film Grain Scaling: Multi-gauge and Phosphor Ghosts', (
     save: () => {},
     restore: () => {},
     beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
     arc: () => {},
     fill: () => { fillCount++; },
     stroke: () => { strokeCount++; },
@@ -888,6 +892,148 @@ test('Directional Stream Configurations: Valid orientations and directions in de
   assert.strictEqual(loaded.direction, 'rtl');
   assert.ok(loaded.activeLayout);
   assert.ok(loaded.activeLayout.root);
+});
+
+test('Cosmetics Configuration & Persistence: CRT Scanlines, Optical Lens Flares, and Sparks Physics', () => {
+  // Test defaults
+  assert.strictEqual(DEFAULT_CONFIG.scanlineIntensity, 0.0);
+  assert.strictEqual(DEFAULT_CONFIG.scanlineDensity, 2);
+  assert.strictEqual(DEFAULT_CONFIG.crtVignette, 0.2);
+  assert.strictEqual(DEFAULT_CONFIG.lensFlareIntensity, 0.35);
+  assert.strictEqual(DEFAULT_CONFIG.lensFlareStyle, 'cinematic');
+  assert.strictEqual(DEFAULT_CONFIG.particleSize, 1.0);
+  assert.strictEqual(DEFAULT_CONFIG.particleVolume, 1.0);
+  assert.strictEqual(DEFAULT_CONFIG.particleGravity, 0.15);
+  assert.strictEqual(DEFAULT_CONFIG.particleOriginDistance, 0);
+
+  // Test loading and sanitization with custom config
+  const customConfig = {
+    ...DEFAULT_CONFIG,
+    scanlineIntensity: 0.6,
+    scanlineDensity: 3,
+    crtVignette: 0.45,
+    lensFlareIntensity: 0.8,
+    lensFlareStyle: 'starburst' as const,
+    particleSize: 2.2,
+    particleVolume: 1.5,
+    particleGravity: -0.5,
+    particleOriginDistance: 25,
+  };
+  saveConfig(customConfig);
+  const loaded = loadSavedConfig();
+  assert.strictEqual(loaded.scanlineIntensity, 0.6);
+  assert.strictEqual(loaded.scanlineDensity, 3);
+  assert.strictEqual(loaded.crtVignette, 0.45);
+  assert.strictEqual(loaded.lensFlareIntensity, 0.8);
+  assert.strictEqual(loaded.lensFlareStyle, 'starburst');
+  assert.strictEqual(loaded.particleSize, 2.2);
+  assert.strictEqual(loaded.particleVolume, 1.5);
+  assert.strictEqual(loaded.particleGravity, -0.5);
+  assert.strictEqual(loaded.particleOriginDistance, 25);
+  clearSavedConfig();
+});
+
+test('Note Sparks Physics: Particle trajectory, gravity, volume scaling, and radial origin offset', () => {
+  const engine = new CosmeticsEngine();
+
+  // Test 1: Spawning with radial offset
+  const cx = 200;
+  const cy = 200;
+  const offset = 30;
+  const radialAngle = 0; // 0 radians = along +X axis
+  engine.spawnNoteSparks(cx, cy, '#3b82f6', 1.0, 10, 1.5, 1.0, 0.2, offset, radialAngle);
+
+  // Run physics step with downward gravity (+0.2)
+  for (let i = 0; i < 5; i++) {
+    engine.update();
+  }
+
+  // Test 2: Spawning with upward buoyant gravity (-0.8) and high volume
+  engine.spawnNoteSparks(cx, cy, '#ef4444', 0.9, 20, 2.0, 2.5, -0.8, 15, Math.PI / 2);
+  for (let i = 0; i < 5; i++) {
+    engine.update();
+  }
+
+  // Verify renderEffects renders with mock context
+  let arcCount = 0;
+  let fillCount = 0;
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    arc: () => { arcCount++; },
+    fill: () => { fillCount++; },
+    stroke: () => {},
+    fillRect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+  };
+
+  engine.renderEffects(mockCtx, 1.0);
+  assert.ok(arcCount > 0, 'Sparks must render arcs for active particles');
+  assert.ok(fillCount > 0, 'Sparks must fill particles');
+});
+
+test('Optical Lens Flare & CRT Scanline Rendering: Canvas drawing execution', () => {
+  const engine = new CosmeticsEngine();
+
+  let lineCount = 0;
+  let rectCount = 0;
+  let gradCount = 0;
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => { lineCount++; },
+    lineTo: () => { lineCount++; },
+    stroke: () => {},
+    arc: () => {},
+    fill: () => {},
+    fillRect: () => { rectCount++; },
+    translate: () => {},
+    rotate: () => {},
+    scale: () => {},
+    closePath: () => {},
+    createLinearGradient: () => {
+      gradCount++;
+      return { addColorStop: () => {} };
+    },
+    createRadialGradient: () => {
+      gradCount++;
+      return { addColorStop: () => {} };
+    },
+  };
+
+  // Test CRT Scanlines & Screen Vignette
+  engine.renderScanlines(mockCtx, 800, 600, 0.5, 2, 0.3);
+  assert.ok(rectCount > 0, 'Scanlines must draw horizontal raster lines across canvas');
+  assert.ok(gradCount > 0, 'CRT Vignette must create radial gradient for glass curvature falloff');
+
+  // Test Optical Lens Flares with sources across different styles
+  const sources = [
+    { x: 300, y: 200, color: '#f59e0b', velocity: 0.9 },
+    { x: 500, y: 350, color: '#06b6d4', velocity: 0.75 },
+  ];
+
+  // Cinematic style (streaks + ghosts + starburst)
+  engine.renderOpticalLensFlares(mockCtx, 800, 600, sources, 0.6, 'cinematic');
+
+  // Anamorphic style (horizontal streaks)
+  engine.renderOpticalLensFlares(mockCtx, 800, 600, sources, 0.6, 'anamorphic');
+
+  // Starburst style (diffraction rays)
+  engine.renderOpticalLensFlares(mockCtx, 800, 600, sources, 0.6, 'starburst');
+});
+
+test('Pitch Clock Renderer: Tone node coordinate query interface', () => {
+  const renderer = new PitchClockRenderer();
+  // Before rendering, no cached coordinates
+  const initial = renderer.getToneCoordinates(62, 2, 21);
+  assert.strictEqual(initial, null);
+
+  // Reset reveals and activity works cleanly
+  renderer.resetRevealsAndActivity();
 });
 
 

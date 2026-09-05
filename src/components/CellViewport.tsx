@@ -152,6 +152,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
   return (
     <div
       ref={containerRef}
+      data-module={cell.module}
       className="relative w-full h-full min-w-0 min-h-0 overflow-hidden rounded-lg bg-slate-950/20 border border-slate-800/40 backdrop-blur-xs group"
     >
       <canvas ref={canvasRef} className="absolute inset-0 block w-full h-full" />

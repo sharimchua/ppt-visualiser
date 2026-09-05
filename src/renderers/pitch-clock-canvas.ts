@@ -52,6 +52,18 @@ export class PitchClockRenderer {
   private processedNoteStarts: Set<string> = new Set();
   private radialTrails: RadialArcTrail[] = [];
 
+  // Exact on-screen rendered coordinates of each tone node for pixel-precise cosmetic effects
+  private toneCoordinates: Map<string, { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number }> = new Map();
+
+  /**
+   * Look up exact on-screen rendered center coordinates and radius for a MIDI note.
+   */
+  public getToneCoordinates(midi: number, tonic: number, lowestMidi: number = 21): { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number } | null {
+    const res = resolveMidiToRegisterAndSemitone(midi, tonic, lowestMidi);
+    const key = `${res.registerIndex}_${res.semitone}`;
+    return this.toneCoordinates.get(key) || null;
+  }
+
   /**
    * Resets all discovered tones, tone pop scale animations, and organic register activity
    * without needing to reload the webpage.
@@ -782,6 +794,16 @@ export class PitchClockRenderer {
         const angle = getClockAngleRad(s);
         const nx = cx + radius * Math.cos(angle);
         const ny = cy + radius * Math.sin(angle);
+
+        // Record exact rendered coordinates for particle bursts, lens flares, and shocks
+        this.toneCoordinates.set(toneKey, {
+          x: nx,
+          y: ny,
+          radius: baseNodeRadius,
+          angle,
+          semitone: s,
+          registerIndex: r,
+        });
 
         const pitchClass = (tonic + s) % 12;
 

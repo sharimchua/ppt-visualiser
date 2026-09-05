@@ -6,6 +6,7 @@ export interface KineticParticle {
   y: number;
   vx: number;
   vy: number;
+  gravity: number; // Downward or upward acceleration
   radius: number;
   color: string;
   alpha: number;
@@ -86,20 +87,49 @@ export class CosmeticsEngine {
   }
 
   /**
-   * Spawns a burst of kinetic particles radiating from (cx, cy)
+   * Spawns a burst of kinetic particles radiating from (cx, cy).
+   * Fully supports user physics controls:
+   * - sizeMultiplier: scales spark radii
+   * - volumeMultiplier: scales emission quantity
+   * - gravity: vertical acceleration per frame (buoyancy vs gravity)
+   * - originDistance: distance offset from tone circle center
+   * - radialAngle: tone radial direction (if offset distance is applied)
    */
-  public spawnNoteSparks(cx: number, cy: number, color: string, velocity: number, count: number = 18) {
-    const actualCount = Math.round(count * (0.6 + velocity * 0.8));
-    for (let i = 0; i < actualCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (Math.random() * 3 + 1.5) * (0.7 + velocity * 0.8);
-      const life = Math.random() * 40 + 30; // frames
+  public spawnNoteSparks(
+    cx: number,
+    cy: number,
+    color: string,
+    velocity: number,
+    baseCount: number = 18,
+    sizeMultiplier: number = 1.0,
+    volumeMultiplier: number = 1.0,
+    gravity: number = 0.15,
+    originDistance: number = 0,
+    radialAngle: number = 0
+  ) {
+    const totalCount = Math.max(2, Math.round(baseCount * volumeMultiplier * (0.6 + velocity * 0.8)));
+
+    // Origin position offset along radial angle or ring
+    const originX = originDistance > 0 ? cx + originDistance * Math.cos(radialAngle) : cx;
+    const originY = originDistance > 0 ? cy + originDistance * Math.sin(radialAngle) : cy;
+
+    for (let i = 0; i < totalCount; i++) {
+      // Directional bias: outward explosion with random fan
+      const angle = originDistance > 0
+        ? radialAngle + (Math.random() - 0.5) * Math.PI * 1.4
+        : Math.random() * Math.PI * 2;
+
+      const speed = (Math.random() * 3.5 + 1.2) * (0.7 + velocity * 0.8);
+      const life = Math.random() * 45 + 25; // frames
+      const radius = (Math.random() * 2.5 + 1.0) * sizeMultiplier;
+
       this.particles.push({
-        x: cx,
-        y: cy,
+        x: originX,
+        y: originY,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        radius: Math.random() * 2.5 + 1.2,
+        gravity,
+        radius,
         color,
         alpha: 1.0,
         decay: 1.0 / life,
@@ -142,7 +172,8 @@ export class CosmeticsEngine {
       const p = this.particles[i];
       p.x += p.vx;
       p.y += p.vy;
-      p.vx *= 0.94; // friction
+      p.vy += p.gravity; // Apply particle gravity or upward buoyancy
+      p.vx *= 0.94; // air friction
       p.vy *= 0.94;
       p.life++;
       p.alpha = Math.max(0, 1 - (p.life / p.maxLife));
@@ -406,6 +437,154 @@ export class CosmeticsEngine {
         ctx.shadowBlur = 0;
         ctx.fill();
       }
+    }
+
+    // 3. Multi-Element Optical Lens Flare & Diffraction Starburst Rays
+    const flare = config.lensFlareIntensity ?? 0;
+    if (flare > 0.01 && sources.length > 0) {
+      this.renderOpticalLensFlares(ctx, width, _height, sources, flare, config.lensFlareStyle ?? 'cinematic');
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Renders multi-element optical lens flares:
+   * - Diffraction starburst rays radiating from sounding notes
+   * - Anamorphic horizontal optical streak
+   * - Aperture reflection ghosts reflected across viewport optical center
+   */
+  public renderOpticalLensFlares(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    sources: Array<{ x: number; y: number; color: string; velocity: number }>,
+    intensity: number,
+    style: 'anamorphic' | 'starburst' | 'cinematic'
+  ) {
+    const opticalCx = width / 2;
+    const opticalCy = height / 2;
+
+    for (const src of sources) {
+      const alpha = Math.min(1.0, src.velocity * intensity);
+      if (alpha <= 0.02) continue;
+
+      // 1. Starburst diffraction rays
+      if (style === 'starburst' || style === 'cinematic') {
+        const rayCount = 6;
+        const rayLen = Math.min(width * 0.32, 60 + 140 * intensity * src.velocity);
+        const rayWidth = 1.5 + src.velocity;
+
+        ctx.save();
+        ctx.translate(src.x, src.y);
+        ctx.strokeStyle = src.color;
+        ctx.shadowColor = src.color;
+        ctx.shadowBlur = 12 * intensity;
+
+        for (let i = 0; i < rayCount; i++) {
+          const angle = (i * Math.PI) / rayCount + (Math.PI / 12);
+          ctx.beginPath();
+          ctx.moveTo(-Math.cos(angle) * rayLen, -Math.sin(angle) * rayLen);
+          ctx.lineTo(Math.cos(angle) * rayLen, Math.sin(angle) * rayLen);
+
+          const grad = ctx.createLinearGradient(
+            -Math.cos(angle) * rayLen, -Math.sin(angle) * rayLen,
+            Math.cos(angle) * rayLen, Math.sin(angle) * rayLen
+          );
+          grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          grad.addColorStop(0.35, hexToRgba(src.color, alpha * 0.25));
+          grad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.8) + ')');
+          grad.addColorStop(0.65, hexToRgba(src.color, alpha * 0.25));
+          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = rayWidth;
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 2. Anamorphic horizontal flare
+      if (style === 'anamorphic' || style === 'cinematic') {
+        const streakW = Math.min(width * 0.65, 200 + 400 * intensity);
+        const streakH = Math.max(2, 4 * src.velocity);
+
+        const streakGrad = ctx.createLinearGradient(src.x - streakW, src.y, src.x + streakW, src.y);
+        streakGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        streakGrad.addColorStop(0.3, hexToRgba('#38bdf8', alpha * 0.22)); // Sci-fi cyan anamorphic tint
+        streakGrad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.9) + ')');
+        streakGrad.addColorStop(0.7, hexToRgba('#818cf8', alpha * 0.22));
+        streakGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = streakGrad;
+        ctx.fillRect(src.x - streakW, src.y - streakH / 2, streakW * 2, streakH);
+      }
+
+      // 3. Aperture reflection ghosts reflected across optical center
+      if (style === 'cinematic') {
+        const dx = opticalCx - src.x;
+        const dy = opticalCy - src.y;
+
+        // Reflection offsets: 0.4x, 0.75x, 1.25x along optical axis
+        const ghostScales = [0.4, 0.75, 1.35];
+        const ghostSizes = [12, 22, 38];
+
+        for (let g = 0; g < ghostScales.length; g++) {
+          const gx = src.x + dx * (1 + ghostScales[g]);
+          const gy = src.y + dy * (1 + ghostScales[g]);
+          const gr = ghostSizes[g] * (0.8 + src.velocity * 0.4) * intensity;
+          const ga = alpha * (0.15 / (g + 1));
+
+          ctx.beginPath();
+          ctx.arc(gx, gy, gr, 0, Math.PI * 2);
+          ctx.fillStyle = hexToRgba(src.color, ga);
+          ctx.strokeStyle = hexToRgba('#38bdf8', ga * 1.5);
+          ctx.lineWidth = 1;
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  /**
+   * Renders authentic CRT scanlines and barrel vignette
+   */
+  public renderScanlines(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    intensity: number,
+    densityMultiplier: number = 2,
+    vignetteIntensity: number = 0.2
+  ) {
+    if (intensity <= 0.01 && vignetteIntensity <= 0.01) return;
+
+    ctx.save();
+
+    // 1. Interlaced Scanlines
+    if (intensity > 0.01) {
+      // Density: 1=Fine (step 2), 2=Standard (step 3), 3=Retro (step 4), 4=Coarse Arcade (step 6)
+      const step = Math.max(2, Math.min(8, [2, 3, 4, 6][(densityMultiplier || 2) - 1] || 3));
+      ctx.fillStyle = 'rgba(0, 0, 0, ' + Math.min(0.75, intensity * 0.48) + ')';
+
+      for (let y = 0; y < height; y += step) {
+        ctx.fillRect(0, y, width, 1);
+      }
+    }
+
+    // 2. CRT Screen Vignette / Radial Glass Curve Falloff
+    if (vignetteIntensity > 0.01) {
+      const cx = width / 2;
+      const cy = height / 2;
+      const maxR = Math.sqrt(cx * cx + cy * cy);
+      const vigGrad = ctx.createRadialGradient(cx, cy, maxR * 0.55, cx, cy, maxR);
+      vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      vigGrad.addColorStop(0.7, 'rgba(0, 0, 0, ' + (vignetteIntensity * 0.35) + ')');
+      vigGrad.addColorStop(1, 'rgba(0, 0, 0, ' + (vignetteIntensity * 0.85) + ')');
+
+      ctx.fillStyle = vigGrad;
+      ctx.fillRect(0, 0, width, height);
     }
 
     ctx.restore();

@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers } from 'lucide-react';
-import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode } from '../core/types';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv } from 'lucide-react';
+import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
 import { PRESET_LAYOUTS } from '../core/layout-models';
@@ -1106,12 +1106,139 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
           </div>
 
-          {/* Reactive Particle Burst Slider */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+          {/* CRT Scanlines & Glass Optics */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+              <Tv className="w-3.5 h-3.5 text-purple-400" />
+              <span>CRT Scanlines & Glass Curvature</span>
+            </div>
+
+            {/* Scanline Intensity */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Scanline Opacity:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.scanlineIntensity ?? 0) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.scanlineIntensity ?? 0}
+                onChange={(e) => onUpdateConfig({ scanlineIntensity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+            </div>
+
+            {/* Scanline Density */}
+            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+              <label className="text-[11px] text-slate-400 block font-medium">Line Pitch / Density:</label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { density: 1, label: 'Fine (1px)' },
+                  { density: 2, label: 'Standard' },
+                  { density: 3, label: 'Retro' },
+                  { density: 4, label: 'Arcade' },
+                ].map((d) => (
+                  <button
+                    key={d.density}
+                    onClick={() => onUpdateConfig({ scanlineDensity: d.density })}
+                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                      (config.scanlineDensity ?? 2) === d.density
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* CRT Screen Vignette */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>CRT Screen Curvature Vignette:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.crtVignette ?? 0.2) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.crtVignette ?? 0.2}
+                onChange={(e) => onUpdateConfig({ crtVignette: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <p className="text-[10px] text-slate-500 italic">
+                Simulates spherical CRT cathode ray tube edge darkening and curved glass refraction.
+              </p>
+            </div>
+          </div>
+
+          {/* Optical Lens Flare & Starburst */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <label className="block font-medium text-slate-300">Optical Lens Flare & Artifacts</label>
+
+            {/* Lens Flare Intensity */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Lens Flare Brightness:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.lensFlareIntensity ?? 0.35) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.lensFlareIntensity ?? 0.35}
+                onChange={(e) => onUpdateConfig({ lensFlareIntensity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+            </div>
+
+            {/* Flare Style Buttons */}
+            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+              <label className="text-[11px] text-slate-400 block font-medium">Optical Optics Preset:</label>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { style: 'cinematic' as LensFlareStyle, label: 'Cinematic' },
+                  { style: 'anamorphic' as LensFlareStyle, label: 'Anamorphic' },
+                  { style: 'starburst' as LensFlareStyle, label: 'Starburst' },
+                ].map((item) => (
+                  <button
+                    key={item.style}
+                    onClick={() => onUpdateConfig({ lensFlareStyle: item.style })}
+                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                      (config.lensFlareStyle ?? 'cinematic') === item.style
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 italic">
+                Projects multi-element aperture ghosts, horizontal streak flares, and diffraction starburst rays.
+              </p>
+            </div>
+          </div>
+
+          {/* Reactive Note Sparks Physics */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center text-slate-300">
-              <span className="font-medium">Reactive Note Sparks:</span>
+              <span className="font-medium">Reactive Note Sparks</span>
               <span className="font-mono text-purple-400">{Math.round(config.particleIntensity * 100)}%</span>
             </div>
+
+            {/* Spark Master Intensity */}
             <input
               type="range"
               min={0}
@@ -1121,6 +1248,84 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               onChange={(e) => onUpdateConfig({ particleIntensity: parseFloat(e.target.value) })}
               className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
             />
+
+            {/* Particle Size Multiplier */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Particle Size:</span>
+                <span className="font-mono text-purple-400">{(config.particleSize ?? 1.0).toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min={0.5}
+                max={3.0}
+                step={0.1}
+                value={config.particleSize ?? 1.0}
+                onChange={(e) => onUpdateConfig({ particleSize: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+            </div>
+
+            {/* Particle Volume / Count Multiplier */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Sparks Volume / Count:</span>
+                <span className="font-mono text-purple-400">{(config.particleVolume ?? 1.0).toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min={0.2}
+                max={3.0}
+                step={0.1}
+                value={config.particleVolume ?? 1.0}
+                onChange={(e) => onUpdateConfig({ particleVolume: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+            </div>
+
+            {/* Particle Gravity */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Physics Gravity:</span>
+                <span className="font-mono text-purple-400">
+                  {(config.particleGravity ?? 0.15) > 0 ? '+' : ''}{(config.particleGravity ?? 0.15).toFixed(2)}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-2.0}
+                max={2.0}
+                step={0.05}
+                value={config.particleGravity ?? 0.15}
+                onChange={(e) => onUpdateConfig({ particleGravity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>Float Upwards</span>
+                <span>Zero-G</span>
+                <span>Downward Fall</span>
+              </div>
+            </div>
+
+            {/* Origin Distance Offset */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Origin Offset from Tone Node:</span>
+                <span className="font-mono text-purple-400">{config.particleOriginDistance ?? 0}px</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={60}
+                step={2}
+                value={config.particleOriginDistance ?? 0}
+                onChange={(e) => onUpdateConfig({ particleOriginDistance: parseInt(e.target.value, 10) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <p className="text-[10px] text-slate-500 italic">
+                Emanates bursts outward from the exact orbital tone circle perimeter.
+              </p>
+            </div>
           </div>
 
           {/* Glow Bloom Slider */}
