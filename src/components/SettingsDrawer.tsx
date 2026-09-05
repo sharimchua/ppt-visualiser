@@ -1,0 +1,955 @@
+import React from 'react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw } from 'lucide-react';
+import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType } from '../core/types';
+
+interface SettingsDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  config: VisualiserConfig;
+  onUpdateConfig: (partial: Partial<VisualiserConfig>) => void;
+  onResetConfig?: () => void;
+  onResetReveals?: () => void;
+}
+
+export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
+  isOpen,
+  onClose,
+  config,
+  onUpdateConfig,
+  onResetConfig,
+  onResetReveals,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <aside className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-[#0b0e17]/95 backdrop-blur-xl border-l border-slate-800 shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80">
+        <div className="flex items-center gap-2">
+          <Sliders className="w-5 h-5 text-red-500" />
+          <h2 className="font-bold text-slate-100 text-sm tracking-wide">Visualiser Settings</h2>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Settings Scrollable Content */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-6 text-xs text-slate-300">
+        {/* SECTION 1: CONCENTRIC PITCH CLOCK */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Eye className="w-4 h-4 text-red-400" />
+            <span>8-Octave Pitch Clock</span>
+          </div>
+
+          {/* Dynamic Tone Reveal Mode */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <div className="flex justify-between items-center">
+              <label className="block font-medium text-slate-300">Tone Circle Reveal</label>
+              {onResetReveals && (
+                <button
+                  onClick={onResetReveals}
+                  className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1 font-mono transition"
+                  title="Reset discovered tones and organic window"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset (R)</span>
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onUpdateConfig({ toneRevealMode: 'played' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.toneRevealMode === 'played'
+                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Played Tones Only
+              </button>
+              <button
+                onClick={() => onUpdateConfig({ toneRevealMode: 'all' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.toneRevealMode === 'all'
+                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                All 12 Tones
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 italic">
+              {config.toneRevealMode === 'played'
+                ? 'Only tones that have been activated appear on screen, dynamically populating as you play.'
+                : 'All 12 chromatic tones are permanently displayed on active rings.'}
+            </p>
+            {onResetReveals && (
+              <button
+                onClick={onResetReveals}
+                className="w-full mt-1.5 py-1 px-2 rounded border border-red-500/30 bg-red-600/15 hover:bg-red-600/25 text-red-300 font-medium transition flex items-center justify-center gap-1.5 text-[11px]"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-red-400" />
+                <span>Clear Discovered Tones & Activity</span>
+              </button>
+            )}
+          </div>
+
+          {/* Octave Register Range & Spacing */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="block font-medium text-slate-300">Octave Register Range</label>
+              <span className="font-mono text-red-400 font-bold">
+                Oct {config.startOctave} – {config.endOctave}
+              </span>
+            </div>
+
+            {/* Visual Octave Span Badges */}
+            <div className="grid grid-cols-8 gap-1 pt-0.5">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((oct) => {
+                const isSelected = oct >= config.startOctave && oct <= config.endOctave;
+                return (
+                  <button
+                    key={oct}
+                    onClick={() => {
+                      if (oct < config.startOctave) {
+                        onUpdateConfig({ startOctave: oct });
+                      } else if (oct > config.endOctave) {
+                        onUpdateConfig({ endOctave: oct });
+                      } else {
+                        // Toggle or set single
+                        onUpdateConfig({ startOctave: oct, endOctave: oct });
+                      }
+                    }}
+                    className={`py-1 text-center rounded text-[10px] font-mono transition ${
+                      isSelected
+                        ? 'bg-red-600/40 border border-red-500 text-white font-bold'
+                        : 'bg-slate-800/30 border border-slate-800 text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {oct}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Range Sliders */}
+            <div className="space-y-2 pt-1">
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>Start Octave (Outermost):</span>
+                  <span className="font-mono text-slate-200">Oct {config.startOctave}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={config.startOctave}
+                  onChange={(e) => {
+                    const newStart = parseInt(e.target.value, 10);
+                    onUpdateConfig({
+                      startOctave: newStart,
+                      endOctave: Math.max(newStart, config.endOctave),
+                    });
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>End Octave (Innermost):</span>
+                  <span className="font-mono text-slate-200">Oct {config.endOctave}</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={8}
+                  step={1}
+                  value={config.endOctave}
+                  onChange={(e) => {
+                    const newEnd = parseInt(e.target.value, 10);
+                    onUpdateConfig({
+                      endOctave: newEnd,
+                      startOctave: Math.min(newEnd, config.startOctave),
+                    });
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+                />
+              </div>
+            </div>
+
+            {/* Show Octave Numbers Toggle */}
+            <div className="pt-2 border-t border-slate-800/60 flex items-center justify-between">
+              <span className="text-[11px] text-slate-300">Show Octave Numbers (1–8):</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showOctaveNumbers}
+                  onChange={(e) => onUpdateConfig({ showOctaveNumbers: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+          </div>
+
+          {/* Keyboard / Instrument Physical Range */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="block font-medium text-slate-300">Keyboard / Instrument Range</label>
+              <span className="font-mono text-red-400 font-bold text-[11px]">
+                MIDI {config.keyboardLowestMidi} – {config.keyboardHighestMidi}
+              </span>
+            </div>
+
+            {/* Presets */}
+            <div className="grid grid-cols-5 gap-1">
+              {[
+                { label: '88-Key', low: 21, high: 108 },
+                { label: '76-Key', low: 28, high: 103 },
+                { label: '61-Key', low: 36, high: 96 },
+                { label: '49-Key', low: 48, high: 96 },
+                { label: 'Full MIDI', low: 0, high: 127 },
+              ].map((p) => {
+                const isActive = config.keyboardLowestMidi === p.low && config.keyboardHighestMidi === p.high;
+                return (
+                  <button
+                    key={p.label}
+                    onClick={() => onUpdateConfig({ keyboardLowestMidi: p.low, keyboardHighestMidi: p.high })}
+                    className={`py-1 px-1 rounded border text-[10px] text-center transition ${
+                      isActive
+                        ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Lowest and Highest controls */}
+            <div className="space-y-2 pt-1">
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>Lowest Physical Note:</span>
+                  <span className="font-mono text-slate-200">
+                    {['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((config.keyboardLowestMidi % 12) + 12) % 12]} (MIDI {config.keyboardLowestMidi})
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.min(100, config.keyboardHighestMidi - 12)}
+                  step={1}
+                  value={config.keyboardLowestMidi}
+                  onChange={(e) => {
+                    const newLow = parseInt(e.target.value, 10);
+                    onUpdateConfig({ keyboardLowestMidi: newLow });
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex justify-between text-[11px] text-slate-400">
+                  <span>Highest Physical Note:</span>
+                  <span className="font-mono text-slate-200">
+                    {['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((config.keyboardHighestMidi % 12) + 12) % 12]} (MIDI {config.keyboardHighestMidi})
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={Math.max(24, config.keyboardLowestMidi + 12)}
+                  max={127}
+                  step={1}
+                  value={config.keyboardHighestMidi}
+                  onChange={(e) => {
+                    const newHigh = parseInt(e.target.value, 10);
+                    onUpdateConfig({ keyboardHighestMidi: newHigh });
+                  }}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+                />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 italic">
+              Defines the physical boundaries of the instrument. In PPT, octaves are centered on Do (12 o'clock) and span ascending from So (7 o'clock) to Fi (6 o'clock). Non-existent physical keys (e.g. G0 below an 88-key piano when Do is C) are omitted without distorting ring assignment.
+            </p>
+          </div>
+
+          {/* Visual Weight & Register Priority */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Visual Weight & Register Spacing</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {[
+                { id: 'organic', label: 'Organic Window' },
+                { id: 'discovered', label: 'Discovered' },
+                { id: 'fixed8', label: 'Fixed Range' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => onUpdateConfig({ registerWeightMode: opt.id as any })}
+                  className={`py-1.5 px-1 rounded border text-[11px] text-center transition ${
+                    config.registerWeightMode === opt.id
+                      ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-400 italic">
+              {config.registerWeightMode === 'organic'
+                ? 'Dynamic living window: played tones and active registers smoothly fade away after the decay window passes, letting the layout re-balance.'
+                : config.registerWeightMode === 'discovered'
+                ? 'Cumulative discovery: played tones and octaves stay permanently exposed throughout the session until Reset.'
+                : 'Fixed layout: maintains the exact start and end octave range selected above.'}
+            </p>
+
+            {/* Inactive Register Display */}
+            {config.registerWeightMode !== 'fixed8' && (
+              <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
+                <label className="text-[11px] text-slate-400 block font-medium">Inactive Octaves:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => onUpdateConfig({ inactiveRegisterDisplay: 'hidden' })}
+                    className={`py-1 px-1.5 rounded border text-[10px] text-center transition ${
+                      config.inactiveRegisterDisplay === 'hidden'
+                        ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Omit (Maximize Space)
+                  </button>
+                  <button
+                    onClick={() => onUpdateConfig({ inactiveRegisterDisplay: 'faint' })}
+                    className={`py-1 px-1.5 rounded border text-[10px] text-center transition ${
+                      config.inactiveRegisterDisplay === 'faint'
+                        ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Compress Faint
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {config.registerWeightMode === 'organic' && (
+              <div className="pt-2 space-y-1">
+                <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                  <span>Activity Decay Window:</span>
+                  <span className="font-mono text-red-400">{config.organicWindowDurationSec}s</span>
+                </div>
+                <input
+                  type="range"
+                  min={4}
+                  max={30}
+                  step={1}
+                  value={config.organicWindowDurationSec}
+                  onChange={(e) => onUpdateConfig({ organicWindowDurationSec: parseInt(e.target.value, 10) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Glyph Contrast & Fi Styling */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Glyph Contrast & Legibility</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onUpdateConfig({ glyphContrastMode: 'high' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.glyphContrastMode === 'high'
+                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                High-Contrast Luminous
+              </button>
+              <button
+                onClick={() => onUpdateConfig({ glyphContrastMode: 'solfege' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.glyphContrastMode === 'solfege'
+                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Canonical Solfège
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 italic">
+              {config.glyphContrastMode === 'high'
+                ? 'High-contrast mode adds brilliant white outlines to all solfège glyphs and renders Fi with luminous platinum styling for supreme legibility.'
+                : 'Canonical Solfège mode uses traditional darker engravings and subtle boundary styling.'}
+            </p>
+          </div>
+
+          {/* Clock Node Label Priority Slots */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center">
+              <label className="block font-medium text-slate-300">Clock Node Label Priorities</label>
+              <span className="text-[10px] text-slate-400 font-mono">8 Orbit Slots</span>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-relaxed">
+              Assigned from outermost/largest orbit (Slot 1) inward to innermost/smallest orbit (Slot 8). Setting all slots identical applies a uniform label across all octaves.
+            </p>
+
+            {/* Presets */}
+            <div className="space-y-1 pt-0.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Presets:</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('glyphs') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Uniform Solfège
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('triangles') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Piano Triangles
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('syllables') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Solfège Names
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('pitches') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Pitch Names
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('triPitches') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Tri Pitch (△X)
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateConfig({
+                      clockLabelPriorities: [
+                        'triangles',
+                        'triangles',
+                        'glyphs',
+                        'glyphs',
+                        'syllables',
+                        'syllables',
+                        'pitches',
+                        'none',
+                      ],
+                    })
+                  }
+                  className="py-1 px-1.5 rounded border border-red-500/50 bg-red-600/20 hover:bg-red-600/30 text-[10px] text-red-300 transition text-center font-medium"
+                >
+                  Graduated Scale
+                </button>
+              </div>
+            </div>
+
+            {/* 8 Priority Slots */}
+            <div className="space-y-1.5 pt-1">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Priority Slots (Outer → Inner):</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
+                  const currentVal = config.clockLabelPriorities?.[idx] ?? 'glyphs';
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between bg-slate-800/50 px-2 py-1.5 rounded border border-slate-700/50"
+                    >
+                      <span className="font-mono text-[10px] text-slate-400 font-semibold">
+                        S{idx + 1} <span className="text-[9px] text-slate-500 font-normal">{idx === 0 ? 'Max' : idx === 7 ? 'Min' : ''}</span>:
+                      </span>
+                      <select
+                        value={currentVal}
+                        onChange={(e) => {
+                          const updated = [...(config.clockLabelPriorities || Array(8).fill('glyphs'))];
+                          updated[idx] = e.target.value as ClockLabelType;
+                          onUpdateConfig({ clockLabelPriorities: updated });
+                        }}
+                        className="bg-slate-900 text-[10px] text-slate-200 rounded px-1.5 py-0.5 border border-slate-700 focus:outline-none focus:border-red-500 cursor-pointer"
+                      >
+                        <option value="glyphs">Uniform Solfège</option>
+                        <option value="triangles">Piano Triangles</option>
+                        <option value="syllables">Solfège Names</option>
+                        <option value="pitches">Pitch Names</option>
+                        <option value="triPitches">Tri Pitch Class (△X)</option>
+                        <option value="intervals">Intervals</option>
+                        <option value="none">None (Dot)</option>
+                      </select>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Decay Duration */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="font-medium">Note Glow Decay:</span>
+              <span className="font-mono text-red-400">{config.decayDurationMs}ms</span>
+            </div>
+            <input
+              type="range"
+              min={200}
+              max={2500}
+              step={50}
+              value={config.decayDurationMs}
+              onChange={(e) => onUpdateConfig({ decayDurationMs: parseInt(e.target.value, 10) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-red-500"
+            />
+          </div>
+
+          {/* Chord Rays & Geometry */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2.5">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-slate-300 font-medium">Chord Connection Rays</span>
+              <input
+                type="checkbox"
+                checked={config.connectChordRays}
+                onChange={(e) => onUpdateConfig({ connectChordRays: e.target.checked })}
+                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
+              />
+            </label>
+
+            {config.connectChordRays && (
+              <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
+                <div className="flex justify-between items-center text-[11px] text-slate-400">
+                  <span>Chord Geometry:</span>
+                  <span className="font-mono text-red-400">
+                    {config.chordRayMode === 'hull' ? 'Convex Hull' : 'Star Web'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => onUpdateConfig({ chordRayMode: 'hull' })}
+                    className={`py-1 px-2 rounded border text-[11px] text-center transition ${
+                      config.chordRayMode === 'hull'
+                        ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Convex Hull
+                  </button>
+                  <button
+                    onClick={() => onUpdateConfig({ chordRayMode: 'web' })}
+                    className={`py-1 px-2 rounded border text-[11px] text-center transition ${
+                      config.chordRayMode === 'web'
+                        ? 'bg-red-600/30 border-red-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Star Web
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400 italic">
+                  {config.chordRayMode === 'hull'
+                    ? 'Convex Hull outlines the perimeter of simultaneous chord voicings with zero self-intersecting lines.'
+                    : 'Star Web connects all sounding notes in the simultaneous chord cluster.'}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Radial Movement Trails & Shockwaves */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="flex items-center justify-between cursor-pointer">
+              <div>
+                <span className="text-slate-300 font-medium block">Radial Movement Trails</span>
+                <span className="text-[10px] text-slate-400 block">Arc trails between melodic notes on the same octave</span>
+              </div>
+              <input
+                type="checkbox"
+                checked={config.showRadialMovementTrails}
+                onChange={(e) => onUpdateConfig({ showRadialMovementTrails: e.target.checked })}
+                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer ml-2"
+              />
+            </label>
+            <label className="flex items-center justify-between cursor-pointer pt-2 border-t border-slate-800/60">
+              <span className="text-slate-300 font-medium">Kinetic Shockwave Rings</span>
+              <input
+                type="checkbox"
+                checked={config.pulseShockwaves}
+                onChange={(e) => onUpdateConfig({ pulseShockwaves: e.target.checked })}
+                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
+              />
+            </label>
+          </div>
+        </section>
+
+        {/* SECTION 2: LIVE NOTE STREAM */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Sliders className="w-4 h-4 text-orange-400" />
+            <span>Sequential Note Stream</span>
+          </div>
+
+          {/* Stream Mode */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Stream Mode</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onUpdateConfig({ streamMode: 'fixed' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.streamMode === 'fixed'
+                    ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Fixed Length Queue
+              </button>
+              <button
+                onClick={() => onUpdateConfig({ streamMode: 'continuous' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.streamMode === 'continuous'
+                    ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Continuous Scroll
+              </button>
+            </div>
+          </div>
+
+          {/* Fixed Window Size Slider */}
+          {config.streamMode === 'fixed' && (
+            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="font-medium">Fixed Window Size:</span>
+                <span className="font-mono text-orange-400">
+                  {config.fixedWindowSize === 1 ? '1 (Kinetic Rotation Mode)' : `${config.fixedWindowSize} notes`}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={24}
+                step={1}
+                value={config.fixedWindowSize}
+                onChange={(e) => onUpdateConfig({ fixedWindowSize: parseInt(e.target.value, 10) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-orange-500"
+              />
+              {config.fixedWindowSize === 1 && (
+                <div className="mt-2 p-2 rounded bg-orange-950/40 border border-orange-800/60 flex items-start gap-1.5 text-[10px] text-orange-300">
+                  <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Single-Window Showcase active:</strong> Morphs and smoothly rotates Uniform Solfège glyphs between note representations!
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Stream Presentation Format */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Stream Presentation Format</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { id: 'glyphs', label: 'Uniform Solfège' },
+                { id: 'pianoTriangles', label: 'Piano Triangles' },
+                { id: 'syllables', label: 'Solfège Syllables' },
+                { id: 'pitchNames', label: 'Pitch Names' },
+                { id: 'triPitches', label: 'Tri Pitch (△X)' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => onUpdateConfig({ presentationFormat: opt.id as any })}
+                  className={`py-1 px-2 rounded border text-[11px] transition ${
+                    config.presentationFormat === opt.id
+                      ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Register Filters */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Stream Register Filter</label>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'bass', label: 'Bass' },
+                { id: 'mid', label: 'Mid' },
+                { id: 'treble', label: 'Treble' },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  onClick={() => onUpdateConfig({ streamFilterRegister: opt.id as any })}
+                  className={`py-1 px-1.5 rounded border text-[11px] text-center transition ${
+                    config.streamFilterRegister === opt.id
+                      ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 3: COSMETICS & KINETIC AESTHETICS */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>Cosmetics & Kinetic Effects</span>
+          </div>
+
+          {/* Background Theme */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Background Aesthetic</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { id: 'studio-obsidian', label: 'Studio Obsidian' },
+                { id: 'cosmic-abyss', label: 'Cosmic Abyss' },
+                { id: 'carbon-grid', label: 'Carbon Grid' },
+                { id: 'velvet-dark', label: 'Velvet Dark' },
+              ].map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => onUpdateConfig({ backgroundTheme: theme.id as BackgroundTheme })}
+                  className={`py-1 px-2 rounded border text-[11px] transition ${
+                    config.backgroundTheme === theme.id
+                      ? 'bg-purple-600/30 border-purple-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Film Grain Controls (Intensity, Size, Contrast) */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="font-medium">Procedural Film Grain</span>
+              <span className="font-mono text-purple-400">{Math.round(config.filmGrainIntensity * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.filmGrainIntensity}
+              onChange={(e) => onUpdateConfig({ filmGrainIntensity: parseFloat(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+            />
+
+            {/* Grain Size / Gauge */}
+            <div className="space-y-1.5 pt-1 border-t border-slate-800/60">
+              <label className="text-[11px] text-slate-400 block font-medium">Grain Gauge / Scale:</label>
+              <div className="grid grid-cols-4 gap-1">
+                {[
+                  { size: 1, label: '35mm' },
+                  { size: 2, label: '16mm' },
+                  { size: 3, label: '8mm' },
+                  { size: 4, label: 'Chunky' },
+                ].map((g) => (
+                  <button
+                    key={g.size}
+                    onClick={() => onUpdateConfig({ filmGrainSize: g.size })}
+                    className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                      (config.filmGrainSize ?? 1) === g.size
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {g.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Grain Contrast Slider */}
+            <div className="space-y-1 pt-1 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Grain Contrast / Grit:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.filmGrainContrast ?? 0.5) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.filmGrainContrast ?? 0.5}
+                onChange={(e) => onUpdateConfig({ filmGrainContrast: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <div className="flex justify-between text-[9px] text-slate-500">
+                <span>Soft Organic</span>
+                <span>Gritty High-Contrast</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Analog Artifacts & Degradation (Light Bleed & Phosphor Ghosting) */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <label className="block font-medium text-slate-300">Analog Artifacts & Stylized Degradation</label>
+
+            {/* Light Bleed / Halation Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Light Bleed / Halation:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.lightBleedIntensity ?? 0.25) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.lightBleedIntensity ?? 0.25}
+                onChange={(e) => onUpdateConfig({ lightBleedIntensity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <p className="text-[10px] text-slate-500 italic">
+                Emulates 35mm film halation and horizontal anamorphic lens streaks radiating from active tones.
+              </p>
+            </div>
+
+            {/* Phosphor Ghosting Slider */}
+            <div className="space-y-1 pt-2 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                <span>Phosphor Ghosting:</span>
+                <span className="font-mono text-purple-400">
+                  {Math.round((config.ghostingIntensity ?? 0.0) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={config.ghostingIntensity ?? 0.0}
+                onChange={(e) => onUpdateConfig({ ghostingIntensity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+              />
+              <p className="text-[10px] text-slate-500 italic">
+                Emulates vintage oscilloscope / CRT phosphor decay with chromatic aberration trails.
+              </p>
+            </div>
+          </div>
+
+          {/* Reactive Particle Burst Slider */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="font-medium">Reactive Note Sparks:</span>
+              <span className="font-mono text-purple-400">{Math.round(config.particleIntensity * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.particleIntensity}
+              onChange={(e) => onUpdateConfig({ particleIntensity: parseFloat(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+            />
+          </div>
+
+          {/* Glow Bloom Slider */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="font-medium">Neon Glow Bloom:</span>
+              <span className="font-mono text-purple-400">{Math.round(config.glowBloom * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0.1}
+              max={1.5}
+              step={0.05}
+              value={config.glowBloom}
+              onChange={(e) => onUpdateConfig({ glowBloom: parseFloat(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+            />
+          </div>
+
+          {/* Motion Trails Slider */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+            <div className="flex justify-between items-center text-slate-300">
+              <span className="font-medium">Motion Trail Persistence:</span>
+              <span className="font-mono text-purple-400">{Math.round(config.motionTrails * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={0.7}
+              step={0.05}
+              value={config.motionTrails}
+              onChange={(e) => onUpdateConfig({ motionTrails: parseFloat(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+            />
+          </div>
+        </section>
+
+        {/* SECTION 4: SOUND SYNTHESIZER */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Volume2 className="w-4 h-4 text-emerald-400" />
+            <span>Audio Synthesizer</span>
+          </div>
+
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Waveform Timbre</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { id: 'warm-poly', label: 'Warm Poly' },
+                { id: 'sine', label: 'Pure Sine' },
+                { id: 'triangle', label: 'Triangle' },
+                { id: 'sawtooth', label: 'Sawtooth' },
+              ].map((wf) => (
+                <button
+                  key={wf.id}
+                  onClick={() => onUpdateConfig({ synthWaveform: wf.id as SynthWaveform })}
+                  className={`py-1 px-2 rounded border text-[11px] transition ${
+                    config.synthWaveform === wf.id
+                      ? 'bg-emerald-600/30 border-emerald-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {wf.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Footer: Reset & Autosave status */}
+      <div className="p-3.5 border-t border-slate-800 bg-[#080b12] flex items-center justify-between">
+        <button
+          onClick={onResetConfig}
+          className="text-xs text-slate-400 hover:text-red-400 flex items-center gap-1.5 transition cursor-pointer"
+          title="Reset all settings to default PPT layout"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          <span>Reset to Defaults</span>
+        </button>
+        <span className="text-[10px] text-slate-500 font-mono">Autosaved to browser</span>
+      </div>
+    </aside>
+  );
+};
