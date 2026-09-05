@@ -14,7 +14,6 @@ import {
   LayoutGrid,
   Radio,
   Music2,
-  Disc3,
   RotateCcw,
   Share2,
   Check,
@@ -104,9 +103,11 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
       {/* Top Row on Mobile / Left Group on Desktop: Brand + Elegant Tonic Selector */}
       <div className="flex items-center justify-between md:justify-start gap-2 sm:gap-3 min-w-0">
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-br from-red-500 via-orange-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-red-500/20 flex-shrink-0">
-            <Disc3 className="w-4 h-4 sm:w-5 sm:h-5 text-white animate-spin-slow" />
-          </div>
+          <img
+            src="/logo.svg"
+            alt="PPT Logo"
+            className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-md drop-shadow-[0_0_8px_rgba(225,54,16,0.35)] flex-shrink-0 select-none hover:scale-105 transition-transform"
+          />
           <div className="min-w-0">
             <span className="font-bold text-xs sm:text-sm tracking-wide text-white truncate block">
               <span className="sm:hidden">PPT</span>
@@ -140,7 +141,7 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
             <div className="absolute left-0 top-full mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-3 z-50 text-xs space-y-3 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                  <Disc3 className="w-3.5 h-3.5 text-red-400" />
+                  <img src="/logo.svg" alt="PPT Logo" className="w-4 h-4 object-contain" />
                   <span>Tonic / Key ("Do")</span>
                 </div>
                 <button
