@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { VisualiserConfig, ActiveNote, StreamItem } from '../core/types';
+import { VisualiserConfig, ActiveNote, StreamItem, LayoutCellNode } from '../core/types';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
 import { CosmeticsEngine } from '../renderers/cosmetics';
+import { FlexLayoutRenderer } from './FlexLayoutRenderer';
 
 interface VisualiserViewportProps {
   config: VisualiserConfig;
@@ -11,6 +12,7 @@ interface VisualiserViewportProps {
   streamItems: StreamItem[];
   cosmeticsEngine: CosmeticsEngine;
   resetSessionCount?: number;
+  onUpdateCell?: (updated: LayoutCellNode) => void;
 }
 
 export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
@@ -20,8 +22,10 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
   streamItems,
   cosmeticsEngine,
   resetSessionCount = 0,
+  onUpdateCell,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const pitchClockRendererRef = useRef(new PitchClockRenderer());
@@ -33,200 +37,65 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     }
   }, [resetSessionCount]);
 
+  // Global whole-display cosmetics & atmosphere rendering loop
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const bgCanvas = bgCanvasRef.current;
+    const overlayCanvas = overlayCanvasRef.current;
+    if (!bgCanvas || !overlayCanvas) return;
+
+    const bgCtx = bgCanvas.getContext('2d');
+    const overlayCtx = overlayCanvas.getContext('2d');
+    if (!bgCtx || !overlayCtx) return;
 
     let animId: number;
 
-    const render = (time: number) => {
-      // Dimensions
+    const render = (_time: number) => {
       const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
+      const width = bgCanvas.width / dpr;
+      const height = bgCanvas.height / dpr;
 
       if (width <= 0 || height <= 0) {
         animId = requestAnimationFrame(render);
         return;
       }
 
-      ctx.save();
-      ctx.scale(dpr, dpr);
+      // 1. Render Global Display Background & Theme on background canvas
+      bgCtx.save();
+      bgCtx.scale(dpr, dpr);
+      cosmeticsEngine.renderBackground(bgCtx, width, height, config.backgroundTheme, config.motionTrails);
+      bgCtx.restore();
 
-      // 1. Cosmetics: Render Background & Theme
-      cosmeticsEngine.renderBackground(ctx, width, height, config.backgroundTheme, config.motionTrails);
-
-      // 2. Update Cosmetics physics (particles, shockwaves)
+      // 2. Update Cosmetics Physics (particles, shockwaves)
       cosmeticsEngine.update();
 
-      // 3. Responsive Window-Maximizing Layout Calculation
-      const layout = config.layoutMode;
-      let clockCx = width / 2;
-      let clockCy = height / 2;
-      let clockRadius = Math.min(width, height) * 0.45;
+      // 3. Render Global Cosmetics & Analog Artifacts on top overlay canvas
+      overlayCtx.save();
+      overlayCtx.scale(dpr, dpr);
+      overlayCtx.clearRect(0, 0, width, height);
 
-      if (layout === 'monument') {
-        // Clock Monument: Pitch Clock takes maximized area, stream is compact bottom bar
-        const streamHeight = Math.max(65, Math.min(100, height * 0.14));
-        const clockHeight = height - streamHeight - 12;
-        clockCx = width / 2;
-        clockCy = clockHeight / 2;
-        clockRadius = Math.min(width, clockHeight) * 0.45;
+      const cx = width / 2;
+      const cy = height / 2;
+      const radius = Math.min(width, height) * 0.45;
 
-        ctx.save();
-        pitchClockRendererRef.current.render(
-          ctx,
-          width,
-          clockHeight,
-          activeNotes,
-          decayingNotes,
-          config,
-          time
-        );
-        ctx.restore();
-
-        // Stream bar at bottom
-        const streamWidth = Math.min(width - 40, 1100);
-        const streamX = (width - streamWidth) / 2;
-        const streamY = height - streamHeight - 8;
-
-        streamRendererRef.current.render(
-          ctx,
-          streamX,
-          streamY,
-          streamWidth,
-          streamHeight,
-          streamItems,
-          config,
-          time
-        );
-      } else if (layout === 'river') {
-        // Stream River: Dominant central scrolling stream, clock radar in corner
-        const streamHeight = Math.min(height * 0.55, 300);
-        const streamY = (height - streamHeight) / 2;
-        const streamWidth = width - 40;
-        const streamX = 20;
-
-        streamRendererRef.current.render(
-          ctx,
-          streamX,
-          streamY,
-          streamWidth,
-          streamHeight,
-          streamItems,
-          config,
-          time
-        );
-
-        // Circular Pitch Clock Radar
-        const radarSize = Math.min(width * 0.28, height * 0.32, 220);
-        clockCx = (width - radarSize - 20) + radarSize / 2;
-        clockCy = 20 + radarSize / 2;
-        clockRadius = radarSize * 0.45;
-
-        ctx.save();
-        ctx.translate(width - radarSize - 20, 20);
-        pitchClockRendererRef.current.render(
-          ctx,
-          radarSize,
-          radarSize,
-          activeNotes,
-          decayingNotes,
-          config,
-          time
-        );
-        ctx.restore();
-      } else {
-        // Balanced Duo: Pitch Clock centered, Stream ribbon below
-        const isLandscape = width > height * 1.3;
-        if (isLandscape) {
-          // Horizontal split: Pitch clock in left 62%, stream in right 38%
-          const clockWidth = width * 0.62;
-          clockCx = clockWidth / 2;
-          clockCy = height / 2;
-          clockRadius = Math.min(clockWidth, height) * 0.45;
-
-          pitchClockRendererRef.current.render(
-            ctx,
-            clockWidth,
-            height,
-            activeNotes,
-            decayingNotes,
-            config,
-            time
-          );
-
-          const streamX = clockWidth + 10;
-          const streamWidth = width - clockWidth - 25;
-          const streamHeight = height - 40;
-          const streamY = 20;
-
-          streamRendererRef.current.render(
-            ctx,
-            streamX,
-            streamY,
-            streamWidth,
-            streamHeight,
-            streamItems,
-            config,
-            time
-          );
-        } else {
-          // Vertical split: Pitch clock on top (72%), stream at bottom (28%)
-          const streamHeight = Math.max(80, Math.min(130, height * 0.22));
-          const clockHeight = height - streamHeight - 16;
-          clockCx = width / 2;
-          clockCy = clockHeight / 2;
-          clockRadius = Math.min(width, clockHeight) * 0.45;
-
-          pitchClockRendererRef.current.render(
-            ctx,
-            width,
-            clockHeight,
-            activeNotes,
-            decayingNotes,
-            config,
-            time
-          );
-
-          const streamWidth = Math.min(width - 24, 1200);
-          const streamX = (width - streamWidth) / 2;
-          const streamY = height - streamHeight - 8;
-
-          streamRendererRef.current.render(
-            ctx,
-            streamX,
-            streamY,
-            streamWidth,
-            streamHeight,
-            streamItems,
-            config,
-            time
-          );
-        }
-      }
-
-      // 4. Render Analog Artifacts: Light Bleed / Halation & Phosphor Ghosting
+      // Analog artifacts (light bleed halation, phosphor ghosting)
       cosmeticsEngine.renderAnalogArtifacts(
-        ctx,
+        overlayCtx,
         width,
         height,
         activeNotes,
         decayingNotes,
-        clockCx,
-        clockCy,
-        clockRadius,
+        cx,
+        cy,
+        radius,
         config
       );
 
-      // 5. Render Cosmetic Effects: Particles & Shockwaves
-      cosmeticsEngine.renderEffects(ctx, config.glowBloom);
+      // Reactive sparks & shockwaves
+      cosmeticsEngine.renderEffects(overlayCtx, config.glowBloom);
 
-      // 6. Render Film Grain Overlay with Size & Contrast
+      // Whole-display film grain overlay (seamlessly spans all cells)
       cosmeticsEngine.renderFilmGrain(
-        ctx,
+        overlayCtx,
         width,
         height,
         config.filmGrainIntensity,
@@ -234,28 +103,37 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
         config.filmGrainContrast
       );
 
-      ctx.restore();
+      overlayCtx.restore();
 
       animId = requestAnimationFrame(render);
     };
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [config, activeNotes, decayingNotes, streamItems, cosmeticsEngine]);
+  }, [config, activeNotes, decayingNotes, cosmeticsEngine]);
 
-  // Handle high-DPI canvas resizing
+  // High-DPI canvas resizing
   useEffect(() => {
     const handleResize = () => {
-      const canvas = canvasRef.current;
       const container = containerRef.current;
-      if (!canvas || !container) return;
+      const bgCanvas = bgCanvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
+      if (!container || !bgCanvas || !overlayCanvas) return;
 
       const dpr = window.devicePixelRatio || 1;
       const rect = container.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      const pixelWidth = rect.width * dpr;
+      const pixelHeight = rect.height * dpr;
+
+      bgCanvas.width = pixelWidth;
+      bgCanvas.height = pixelHeight;
+      bgCanvas.style.width = `${rect.width}px`;
+      bgCanvas.style.height = `${rect.height}px`;
+
+      overlayCanvas.width = pixelWidth;
+      overlayCanvas.height = pixelHeight;
+      overlayCanvas.style.width = `${rect.width}px`;
+      overlayCanvas.style.height = `${rect.height}px`;
     };
 
     handleResize();
@@ -270,9 +148,35 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     };
   }, []);
 
+  const layoutRoot = config.activeLayout?.root;
+
   return (
-    <div ref={containerRef} className="relative flex-1 w-full h-full overflow-hidden">
-      <canvas ref={canvasRef} className="absolute inset-0 block w-full h-full" />
+    <div ref={containerRef} className="relative flex-1 w-full h-full overflow-hidden p-2.5">
+      {/* 1. Global Display Background Canvas (seamless theme across whole display) */}
+      <canvas ref={bgCanvasRef} className="absolute inset-0 block w-full h-full pointer-events-none" />
+
+      {/* 2. Flexbox Multi-Cell Layout Engine (renders modular cell hierarchy) */}
+      <div className="relative z-10 w-full h-full">
+        {layoutRoot && (
+          <FlexLayoutRenderer
+            node={layoutRoot}
+            config={config}
+            activeNotes={activeNotes}
+            decayingNotes={decayingNotes}
+            streamItems={streamItems}
+            pitchClockRenderer={pitchClockRendererRef.current}
+            streamRenderer={streamRendererRef.current}
+            onUpdateCell={onUpdateCell}
+          />
+        )}
+      </div>
+
+      {/* 3. Global Whole-Display Cosmetics & Atmosphere Overlay (film grain, light bleed, phosphor ghosting) */}
+      <canvas
+        ref={overlayCanvasRef}
+        className="absolute inset-0 block w-full h-full pointer-events-none z-20"
+      />
     </div>
   );
 };
+

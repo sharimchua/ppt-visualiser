@@ -13,13 +13,17 @@ import {
   Radio,
   Music2,
   Disc3,
-  Waves,
   RotateCcw,
+  Share2,
+  Check,
+  Link,
+  Copy,
 } from 'lucide-react';
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
 import { midiManagerInstance } from '../core/midi-manager';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
+import { PRESET_LAYOUTS, encodeLayoutToSlug } from '../core/layout-models';
 
 interface ControlToolbarProps {
   config: VisualiserConfig;
@@ -70,6 +74,10 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   onResetState,
 }) => {
   const [showMidiMenu, setShowMidiMenu] = useState(false);
+  const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [includeAestheticsInSlug, setIncludeAestheticsInSlug] = useState(true);
+  const [copiedLink, setCopiedLink] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatTime = (sec: number) => {
@@ -294,24 +302,131 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
           )}
         </div>
 
-        {/* Layout Mode Picker */}
-        <div className="hidden sm:flex items-center bg-slate-800/60 rounded-md p-0.5 border border-slate-700/50">
-          {(['balanced', 'monument', 'river'] as LayoutMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => onUpdateConfig({ layoutMode: mode })}
-              className={`px-2 py-1 text-xs rounded capitalize transition ${
-                config.layoutMode === mode
-                  ? 'bg-red-600 text-white font-medium shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-              title={`Switch layout to ${mode}`}
-            >
-              {mode === 'balanced' && <Layers className="w-3.5 h-3.5" />}
-              {mode === 'monument' && <Disc3 className="w-3.5 h-3.5" />}
-              {mode === 'river' && <Waves className="w-3.5 h-3.5" />}
-            </button>
-          ))}
+        {/* Layout Mode Picker Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLayoutMenu((prev) => !prev)}
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border border-slate-700/70 bg-slate-800/70 text-slate-200 hover:bg-slate-700/80 transition cursor-pointer"
+            title="Switch Layout Preset"
+          >
+            <Layers className="w-3.5 h-3.5 text-red-400" />
+            <span className="capitalize">{config.layoutMode.replace('-', ' ')}</span>
+          </button>
+
+          {showLayoutMenu && (
+            <div className="absolute right-0 top-full mt-2 w-56 bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-2 z-50 text-xs space-y-1">
+              <div className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider px-2 py-1 border-b border-slate-800">
+                Flexbox Layout Presets
+              </div>
+              {(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
+                const preset = PRESET_LAYOUTS[mode];
+                const isSelected = config.layoutMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      onUpdateConfig({
+                        layoutMode: mode,
+                        activeLayout: preset,
+                      });
+                      setShowLayoutMenu(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-1.5 rounded transition flex items-center justify-between text-xs ${
+                      isSelected
+                        ? 'bg-red-600 text-white font-medium shadow'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{preset.name}</span>
+                    {isSelected && <span>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Share Layout & Deep Link Popover */}
+        <div className="relative">
+          <button
+            onClick={() => setShowShareMenu((prev) => !prev)}
+            className="p-1.5 rounded-md border border-slate-700/70 bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-700/80 transition cursor-pointer"
+            title="Share Layout & Deep Link"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
+
+          {showShareMenu && (
+            <div className="absolute right-0 top-full mt-2 w-72 bg-[#0e1320] border border-slate-700 rounded-lg shadow-2xl p-3 z-50 text-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <Link className="w-3.5 h-3.5 text-red-400" />
+                  Share Layout Link
+                </span>
+                <button
+                  onClick={() => setShowShareMenu(false)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Generate a deep-link slug encoding your active layout cells and module settings:
+              </p>
+
+              <label className="flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={includeAestheticsInSlug}
+                  onChange={(e) => setIncludeAestheticsInSlug(e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
+                />
+                <span>Include Visual Aesthetics & Theme</span>
+              </label>
+
+              <div className="pt-1">
+                <button
+                  onClick={() => {
+                    const layout = {
+                      ...config.activeLayout,
+                      aesthetics: includeAestheticsInSlug
+                        ? {
+                            backgroundTheme: config.backgroundTheme,
+                            filmGrainIntensity: config.filmGrainIntensity,
+                            filmGrainSize: config.filmGrainSize,
+                            filmGrainContrast: config.filmGrainContrast,
+                            particleIntensity: config.particleIntensity,
+                            glowBloom: config.glowBloom,
+                            motionTrails: config.motionTrails,
+                            ghostingIntensity: config.ghostingIntensity,
+                            lightBleedIntensity: config.lightBleedIntensity,
+                          }
+                        : undefined,
+                    };
+                    const slug = encodeLayoutToSlug(layout, includeAestheticsInSlug);
+                    const url = `${window.location.origin}${window.location.pathname}?layout=${slug}`;
+                    navigator.clipboard.writeText(url);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2500);
+                  }}
+                  className="w-full py-1.5 bg-red-600 hover:bg-red-500 text-white rounded font-medium transition flex items-center justify-center gap-1.5 text-xs shadow-md shadow-red-600/20"
+                >
+                  {copiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-300" />
+                      <span>Copied to Clipboard!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Deep Link URL</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sound Mute Button */}

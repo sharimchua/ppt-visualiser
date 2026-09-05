@@ -801,6 +801,96 @@ test('Auto-Tonic Configuration Persistence: Save, load, and sanitize', () => {
   assert.strictEqual(reverted.autoTonicSensitivity, 'balanced');
 });
 
+test('Flexbox Layout System: Presets, Cell Traversal, and Tree Modification', async () => {
+  const {
+    PRESET_BALANCED,
+    PRESET_WATERFALL,
+    PRESET_DUAL_STREAM,
+    getAllCellNodes,
+    findCellNodeById,
+    updateCellInTree,
+  } = await import('./layout-models');
+
+  // 1. Presets have valid root container nodes and cells
+  const balancedCells = getAllCellNodes(PRESET_BALANCED.root);
+  assert.strictEqual(balancedCells.length, 2, 'Balanced layout must have 2 cells');
+  assert.ok(balancedCells.some((c) => c.module === 'orbital'), 'Must have orbital cell');
+  assert.ok(balancedCells.some((c) => c.module === 'stream'), 'Must have stream cell');
+
+  const dualStreamCells = getAllCellNodes(PRESET_DUAL_STREAM.root);
+  assert.strictEqual(dualStreamCells.length, 3, 'Dual stream layout must have 3 cells');
+  const streamCells = dualStreamCells.filter((c) => c.module === 'stream');
+  assert.strictEqual(streamCells.length, 2, 'Dual stream layout must have 2 stream cells');
+
+  // 2. Finding cell by ID
+  const foundCell = findCellNodeById(PRESET_WATERFALL.root, 'cell-stream-waterfall');
+  assert.ok(foundCell, 'Must find cell-stream-waterfall');
+  assert.strictEqual(foundCell?.module, 'stream');
+  assert.strictEqual(foundCell?.configOverrides?.direction, 'ttb');
+
+  // 3. Immutably update cell in tree
+  const updatedRoot = updateCellInTree(PRESET_WATERFALL.root, 'cell-stream-waterfall', (cell) => ({
+    ...cell,
+    configOverrides: {
+      ...cell.configOverrides,
+      direction: 'btt',
+    },
+  }));
+  const updatedCell = findCellNodeById(updatedRoot, 'cell-stream-waterfall');
+  assert.strictEqual(updatedCell?.configOverrides?.direction, 'btt', 'Cell direction must be updated to btt');
+});
+
+test('Layout Deep Linking Slugs: URL-Safe Base64 Serialization & Deserialization', async () => {
+  const {
+    PRESET_WATERFALL,
+    encodeLayoutToSlug,
+    decodeLayoutFromSlug,
+  } = await import('./layout-models');
+
+  // 1. Encode layout without aesthetics
+  const slugWithoutAesthetics = encodeLayoutToSlug(PRESET_WATERFALL, false);
+  assert.ok(typeof slugWithoutAesthetics === 'string' && slugWithoutAesthetics.length > 0);
+  assert.strictEqual(slugWithoutAesthetics.includes('+'), false, 'Slug must be URL-safe (no +)');
+  assert.strictEqual(slugWithoutAesthetics.includes('/'), false, 'Slug must be URL-safe (no /)');
+  assert.strictEqual(slugWithoutAesthetics.includes('='), false, 'Slug must be URL-safe (no padding =)');
+
+  const decodedWithout = decodeLayoutFromSlug(slugWithoutAesthetics);
+  assert.ok(decodedWithout !== null);
+  assert.strictEqual(decodedWithout?.layout.id, PRESET_WATERFALL.id);
+  assert.strictEqual(decodedWithout?.hasAesthetics, false);
+  assert.strictEqual(decodedWithout?.layout.root.direction, 'row');
+
+  // 2. Encode layout WITH aesthetics
+  const layoutWithAesthetics = {
+    ...PRESET_WATERFALL,
+    aesthetics: {
+      backgroundTheme: 'cosmic-abyss' as const,
+      filmGrainIntensity: 0.8,
+      filmGrainSize: 3,
+      filmGrainContrast: 0.9,
+    },
+  };
+  const slugWithAesthetics = encodeLayoutToSlug(layoutWithAesthetics, true);
+  const decodedWith = decodeLayoutFromSlug(slugWithAesthetics);
+  assert.ok(decodedWith !== null);
+  assert.strictEqual(decodedWith?.hasAesthetics, true);
+  assert.strictEqual(decodedWith?.layout.aesthetics?.backgroundTheme, 'cosmic-abyss');
+  assert.strictEqual(decodedWith?.layout.aesthetics?.filmGrainIntensity, 0.8);
+  assert.strictEqual(decodedWith?.layout.aesthetics?.filmGrainSize, 3);
+});
+
+test('Directional Stream Configurations: Valid orientations and directions in default config', () => {
+  assert.strictEqual(DEFAULT_CONFIG.orientation, 'horizontal');
+  assert.strictEqual(DEFAULT_CONFIG.direction, 'rtl');
+
+  const loaded = loadSavedConfig();
+  assert.strictEqual(loaded.orientation, 'horizontal');
+  assert.strictEqual(loaded.direction, 'rtl');
+  assert.ok(loaded.activeLayout);
+  assert.ok(loaded.activeLayout.root);
+});
+
+
 
 
 

@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass } from 'lucide-react';
-import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity } from '../core/types';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers } from 'lucide-react';
+import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
+import { PRESET_LAYOUTS } from '../core/layout-models';
 
 interface SettingsDrawerProps {
   isOpen: boolean;
@@ -783,6 +784,101 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
           </div>
 
+          {/* Stream Orientation & Flow Direction */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <label className="block font-medium text-slate-300">Orientation & Flow Direction</label>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-[11px] text-slate-400">
+                <span>Conveyor Orientation:</span>
+                <span className="font-mono text-orange-400 capitalize">{config.orientation}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() =>
+                    onUpdateConfig({
+                      orientation: 'horizontal',
+                      direction: config.direction === 'ttb' || config.direction === 'btt' ? 'rtl' : config.direction,
+                    })
+                  }
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    config.orientation === 'horizontal'
+                      ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Horizontal
+                </button>
+                <button
+                  onClick={() =>
+                    onUpdateConfig({
+                      orientation: 'vertical',
+                      direction: config.direction === 'rtl' || config.direction === 'ltr' ? 'ttb' : config.direction,
+                    })
+                  }
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    config.orientation === 'vertical'
+                      ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Vertical
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center text-[11px] text-slate-400 pt-1">
+                <span>Flow Direction:</span>
+                <span className="font-mono text-orange-400 uppercase">{config.direction}</span>
+              </div>
+              {config.orientation === 'horizontal' ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onUpdateConfig({ direction: 'rtl' })}
+                    className={`py-1.5 px-2 rounded border text-center transition ${
+                      config.direction === 'rtl'
+                        ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Right to Left (RTL)
+                  </button>
+                  <button
+                    onClick={() => onUpdateConfig({ direction: 'ltr' })}
+                    className={`py-1.5 px-2 rounded border text-center transition ${
+                      config.direction === 'ltr'
+                        ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Left to Right (LTR)
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => onUpdateConfig({ direction: 'ttb' })}
+                    className={`py-1.5 px-2 rounded border text-center transition ${
+                      config.direction === 'ttb'
+                        ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Waterfall (Top to Bottom)
+                  </button>
+                  <button
+                    onClick={() => onUpdateConfig({ direction: 'btt' })}
+                    className={`py-1.5 px-2 rounded border text-center transition ${
+                      config.direction === 'btt'
+                        ? 'bg-orange-600/30 border-orange-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Upward (Bottom to Top)
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Fixed Window Size Slider */}
           {config.streamMode === 'fixed' && (
             <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
@@ -1091,6 +1187,37 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* SECTION 5: LAYOUT & DEEP LINK SLUGS */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Layers className="w-4 h-4 text-sky-400" />
+            <span>Layout Architecture & Slugs</span>
+          </div>
+
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <label className="block font-medium text-slate-300">Active Layout Preset</label>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => onUpdateConfig({ layoutMode: mode, activeLayout: PRESET_LAYOUTS[mode] })}
+                  className={`py-1.5 px-2 rounded border text-[11px] capitalize transition ${
+                    config.layoutMode === mode
+                      ? 'bg-sky-600/30 border-sky-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {mode.replace('-', ' ')}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-[10px] text-slate-500 italic">
+              {config.activeLayout?.description || 'Flexbox layout with modular cells.'}
+            </p>
           </div>
         </section>
       </div>

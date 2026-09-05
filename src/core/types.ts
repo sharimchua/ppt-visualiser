@@ -53,9 +53,11 @@ export interface StreamItem {
 }
 
 export type StreamMode = 'fixed' | 'continuous';
+export type StreamOrientation = 'horizontal' | 'vertical';
+export type StreamDirection = 'rtl' | 'ltr' | 'ttb' | 'btt';
 export type PresentationFormat = 'glyphs' | 'pianoTriangles' | 'syllables' | 'pitchNames' | 'triPitches';
 export type BackgroundTheme = 'studio-obsidian' | 'cosmic-abyss' | 'carbon-grid' | 'velvet-dark';
-export type LayoutMode = 'balanced' | 'monument' | 'river';
+export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus';
 export type SynthWaveform = 'warm-poly' | 'sine' | 'triangle' | 'sawtooth';
 export type ToneRevealMode = 'played' | 'all';
 export type RegisterWeightMode = 'organic' | 'discovered' | 'fixed8';
@@ -80,23 +82,16 @@ export type AutoTonicMode =
 
 export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
 
-export interface VisualiserConfig {
-  // General & Tonic
-  tonic: number; // 0=C, 1=C#, 2=D ...
-  accidentalStyle: AccidentalStyle;
-  autoTonicEnabled: boolean;
-  autoTonicMode: AutoTonicMode;
-  autoTonicCustomDegrees: number[]; // e.g. [0, 2, 4, 5, 7, 9, 11]
-  autoTonicSensitivity: AutoTonicSensitivity;
-  
-  // Pitch Clock
+// --- FLEXBOX LAYOUT ARCHITECTURE ---
+export type LayoutFlexDirection = 'row' | 'column';
+export type VisualiserModuleType = 'orbital' | 'stream';
+
+export interface OrbitalModuleConfig {
   octaveMode: 'dynamic' | 'fixed8';
-  keyboardLowestMidi: number; // Lowest note of keyboard/instrument (default 21 = A1)
-  keyboardHighestMidi: number; // Highest note of keyboard/instrument (default 108 = C8)
-  startOctave: number; // 1..8 (lowest / outermost ring)
-  endOctave: number; // 1..8 (highest / innermost ring)
-  showOctaveNumbers: boolean; // Show clean octave numbers (1..8) on rings
-  clockLabelPriorities: ClockLabelType[]; // 8 priority slots for orbit labels from largest to smallest orbit
+  startOctave: number; // 1..8
+  endOctave: number; // 1..8
+  showOctaveNumbers: boolean;
+  clockLabelPriorities: ClockLabelType[];
   toneRevealMode: ToneRevealMode;
   registerWeightMode: RegisterWeightMode;
   inactiveRegisterDisplay: InactiveRegisterDisplay;
@@ -112,33 +107,81 @@ export interface VisualiserConfig {
   chordRayMode: 'hull' | 'web';
   showRadialMovementTrails: boolean;
   pulseShockwaves: boolean;
-  
-  // Note Stream
+}
+
+export interface StreamModuleConfig {
   streamMode: StreamMode;
+  orientation: StreamOrientation;
+  direction: StreamDirection;
   fixedWindowSize: number; // 1..32
   presentationFormat: PresentationFormat;
   singleWindowRotationAnimation: boolean;
   scrollSpeed: number; // px per second
   streamFilterRegister: 'all' | 'bass' | 'mid' | 'treble';
   streamMinVelocity: number; // 0..1
+}
 
-  // Cosmetics & Aesthetics
+export type ModuleCellConfig = OrbitalModuleConfig | StreamModuleConfig;
+
+export interface LayoutCellNode {
+  id: string;
+  type: 'cell';
+  module: VisualiserModuleType;
+  title?: string;
+  flex?: number; // flex-grow weight (default 1)
+  minSize?: number; // min width/height in px
+  configOverrides?: Partial<OrbitalModuleConfig & StreamModuleConfig>;
+}
+
+export interface LayoutContainerNode {
+  id: string;
+  type: 'container';
+  direction: LayoutFlexDirection;
+  flex?: number; // flex weight if nested
+  gap?: number; // gap between children in px
+  children: LayoutNode[];
+}
+
+export type LayoutNode = LayoutContainerNode | LayoutCellNode;
+
+export interface AestheticsConfig {
   backgroundTheme: BackgroundTheme;
   filmGrainIntensity: number; // 0..1
-  filmGrainSize: number; // 1..4 (1=Fine 35mm, 2=Medium 16mm, 3=Coarse 8mm, 4=Chunky Vintage)
-  filmGrainContrast: number; // 0..1 (0=Soft, 1=High-Contrast Gritty)
+  filmGrainSize: number; // 1..4
+  filmGrainContrast: number; // 0..1
   particleIntensity: number; // 0..1
   glowBloom: number; // 0..1
   motionTrails: number; // 0..0.8
-  ghostingIntensity: number; // 0..1 (Phosphor ghost trails / temporal lag)
-  lightBleedIntensity: number; // 0..1 (Analog lens flare / halation / horizontal anamorphic glow)
-
-  // Layout & Audio
-  layoutMode: LayoutMode;
-  showVirtualKeyboard: boolean;
-  masterVolume: number; // 0..1
+  ghostingIntensity: number; // 0..1
+  lightBleedIntensity: number; // 0..1
   soundEnabled: boolean;
+  masterVolume: number; // 0..1
   synthWaveform: SynthWaveform;
+  showVirtualKeyboard: boolean;
+}
+
+export interface SystemConfig {
+  tonic: number; // 0=C, 1=C#, 2=D ...
+  accidentalStyle: AccidentalStyle;
+  keyboardLowestMidi: number; // Lowest note of instrument (default 21 = A1)
+  keyboardHighestMidi: number; // Highest note of instrument (default 108 = C8)
+  autoTonicEnabled: boolean;
+  autoTonicMode: AutoTonicMode;
+  autoTonicCustomDegrees: number[];
+  autoTonicSensitivity: AutoTonicSensitivity;
+}
+
+export interface LayoutDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  root: LayoutContainerNode;
+  aesthetics?: Partial<AestheticsConfig>;
+}
+
+export interface VisualiserConfig extends SystemConfig, AestheticsConfig, OrbitalModuleConfig, StreamModuleConfig {
+  layoutMode: LayoutMode;
+  activeLayout: LayoutDefinition;
 }
 
 export interface MidiDeviceState {

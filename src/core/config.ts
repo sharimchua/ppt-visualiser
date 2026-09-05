@@ -1,4 +1,5 @@
-import { VisualiserConfig } from './types';
+import { VisualiserConfig, LayoutMode } from './types';
+import { PRESET_BALANCED, PRESET_LAYOUTS } from './layout-models';
 
 export const STORAGE_KEY = 'ppt_visualiser_config_v1';
 
@@ -42,6 +43,8 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
 
   // Live Note Stream
   streamMode: 'fixed',
+  orientation: 'horizontal',
+  direction: 'rtl',
   fixedWindowSize: 8,
   presentationFormat: 'glyphs',
   singleWindowRotationAnimation: true,
@@ -62,6 +65,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
 
   // Layout & Sound
   layoutMode: 'balanced',
+  activeLayout: PRESET_BALANCED,
   showVirtualKeyboard: true,
   masterVolume: 0.75,
   soundEnabled: true,
@@ -119,9 +123,15 @@ export function loadSavedConfig(): VisualiserConfig {
     }
     merged.clockLabelPriorities = sanitizedPriorities as any;
 
-    // Sanitize stream presentation format
+    // Sanitize stream presentation format & direction
     const validPresentation = new Set(['glyphs', 'pianoTriangles', 'syllables', 'pitchNames', 'triPitches']);
     if (!validPresentation.has(merged.presentationFormat)) merged.presentationFormat = 'glyphs';
+
+    if (merged.orientation !== 'vertical') merged.orientation = 'horizontal';
+    const validDirections = new Set(['rtl', 'ltr', 'ttb', 'btt']);
+    if (!validDirections.has(merged.direction)) {
+      merged.direction = merged.orientation === 'vertical' ? 'ttb' : 'rtl';
+    }
 
     // Sanitize film grain & artifact settings
     merged.filmGrainSize = Math.max(1, Math.min(4, Math.round(typeof merged.filmGrainSize === 'number' ? merged.filmGrainSize : 1)));
@@ -132,6 +142,14 @@ export function loadSavedConfig(): VisualiserConfig {
     // Sanitize chord geometry & radial movement trails
     merged.chordRayMode = merged.chordRayMode === 'web' ? 'web' : 'hull';
     merged.showRadialMovementTrails = typeof merged.showRadialMovementTrails === 'boolean' ? merged.showRadialMovementTrails : true;
+
+    // Sanitize layout mode and activeLayout
+    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus']);
+    if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'balanced';
+
+    if (!merged.activeLayout || !merged.activeLayout.root) {
+      merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_BALANCED;
+    }
 
     // Sanitize auto-tonic settings
     merged.autoTonicEnabled = typeof merged.autoTonicEnabled === 'boolean' ? merged.autoTonicEnabled : false;
@@ -184,3 +202,4 @@ export function clearSavedConfig(): void {
     console.warn('[Config] Failed to clear config from localStorage:', err);
   }
 }
+

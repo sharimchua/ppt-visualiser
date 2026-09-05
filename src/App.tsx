@@ -28,9 +28,29 @@ import { ControlToolbar } from './components/ControlToolbar';
 import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
+import { decodeLayoutFromSlug, updateCellInTree } from './core/layout-models';
+import { LayoutCellNode } from './core/types';
 
 export const App: React.FC = () => {
-  const [config, setConfig] = useState<VisualiserConfig>(loadSavedConfig);
+  const [config, setConfig] = useState<VisualiserConfig>(() => {
+    const saved = loadSavedConfig();
+    // Check if deep link ?layout=<slug> is in URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const layoutSlug = params.get('layout');
+      if (layoutSlug) {
+        const decoded = decodeLayoutFromSlug(layoutSlug);
+        if (decoded) {
+          return {
+            ...saved,
+            activeLayout: decoded.layout,
+            ...(decoded.hasAesthetics && decoded.layout.aesthetics ? decoded.layout.aesthetics : {}),
+          };
+        }
+      }
+    }
+    return saved;
+  });
   const [activeNotes, setActiveNotes] = useState<Map<number, ActiveNote>>(new Map());
   const [decayingNotes, setDecayingNotes] = useState<Map<number, { note: ActiveNote; decayProgress: number }>>(new Map());
   const [streamItems, setStreamItems] = useState<StreamItem[]>([]);
@@ -65,6 +85,20 @@ export const App: React.FC = () => {
   decayingNotesRef.current = decayingNotes;
   const configRef = useRef(config);
   configRef.current = config;
+
+  const handleUpdateCell = useCallback((updatedCell: LayoutCellNode) => {
+    setConfig((prev) => {
+      if (!prev.activeLayout || !prev.activeLayout.root) return prev;
+      const updatedRoot = updateCellInTree(prev.activeLayout.root, updatedCell.id, () => updatedCell);
+      return {
+        ...prev,
+        activeLayout: {
+          ...prev.activeLayout,
+          root: updatedRoot,
+        },
+      };
+    });
+  }, []);
 
   // Reset session state: clears discovered tones, tone pop scales, organic activity, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
@@ -414,6 +448,7 @@ export const App: React.FC = () => {
           streamItems={streamItems}
           cosmeticsEngine={cosmeticsEngineRef.current}
           resetSessionCount={resetNonce}
+          onUpdateCell={handleUpdateCell}
         />
       </main>
 

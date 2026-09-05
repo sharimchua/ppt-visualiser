@@ -98,29 +98,32 @@ export class StreamRenderer {
       const targetDeg = latestItem.rotation;
       let diff = (targetDeg - (this.currentRotation % 360) + 540) % 360 - 180;
       this.targetRotation = this.currentRotation + diff;
-      this.currentScale = 1.35; // Pulse bounce on note onset
+      this.currentScale = 1.35; // Pop burst animation
     }
 
-    // Spring interpolation for kinetic rotation & scale
+    // Smooth lerp rotation and scale bounce
     this.currentRotation += (this.targetRotation - this.currentRotation) * 0.18;
     this.currentScale += (1.0 - this.currentScale) * 0.15;
 
-    const size = Math.min(width, height) * 0.62 * this.currentScale;
-    const isFi = latestItem.colorHex === '#141414';
-    const auraColor = isFi ? '#f8fafc' : latestItem.colorHex;
+    const size = Math.min(width * 0.55, height * 0.65, 140) * this.currentScale;
+    const auraColor = latestItem.colorHex === '#141414' ? 'rgba(255, 255, 255, 0.35)' : latestItem.colorHex;
 
-    // Glowing aura behind showcase glyph
+    // Glowing energy backdrop ring
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, size * 0.6, 0, Math.PI * 2);
+    ctx.arc(cx, cy, size * 0.58, 0, Math.PI * 2);
     ctx.fillStyle = auraColor;
-    ctx.globalAlpha = isFi ? 0.28 : 0.18;
-    ctx.shadowColor = auraColor;
-    ctx.shadowBlur = 25 * config.glowBloom;
+    ctx.globalAlpha = 0.14;
     ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = auraColor;
+    ctx.globalAlpha = 0.45;
+    ctx.stroke();
     ctx.restore();
 
-    // Render showcase presentation
+    const isFi = latestItem.colorHex === '#141414';
+
+    // Presentation format rendering
     if (config.presentationFormat === 'pianoTriangles') {
       drawPianoTriangleOnCanvas(
         ctx,
@@ -128,15 +131,15 @@ export class StreamRenderer {
         latestItem.pianoTriangle.point as PianoTrianglePoint,
         cx,
         cy,
-        size,
+        size * 0.85,
         isFi ? '#f8fafc' : latestItem.colorHex,
-        'rgba(255, 255, 255, 0.85)',
+        isFi ? '#f8fafc' : '#ffffff',
         'rgba(148, 163, 184, 0.4)'
       );
     } else if (config.presentationFormat === 'syllables') {
       ctx.save();
       ctx.fillStyle = isFi ? '#f8fafc' : latestItem.colorHex;
-      ctx.font = `bold ${Math.round(size * 0.55)}px "Inter", sans-serif`;
+      ctx.font = `bold ${Math.round(size * 0.52)}px "Inter", sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = auraColor;
@@ -146,7 +149,7 @@ export class StreamRenderer {
     } else if (config.presentationFormat === 'pitchNames') {
       ctx.save();
       ctx.fillStyle = isFi ? '#f8fafc' : latestItem.colorHex;
-      ctx.font = `bold ${Math.round(size * 0.55)}px "JetBrains Mono", monospace`;
+      ctx.font = `bold ${Math.round(size * 0.48)}px "JetBrains Mono", monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = auraColor;
@@ -172,7 +175,7 @@ export class StreamRenderer {
         this.currentRotation,
         cx,
         cy,
-        size,
+        size * 0.75,
         latestItem.colorHex,
         undefined,
         isFi ? 3.5 : 2.5,
@@ -189,7 +192,7 @@ export class StreamRenderer {
 
   /**
    * Fixed Queue Mode:
-   * Fixed length queue (e.g. 8 notes) moving along horizontal conveyor.
+   * Fixed length queue moving along horizontal or vertical conveyor.
    */
   private renderFixedQueue(
     ctx: CanvasRenderingContext2D,
@@ -201,44 +204,88 @@ export class StreamRenderer {
     config: VisualiserConfig
   ) {
     const queueSize = Math.max(2, config.fixedWindowSize);
-    // Take the most recent items up to queueSize
     const visibleItems = items.slice(-queueSize);
+    const isVertical = config.orientation === 'vertical';
+    const direction = config.direction || (isVertical ? 'ttb' : 'rtl');
 
-    const slotWidth = width / queueSize;
-    const itemSize = Math.min(slotWidth * 0.72, height * 0.58);
-    const cy = y + height / 2;
+    if (isVertical) {
+      // Vertical conveyor
+      const slotHeight = height / queueSize;
+      const itemSize = Math.min(width * 0.72, slotHeight * 0.65, 80);
+      const cx = x + width / 2;
 
-    // Slot separators & conveyor track
-    for (let i = 0; i < queueSize; i++) {
-      const slotX = x + i * slotWidth;
-      ctx.strokeStyle = 'rgba(51, 65, 85, 0.2)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(slotX, y + 4, slotWidth, height - 8);
-    }
-
-    // Render items in queue from oldest (left) to newest (right)
-    visibleItems.forEach((item, idx) => {
-      // Slot index from right to left
-      const slotIdx = queueSize - visibleItems.length + idx;
-      const slotCenterX = x + slotIdx * slotWidth + slotWidth / 2;
-      const isNewest = idx === visibleItems.length - 1;
-
-      // Glow on slot
-      if (isNewest) {
-        ctx.save();
-        ctx.fillStyle = item.colorHex;
-        ctx.globalAlpha = 0.12;
-        ctx.fillRect(x + slotIdx * slotWidth + 2, y + 6, slotWidth - 4, height - 12);
-        ctx.restore();
+      // Slot dividers
+      for (let i = 0; i < queueSize; i++) {
+        const slotY = y + i * slotHeight;
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 4, slotY, width - 8, slotHeight);
       }
 
-      this.renderItemCard(ctx, slotCenterX, cy, itemSize, item, config, isNewest);
-    });
+      visibleItems.forEach((item, idx) => {
+        // Position depends on direction:
+        // 'ttb': newest note at top (slot 0) or waterfall down
+        // If 'ttb', newest is at slot 0:
+        const slotIdx = direction === 'ttb'
+          ? (visibleItems.length - 1 - idx)
+          : (queueSize - visibleItems.length + idx);
+
+        const slotCenterY = y + slotIdx * slotHeight + slotHeight / 2;
+        const isNewest = idx === visibleItems.length - 1;
+
+        if (isNewest) {
+          ctx.save();
+          ctx.fillStyle = item.colorHex;
+          ctx.globalAlpha = 0.12;
+          ctx.fillRect(x + 6, y + slotIdx * slotHeight + 2, width - 12, slotHeight - 4);
+          ctx.restore();
+        }
+
+        this.renderItemCard(ctx, cx, slotCenterY, itemSize, item, config, isNewest);
+      });
+    } else {
+      // Horizontal conveyor
+      const slotWidth = width / queueSize;
+      const itemSize = Math.min(slotWidth * 0.72, height * 0.58, 80);
+      const cy = y + height / 2;
+
+      for (let i = 0; i < queueSize; i++) {
+        const slotX = x + i * slotWidth;
+        ctx.strokeStyle = 'rgba(51, 65, 85, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(slotX, y + 4, slotWidth, height - 8);
+      }
+
+      visibleItems.forEach((item, idx) => {
+        // 'rtl': newest note at right (slot queueSize - 1)
+        // 'ltr': newest note at left (slot 0)
+        const slotIdx = direction === 'ltr'
+          ? (visibleItems.length - 1 - idx)
+          : (queueSize - visibleItems.length + idx);
+
+        const slotCenterX = x + slotIdx * slotWidth + slotWidth / 2;
+        const isNewest = idx === visibleItems.length - 1;
+
+        if (isNewest) {
+          ctx.save();
+          ctx.fillStyle = item.colorHex;
+          ctx.globalAlpha = 0.12;
+          ctx.fillRect(x + slotIdx * slotWidth + 2, y + 6, slotWidth - 4, height - 12);
+          ctx.restore();
+        }
+
+        this.renderItemCard(ctx, slotCenterX, cy, itemSize, item, config, isNewest);
+      });
+    }
   }
 
   /**
    * Continuous Scrolling Mode:
-   * Real-time passage of time, notes move horizontally right to left smoothly.
+   * Real-time passage of time. Supports 4 directions:
+   * - Horizontal RTL: notes enter right, scroll left (standard piano roll / tape)
+   * - Horizontal LTR: notes enter left, scroll right
+   * - Vertical TTB: notes enter top, waterfall downwards
+   * - Vertical BTT: notes enter bottom, float upwards
    */
   private renderContinuousStream(
     ctx: CanvasRenderingContext2D,
@@ -252,42 +299,83 @@ export class StreamRenderer {
   ) {
     const speed = config.scrollSpeed; // px per second
     const nowSec = now / 1000;
-    const cy = y + height / 2;
-    const itemSize = Math.min(60, height * 0.55);
+    const isVertical = config.orientation === 'vertical';
+    const direction = config.direction || (isVertical ? 'ttb' : 'rtl');
 
-    // Current playhead line at right edge
-    const playheadX = x + width - 30;
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(playheadX, y);
-    ctx.lineTo(playheadX, y + height);
-    ctx.stroke();
+    if (isVertical) {
+      const itemSize = Math.min(60, width * 0.55);
+      const cx = x + width / 2;
+      const isTTB = direction === 'ttb'; // Waterfall: playhead at top, notes scroll down
+      const playheadY = isTTB ? (y + 30) : (y + height - 30);
 
-    // Iterate through items and position based on elapsed time
-    for (const item of items) {
-      const elapsed = nowSec - item.timestamp;
-      const itemX = playheadX - elapsed * speed;
+      // Playhead line
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, playheadY);
+      ctx.lineTo(x + width, playheadY);
+      ctx.stroke();
 
-      // Skip if scrolled past left edge
-      if (itemX + itemSize < x) continue;
-      // Skip if in future beyond right edge
-      if (itemX - itemSize > x + width) continue;
+      for (const item of items) {
+        const elapsed = nowSec - item.timestamp;
+        const itemY = isTTB
+          ? playheadY + elapsed * speed
+          : playheadY - elapsed * speed;
 
-      // Note duration ribbon (if duration is present)
-      if (item.duration && item.duration > 0.05) {
-        const ribbonWidth = item.duration * speed;
-        const ribbonX = itemX;
-        ctx.save();
-        ctx.fillStyle = item.colorHex;
-        ctx.globalAlpha = 0.35 * item.velocity;
-        ctx.beginPath();
-        ctx.roundRect(ribbonX, cy - itemSize * 0.25, ribbonWidth, itemSize * 0.5, 4);
-        ctx.fill();
-        ctx.restore();
+        if (itemY + itemSize < y || itemY - itemSize > y + height) continue;
+
+        // Note duration ribbon
+        if (item.duration && item.duration > 0.05) {
+          const ribbonHeight = item.duration * speed;
+          const ribbonY = isTTB ? (itemY - ribbonHeight) : itemY;
+          ctx.save();
+          ctx.fillStyle = item.colorHex;
+          ctx.globalAlpha = 0.35 * item.velocity;
+          ctx.beginPath();
+          ctx.roundRect(cx - itemSize * 0.25, ribbonY, itemSize * 0.5, ribbonHeight, 4);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        this.renderItemCard(ctx, cx, itemY, itemSize, item, config, false);
       }
+    } else {
+      // Horizontal
+      const itemSize = Math.min(60, height * 0.55);
+      const cy = y + height / 2;
+      const isLTR = direction === 'ltr';
+      const playheadX = isLTR ? (x + 30) : (x + width - 30);
 
-      this.renderItemCard(ctx, itemX, cy, itemSize, item, config, false);
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(playheadX, y);
+      ctx.lineTo(playheadX, y + height);
+      ctx.stroke();
+
+      for (const item of items) {
+        const elapsed = nowSec - item.timestamp;
+        const itemX = isLTR
+          ? playheadX + elapsed * speed
+          : playheadX - elapsed * speed;
+
+        if (itemX + itemSize < x || itemX - itemSize > x + width) continue;
+
+        // Note duration ribbon
+        if (item.duration && item.duration > 0.05) {
+          const ribbonWidth = item.duration * speed;
+          const ribbonX = isLTR ? (itemX - ribbonWidth) : itemX;
+          ctx.save();
+          ctx.fillStyle = item.colorHex;
+          ctx.globalAlpha = 0.35 * item.velocity;
+          ctx.beginPath();
+          ctx.roundRect(ribbonX, cy - itemSize * 0.25, ribbonWidth, itemSize * 0.5, 4);
+          ctx.fill();
+          ctx.restore();
+        }
+
+        this.renderItemCard(ctx, itemX, cy, itemSize, item, config, false);
+      }
     }
   }
 
