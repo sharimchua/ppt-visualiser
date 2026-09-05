@@ -867,6 +867,8 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                           crtVignette: config.crtVignette,
                           lensFlareIntensity: config.lensFlareIntensity,
                           lensFlareStyle: config.lensFlareStyle,
+                          clockLabelPriorities: config.clockLabelPriorities,
+                          glyphContrastMode: config.glyphContrastMode,
                         }
                       : undefined,
                   };

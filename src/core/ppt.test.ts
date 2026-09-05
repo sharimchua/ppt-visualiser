@@ -41,6 +41,7 @@ import {
   encodeLayoutToSlug,
   decodeLayoutFromSlug,
 } from './layout-models';
+import { LayoutDefinition } from './types';
 import {
   getScaleTetrachordChainTriangles,
   PIANO_TRIANGLE_POINT_TO_PITCH_CLASS,
@@ -919,11 +920,15 @@ test('Directional Stream Configurations: Valid orientations and directions in de
 
 test('Cosmetics Configuration & Persistence: CRT Scanlines, Optical Lens Flares, and Sparks Physics', () => {
   // Test defaults
-  assert.strictEqual(DEFAULT_CONFIG.scanlineIntensity, 0.55);
-  assert.strictEqual(DEFAULT_CONFIG.scanlineDensity, 3);
+  assert.strictEqual(DEFAULT_CONFIG.scanlineIntensity, 0.4);
+  assert.strictEqual(DEFAULT_CONFIG.scanlineDensity, 2);
   assert.strictEqual(DEFAULT_CONFIG.crtVignette, 0.3);
-  assert.strictEqual(DEFAULT_CONFIG.lensFlareIntensity, 0.3);
+  assert.strictEqual(DEFAULT_CONFIG.lensFlareIntensity, 0.55);
   assert.strictEqual(DEFAULT_CONFIG.lensFlareStyle, 'cinematic');
+  assert.strictEqual(DEFAULT_CONFIG.filmGrainIntensity, 0.35);
+  assert.strictEqual(DEFAULT_CONFIG.ghostingIntensity, 0.3);
+  assert.strictEqual(DEFAULT_CONFIG.lightBleedIntensity, 0.45);
+  assert.strictEqual(DEFAULT_CONFIG.streamMode, 'continuous');
   assert.strictEqual(DEFAULT_CONFIG.particleSize, 1.0);
   assert.strictEqual(DEFAULT_CONFIG.particleVolume, 1.0);
   assert.strictEqual(DEFAULT_CONFIG.particleGravity, 0.15);
@@ -1204,7 +1209,7 @@ test('Layout Models: URL Slug round-trip encoding and decoding with and without 
   assert.strictEqual(decodedNoAes.hasAesthetics, false);
   assert.strictEqual(getAllCellNodes(decodedNoAes.layout.root).length, 2);
 
-  // 2. With aesthetics
+  // 2. With aesthetics (including priority slots & glyph contrast)
   const layoutWithAesthetics = {
     ...layout,
     aesthetics: {
@@ -1212,6 +1217,8 @@ test('Layout Models: URL Slug round-trip encoding and decoding with and without 
       glowBloom: 0.8,
       scanlineIntensity: 0.4,
       crtVignette: 0.5,
+      clockLabelPriorities: ['syllables', 'triangles', 'glyphs', 'pitches', 'glyphs', 'glyphs', 'glyphs', 'glyphs'] as any,
+      glyphContrastMode: 'solfege' as const,
     },
   };
   const slugWithAesthetics = encodeLayoutToSlug(layoutWithAesthetics, true);
@@ -1221,8 +1228,26 @@ test('Layout Models: URL Slug round-trip encoding and decoding with and without 
   assert.strictEqual(decodedWithAes.layout.aesthetics?.backgroundTheme, 'cosmic-abyss');
   assert.strictEqual(decodedWithAes.layout.aesthetics?.glowBloom, 0.8);
   assert.strictEqual(decodedWithAes.layout.aesthetics?.scanlineIntensity, 0.4);
+  assert.strictEqual(decodedWithAes.layout.aesthetics?.glyphContrastMode, 'solfege');
+  assert.strictEqual(decodedWithAes.layout.aesthetics?.clockLabelPriorities?.[0], 'syllables');
 
-  // 3. Corrupted slug handling
+  // 3. User slug verification (tweaked aesthetic defaults & continuous stream)
+  const userLayout: LayoutDefinition = {
+    id: 'custom-mtox6883',
+    name: 'Custom Layout',
+    root: PRESET_SIGNATURE.root,
+    aesthetics: PRESET_SIGNATURE.aesthetics,
+  };
+  const userSlug = encodeLayoutToSlug(userLayout, true);
+  const decodedUser = decodeLayoutFromSlug(userSlug);
+  assert.ok(decodedUser);
+  assert.strictEqual(decodedUser.hasAesthetics, true);
+  assert.strictEqual(decodedUser.layout.aesthetics?.filmGrainIntensity, 0.35);
+  assert.strictEqual(decodedUser.layout.aesthetics?.scanlineIntensity, 0.4);
+  assert.strictEqual(decodedUser.layout.aesthetics?.scanlineDensity, 2);
+  assert.strictEqual(decodedUser.layout.aesthetics?.lensFlareIntensity, 0.55);
+
+  // 4. Corrupted slug handling
   const corrupted = decodeLayoutFromSlug('not-a-valid-base64-json-slug!!!');
   assert.strictEqual(corrupted, null, 'Corrupted slug should return null gracefully');
 });

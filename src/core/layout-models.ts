@@ -251,11 +251,28 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
             configOverrides: {
               orientation: 'horizontal',
               direction: 'rtl',
+              streamMode: 'continuous',
             },
           },
         ],
       },
     ],
+  },
+  aesthetics: {
+    backgroundTheme: 'carbon-grid',
+    filmGrainIntensity: 0.35,
+    filmGrainSize: 3,
+    filmGrainContrast: 0.45,
+    particleIntensity: 0.9,
+    glowBloom: 0.8,
+    motionTrails: 0.6,
+    ghostingIntensity: 0.3,
+    lightBleedIntensity: 0.45,
+    scanlineIntensity: 0.4,
+    scanlineDensity: 2,
+    crtVignette: 0.3,
+    lensFlareIntensity: 0.55,
+    lensFlareStyle: 'cinematic',
   },
 };
 

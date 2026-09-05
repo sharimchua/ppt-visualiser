@@ -171,6 +171,8 @@ export interface AestheticsConfig {
   crtVignette: number; // 0..1
   lensFlareIntensity: number; // 0..1
   lensFlareStyle: LensFlareStyle;
+  clockLabelPriorities: ClockLabelType[];
+  glyphContrastMode: GlyphContrastMode;
   soundEnabled: boolean;
   masterVolume: number; // 0..1
   synthWaveform: SynthWaveform;

@@ -591,6 +591,200 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
             </div>
           )}
 
+          {/* Orbital Clock-Specific Options */}
+          {cell.module === 'orbital' && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <label className="text-[11px] text-purple-400 font-medium block uppercase tracking-wider">
+                Orbital Pitch Clock Settings
+              </label>
+
+              {/* Glyph Contrast & Legibility */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Glyph Contrast & Legibility:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          glyphContrastMode: 'high',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      effectiveConfig.glyphContrastMode === 'high'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    High-Contrast Luminous
+                  </button>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          glyphContrastMode: 'solfege',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      effectiveConfig.glyphContrastMode === 'solfege'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Canonical Solfège
+                  </button>
+                </div>
+              </div>
+
+              {/* Clock Node Label Priority Presets */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <label className="text-[10px] text-slate-400 block font-medium">Priority Slots Preset:</label>
+                  <span className="text-[9px] text-slate-500 font-mono">8 Orbit Slots</span>
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+                  {[
+                    { id: 'glyphs' as const, label: 'Glyphs' },
+                    { id: 'triangles' as const, label: 'Triangles' },
+                    { id: 'syllables' as const, label: 'Solfège' },
+                    { id: 'pitches' as const, label: 'Pitches' },
+                    { id: 'triPitches' as const, label: 'Tri-Pitch' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            clockLabelPriorities: Array(8).fill(preset.id),
+                          },
+                        })
+                      }
+                      className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                        effectiveConfig.clockLabelPriorities?.every((p) => p === preset.id)
+                          ? 'bg-purple-600/30 border-purple-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 8 Priority Slots Individual Quick Selection */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Slot Priority Overrides (Slot 1 = Outermost):</label>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
+                    const currentVal = effectiveConfig.clockLabelPriorities?.[idx] ?? 'glyphs';
+                    return (
+                      <div key={idx} className="flex flex-col items-center">
+                        <span className="text-[8px] text-slate-500 font-mono mb-0.5">#{idx + 1}</span>
+                        <select
+                          value={currentVal}
+                          onChange={(e) => {
+                            const updated = [...(effectiveConfig.clockLabelPriorities || Array(8).fill('glyphs'))];
+                            updated[idx] = e.target.value as any;
+                            onUpdateCell({
+                              ...cell,
+                              configOverrides: {
+                                ...(cell.configOverrides || {}),
+                                clockLabelPriorities: updated,
+                              },
+                            });
+                          }}
+                          className="w-full bg-slate-900 border border-slate-800 text-[9px] text-slate-300 rounded px-0.5 py-0.5 text-center font-mono cursor-pointer"
+                        >
+                          <option value="glyphs">Glyphs</option>
+                          <option value="triangles">Triangles</option>
+                          <option value="syllables">Solfège</option>
+                          <option value="pitches">Pitches</option>
+                          <option value="triPitches">Tri-Pitch</option>
+                          <option value="intervals">Degrees</option>
+                          <option value="none">None</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Octave Mode & Numbers */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="text-[10px] text-slate-400 block font-medium mb-1">Octave Display:</label>
+                  <div className="grid grid-cols-2 gap-1">
+                    <button
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            octaveMode: 'dynamic',
+                          },
+                        })
+                      }
+                      className={`py-1 px-1.5 rounded border text-[10px] font-medium transition ${
+                        effectiveConfig.octaveMode === 'dynamic'
+                          ? 'bg-purple-600/30 border-purple-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Dynamic
+                    </button>
+                    <button
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            octaveMode: 'fixed8',
+                          },
+                        })
+                      }
+                      className={`py-1 px-1.5 rounded border text-[10px] font-medium transition ${
+                        effectiveConfig.octaveMode === 'fixed8'
+                          ? 'bg-purple-600/30 border-purple-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      8 Octaves
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-slate-400 block font-medium mb-1">Octave Numbers:</label>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          showOctaveNumbers: !effectiveConfig.showOctaveNumbers,
+                        },
+                      })
+                    }
+                    className={`w-full py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      effectiveConfig.showOctaveNumbers
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {effectiveConfig.showOctaveNumbers ? 'Visible' : 'Hidden'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Piano Triangles-Specific Options */}
           {cell.module === 'triangles' && (
             <div className="space-y-2.5 pt-2 border-t border-slate-800/80">

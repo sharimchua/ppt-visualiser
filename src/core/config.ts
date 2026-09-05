@@ -42,7 +42,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   pulseShockwaves: true,
 
   // Live Note Stream
-  streamMode: 'fixed',
+  streamMode: 'continuous',
   orientation: 'horizontal',
   direction: 'rtl',
   fixedWindowSize: 8,
@@ -59,7 +59,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
 
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
-  filmGrainIntensity: 0.75,
+  filmGrainIntensity: 0.35,
   filmGrainSize: 3,
   filmGrainContrast: 0.45,
   particleIntensity: 0.9,
@@ -69,12 +69,12 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   particleOriginDistance: 0,
   glowBloom: 0.8,
   motionTrails: 0.6,
-  ghostingIntensity: 0.35,
-  lightBleedIntensity: 0.55,
-  scanlineIntensity: 0.55,
-  scanlineDensity: 3,
+  ghostingIntensity: 0.3,
+  lightBleedIntensity: 0.45,
+  scanlineIntensity: 0.4,
+  scanlineDensity: 2,
   crtVignette: 0.3,
-  lensFlareIntensity: 0.3,
+  lensFlareIntensity: 0.55,
   lensFlareStyle: 'cinematic',
 
   // Layout & Sound

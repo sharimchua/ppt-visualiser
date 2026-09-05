@@ -28,22 +28,33 @@ import {
   PRESET_LAYOUTS,
 } from './core/layout-models';
 
+// Helper to extract layout slug from URL query or hash
+function extractLayoutSlugFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const params = new URLSearchParams(window.location.search);
+  const querySlug = params.get('layout');
+  if (querySlug) return querySlug;
+
+  if (window.location.hash) {
+    const match = window.location.hash.match(/layout=([^&]+)/);
+    if (match) return decodeURIComponent(match[1]);
+  }
+  return null;
+}
+
 export const App: React.FC = () => {
   const [config, setConfig] = useState<VisualiserConfig>(() => {
     const saved = loadSavedConfig();
-    // Check if deep link ?layout=<slug> is in URL
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const layoutSlug = params.get('layout');
-      if (layoutSlug) {
-        const decoded = decodeLayoutFromSlug(layoutSlug);
-        if (decoded) {
-          return {
-            ...saved,
-            activeLayout: decoded.layout,
-            ...(decoded.hasAesthetics && decoded.layout.aesthetics ? decoded.layout.aesthetics : {}),
-          };
-        }
+    // Check if deep link ?layout=<slug> or #layout=<slug> is in URL
+    const layoutSlug = extractLayoutSlugFromUrl();
+    if (layoutSlug) {
+      const decoded = decodeLayoutFromSlug(layoutSlug);
+      if (decoded) {
+        return {
+          ...saved,
+          activeLayout: decoded.layout,
+          ...(decoded.hasAesthetics && decoded.layout.aesthetics ? decoded.layout.aesthetics : {}),
+        };
       }
     }
     return saved;
@@ -71,6 +82,25 @@ export const App: React.FC = () => {
     saveConfig(config);
     renderCoordinatorInstance.setConfig(config);
   }, [config]);
+
+  // Handle URL hash changes dynamically (#layout=<slug>)
+  useEffect(() => {
+    const handleHashChange = () => {
+      const layoutSlug = extractLayoutSlugFromUrl();
+      if (layoutSlug) {
+        const decoded = decodeLayoutFromSlug(layoutSlug);
+        if (decoded) {
+          setConfig((prev) => ({
+            ...prev,
+            activeLayout: decoded.layout,
+            ...(decoded.hasAesthetics && decoded.layout.aesthetics ? decoded.layout.aesthetics : {}),
+          }));
+        }
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Subscribe to Scale Alignment updates and handle Auto-Tonic shifting
   useEffect(() => {
