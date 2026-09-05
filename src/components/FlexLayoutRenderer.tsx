@@ -5,6 +5,8 @@ import {
   VisualiserConfig,
   ActiveNote,
   StreamItem,
+  LayoutFlexDirection,
+  VisualiserModuleType,
 } from '../core/types';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
@@ -19,6 +21,11 @@ interface FlexLayoutRendererProps {
   pitchClockRenderer: PitchClockRenderer;
   streamRenderer: StreamRenderer;
   onUpdateCell?: (updated: LayoutCellNode) => void;
+  isEditMode?: boolean;
+  canDelete?: boolean;
+  onSplitCell?: (targetCellId: string, direction: LayoutFlexDirection, newModule: VisualiserModuleType) => void;
+  onRemoveCell?: (targetCellId: string) => void;
+  onDuplicateCell?: (targetCellId: string) => void;
 }
 
 export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
@@ -30,6 +37,11 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
   pitchClockRenderer,
   streamRenderer,
   onUpdateCell,
+  isEditMode = false,
+  canDelete = false,
+  onSplitCell,
+  onRemoveCell,
+  onDuplicateCell,
 }) => {
   if (node.type === 'cell') {
     return (
@@ -52,6 +64,11 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
           pitchClockRenderer={pitchClockRenderer}
           streamRenderer={streamRenderer}
           onUpdateCell={onUpdateCell}
+          isEditMode={isEditMode}
+          canDelete={canDelete}
+          onSplitCell={onSplitCell}
+          onRemoveCell={onRemoveCell}
+          onDuplicateCell={onDuplicateCell}
         />
       </div>
     );
@@ -82,6 +99,11 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
           pitchClockRenderer={pitchClockRenderer}
           streamRenderer={streamRenderer}
           onUpdateCell={onUpdateCell}
+          isEditMode={isEditMode}
+          canDelete={canDelete}
+          onSplitCell={onSplitCell}
+          onRemoveCell={onRemoveCell}
+          onDuplicateCell={onDuplicateCell}
         />
       ))}
     </div>

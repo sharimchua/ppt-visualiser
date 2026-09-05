@@ -28,8 +28,21 @@ import { ControlToolbar } from './components/ControlToolbar';
 import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
-import { decodeLayoutFromSlug, updateCellInTree } from './core/layout-models';
-import { LayoutCellNode } from './core/types';
+import {
+  decodeLayoutFromSlug,
+  updateCellInTree,
+  splitCellInTree,
+  removeCellFromTree,
+  duplicateCellInTree,
+  addCellToTree,
+  PRESET_LAYOUTS,
+} from './core/layout-models';
+import {
+  LayoutCellNode,
+  LayoutFlexDirection,
+  VisualiserModuleType,
+  LayoutMode,
+} from './core/types';
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<VisualiserConfig>(() => {
@@ -60,6 +73,7 @@ export const App: React.FC = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
   const [resetNonce, setResetNonce] = useState(0);
+  const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
   const [scaleFitInfo, setScaleFitInfo] = useState<{
     currentTonicFit: number;
     bestTonic: number;
@@ -95,10 +109,91 @@ export const App: React.FC = () => {
         ...prev,
         activeLayout: {
           ...prev.activeLayout,
+          id: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.id : `custom-${Date.now().toString(36)}`,
+          name: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.name : 'Custom Layout',
           root: updatedRoot,
         },
       };
     });
+  }, []);
+
+  const handleSplitCell = useCallback(
+    (targetCellId: string, direction: LayoutFlexDirection, newModule: VisualiserModuleType) => {
+      setConfig((prev) => {
+        if (!prev.activeLayout || !prev.activeLayout.root) return prev;
+        const updatedRoot = splitCellInTree(prev.activeLayout.root, targetCellId, direction, newModule);
+        return {
+          ...prev,
+          activeLayout: {
+            ...prev.activeLayout,
+            id: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.id : `custom-${Date.now().toString(36)}`,
+            name: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.name : 'Custom Layout',
+            root: updatedRoot,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const handleRemoveCell = useCallback((targetCellId: string) => {
+    setConfig((prev) => {
+      if (!prev.activeLayout || !prev.activeLayout.root) return prev;
+      const updatedRoot = removeCellFromTree(prev.activeLayout.root, targetCellId);
+      return {
+        ...prev,
+        activeLayout: {
+          ...prev.activeLayout,
+          id: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.id : `custom-${Date.now().toString(36)}`,
+          name: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.name : 'Custom Layout',
+          root: updatedRoot,
+        },
+      };
+    });
+  }, []);
+
+  const handleDuplicateCell = useCallback((targetCellId: string) => {
+    setConfig((prev) => {
+      if (!prev.activeLayout || !prev.activeLayout.root) return prev;
+      const updatedRoot = duplicateCellInTree(prev.activeLayout.root, targetCellId);
+      return {
+        ...prev,
+        activeLayout: {
+          ...prev.activeLayout,
+          id: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.id : `custom-${Date.now().toString(36)}`,
+          name: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.name : 'Custom Layout',
+          root: updatedRoot,
+        },
+      };
+    });
+  }, []);
+
+  const handleAddCell = useCallback(
+    (direction: LayoutFlexDirection = 'row', module: VisualiserModuleType = 'stream') => {
+      setConfig((prev) => {
+        if (!prev.activeLayout || !prev.activeLayout.root) return prev;
+        const updatedRoot = addCellToTree(prev.activeLayout.root, direction, module);
+        return {
+          ...prev,
+          activeLayout: {
+            ...prev.activeLayout,
+            id: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.id : `custom-${Date.now().toString(36)}`,
+            name: prev.activeLayout.id.startsWith('custom') ? prev.activeLayout.name : 'Custom Layout',
+            root: updatedRoot,
+          },
+        };
+      });
+    },
+    []
+  );
+
+  const handleResetLayout = useCallback((presetKey: LayoutMode = 'balanced') => {
+    const preset = PRESET_LAYOUTS[presetKey] || PRESET_LAYOUTS['balanced'];
+    setConfig((prev) => ({
+      ...prev,
+      layoutMode: presetKey,
+      activeLayout: preset,
+    }));
   }, []);
 
   // Reset session state: clears discovered tones, tone pop scales, organic activity, scale tracker, and note stream
@@ -456,6 +551,8 @@ export const App: React.FC = () => {
           playbackState={playbackState}
           deviceState={deviceState}
           isFullscreen={isFullscreen}
+          isEditMode={isEditLayoutMode}
+          onToggleEditMode={() => setIsEditLayoutMode((prev) => !prev)}
           onUpdateConfig={updateConfig}
           onPlay={() => midiPlayerInstance.play()}
           onPause={() => midiPlayerInstance.pause()}
@@ -478,6 +575,13 @@ export const App: React.FC = () => {
           streamItems={streamItems}
           cosmeticsEngine={cosmeticsEngineRef.current}
           resetSessionCount={resetNonce}
+          isEditMode={isEditLayoutMode}
+          onToggleEditMode={() => setIsEditLayoutMode((prev) => !prev)}
+          onSplitCell={handleSplitCell}
+          onRemoveCell={handleRemoveCell}
+          onDuplicateCell={handleDuplicateCell}
+          onAddCell={handleAddCell}
+          onResetLayout={handleResetLayout}
           onUpdateCell={handleUpdateCell}
           onToneCoordinatesResolved={(lookup) => {
             toneCoordLookupRef.current = lookup;

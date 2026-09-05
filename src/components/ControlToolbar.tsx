@@ -11,6 +11,7 @@ import {
   Upload,
   Download,
   Layers,
+  LayoutGrid,
   Radio,
   Music2,
   Disc3,
@@ -42,6 +43,8 @@ interface ControlToolbarProps {
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onResetState?: () => void;
+  isEditMode?: boolean;
+  onToggleEditMode?: () => void;
 }
 
 const TONIC_OPTIONS = [
@@ -74,6 +77,8 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
   onToggleFullscreen,
   onToggleSettings,
   onResetState,
+  isEditMode = false,
+  onToggleEditMode,
 }) => {
   const [showMidiMenu, setShowMidiMenu] = useState(false);
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
@@ -330,11 +335,19 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowLayoutMenu((prev) => !prev)}
-            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border border-slate-700/70 bg-slate-800/70 text-slate-200 hover:bg-slate-700/80 transition cursor-pointer"
+            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium border transition cursor-pointer ${
+              config.activeLayout?.id.startsWith('custom')
+                ? 'border-purple-500/60 bg-purple-950/30 text-purple-200 hover:bg-purple-900/40'
+                : 'border-slate-700/70 bg-slate-800/70 text-slate-200 hover:bg-slate-700/80'
+            }`}
             title="Switch Layout Preset"
           >
             <Layers className="w-3.5 h-3.5 text-red-400" />
-            <span className="capitalize">{config.layoutMode.replace('-', ' ')}</span>
+            <span className="capitalize">
+              {config.activeLayout?.id.startsWith('custom')
+                ? (config.activeLayout?.name || 'Custom Layout')
+                : config.layoutMode.replace('-', ' ')}
+            </span>
           </button>
 
           {showLayoutMenu && (
@@ -342,9 +355,15 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
               <div className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider px-2 py-1 border-b border-slate-800">
                 Flexbox Layout Presets
               </div>
+              {config.activeLayout?.id.startsWith('custom') && (
+                <div className="w-full text-left px-2.5 py-1.5 rounded bg-purple-950/50 border border-purple-500/40 text-purple-200 flex items-center justify-between text-xs font-medium">
+                  <span>{config.activeLayout?.name || 'Custom Layout'}</span>
+                  <span className="text-purple-400 font-bold">✓</span>
+                </div>
+              )}
               {(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
                 const preset = PRESET_LAYOUTS[mode];
-                const isSelected = config.layoutMode === mode;
+                const isSelected = !config.activeLayout?.id.startsWith('custom') && config.layoutMode === mode;
                 return (
                   <button
                     key={mode}
@@ -369,6 +388,22 @@ export const ControlToolbar: React.FC<ControlToolbarProps> = ({
             </div>
           )}
         </div>
+
+        {/* Layout Edit Mode Toggle Button */}
+        {onToggleEditMode && (
+          <button
+            onClick={onToggleEditMode}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium border transition cursor-pointer ${
+              isEditMode
+                ? 'bg-purple-600 border-purple-400 text-white shadow-[0_0_12px_rgba(168,85,247,0.4)] ring-1 ring-purple-400/50'
+                : 'border-slate-700/70 bg-slate-800/70 text-slate-300 hover:text-white hover:bg-slate-700/80'
+            }`}
+            title={isEditMode ? 'Exit Layout Edit Mode' : 'Enter Layout Edit Mode (Add, split, configure, and remove cells)'}
+          >
+            <LayoutGrid className={`w-3.5 h-3.5 ${isEditMode ? 'text-white animate-pulse' : 'text-purple-400'}`} />
+            <span className="hidden sm:inline">{isEditMode ? 'Editing' : 'Edit Layout'}</span>
+          </button>
+        )}
 
         {/* Share Layout & Deep Link Popover */}
         <div className="relative">

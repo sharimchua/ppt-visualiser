@@ -5,6 +5,8 @@ import {
   LayoutContainerNode,
   LayoutMode,
   AestheticsConfig,
+  LayoutFlexDirection,
+  VisualiserModuleType,
 } from './types';
 
 /**
@@ -264,6 +266,280 @@ export function updateCellInTree(
       }
       return updateCellInTree(child, cellId, updater);
     }),
+  };
+}
+
+/**
+ * Creates a unique identifier for a newly added cell node.
+ */
+export function createUniqueCellId(module: VisualiserModuleType = 'stream'): string {
+  const rand = Math.random().toString(36).slice(2, 7);
+  const timestamp = Date.now().toString(36);
+  return `cell-${module}-${timestamp}-${rand}`;
+}
+
+/**
+ * Creates a unique identifier for a container node.
+ */
+export function createUniqueContainerId(): string {
+  const rand = Math.random().toString(36).slice(2, 7);
+  const timestamp = Date.now().toString(36);
+  return `container-${timestamp}-${rand}`;
+}
+
+/**
+ * Splits a target cell in the layout tree along row or column direction.
+ * If the parent container has the requested direction, a new sibling cell is inserted.
+ * Otherwise, the cell is replaced by a nested container holding both cells.
+ */
+export function splitCellInTree(
+  root: LayoutContainerNode,
+  targetCellId: string,
+  direction: LayoutFlexDirection,
+  newModule: VisualiserModuleType = 'stream'
+): LayoutContainerNode {
+  const newCellId = createUniqueCellId(newModule);
+
+  function splitNode(container: LayoutContainerNode): LayoutContainerNode {
+    const directChildIdx = container.children.findIndex(
+      (c) => c.type === 'cell' && c.id === targetCellId
+    );
+
+    if (directChildIdx !== -1) {
+      const targetCell = container.children[directChildIdx] as LayoutCellNode;
+      const newCell: LayoutCellNode = {
+        id: newCellId,
+        type: 'cell',
+        module: newModule,
+        flex: 1,
+        title: newModule === 'orbital' ? 'Pitch Clock' : 'Note Stream',
+        configOverrides:
+          newModule === 'stream'
+            ? {
+                orientation: direction === 'row' ? 'vertical' : 'horizontal',
+                direction: direction === 'row' ? 'ttb' : 'rtl',
+              }
+            : undefined,
+      };
+
+      if (container.direction === direction) {
+        // Parent container already flows in this direction: insert next to target
+        const newChildren = [...container.children];
+        newChildren.splice(directChildIdx + 1, 0, newCell);
+        return {
+          ...container,
+          children: newChildren,
+        };
+      } else {
+        // Parent container flows in perpendicular direction: replace target with a sub-container
+        const subContainer: LayoutContainerNode = {
+          id: createUniqueContainerId(),
+          type: 'container',
+          direction: direction,
+          flex: targetCell.flex ?? 1,
+          gap: container.gap ?? 8,
+          children: [
+            { ...targetCell, flex: 1 },
+            newCell,
+          ],
+        };
+        const newChildren = [...container.children];
+        newChildren[directChildIdx] = subContainer;
+        return {
+          ...container,
+          children: newChildren,
+        };
+      }
+    }
+
+    // Recurse into child containers
+    return {
+      ...container,
+      children: container.children.map((child) =>
+        child.type === 'container' ? splitNode(child) : child
+      ),
+    };
+  }
+
+  return splitNode(root);
+}
+
+/**
+ * Removes a cell from the layout tree.
+ * Automatically prunes empty or single-child container nodes to keep the tree normalized.
+ * Enforces a minimum of 1 cell in the layout.
+ */
+export function removeCellFromTree(
+  root: LayoutContainerNode,
+  targetCellId: string
+): LayoutContainerNode {
+  const allCells = getAllCellNodes(root);
+  if (allCells.length <= 1) {
+    // Cannot delete the only remaining cell in the layout
+    return root;
+  }
+
+  function prune(container: LayoutContainerNode): LayoutContainerNode {
+    const updatedChildren: LayoutNode[] = [];
+
+    for (const child of container.children) {
+      if (child.type === 'cell') {
+        if (child.id !== targetCellId) {
+          updatedChildren.push(child);
+        }
+      } else {
+        const prunedSub = prune(child);
+        if (prunedSub.children.length > 0) {
+          // Flatten redundant single-child container
+          if (prunedSub.children.length === 1) {
+            const single = prunedSub.children[0];
+            updatedChildren.push(single);
+          } else {
+            updatedChildren.push(prunedSub);
+          }
+        }
+      }
+    }
+
+    return {
+      ...container,
+      children: updatedChildren,
+    };
+  }
+
+  const prunedRoot = prune(root);
+  // Ensure root never has 0 children
+  if (prunedRoot.children.length === 0) {
+    return root;
+  }
+  return prunedRoot;
+}
+
+/**
+ * Duplicates an existing cell with its configuration overrides and inserts it alongside.
+ */
+export function duplicateCellInTree(
+  root: LayoutContainerNode,
+  targetCellId: string
+): LayoutContainerNode {
+  const target = findCellNodeById(root, targetCellId);
+  if (!target) return root;
+
+  const cloneId = createUniqueCellId(target.module);
+  const clone: LayoutCellNode = {
+    ...target,
+    id: cloneId,
+    title: target.title ? `${target.title} (Copy)` : undefined,
+    configOverrides: target.configOverrides ? { ...target.configOverrides } : undefined,
+  };
+
+  function insertClone(container: LayoutContainerNode): LayoutContainerNode {
+    const idx = container.children.findIndex(
+      (c) => c.type === 'cell' && c.id === targetCellId
+    );
+    if (idx !== -1) {
+      const newChildren = [...container.children];
+      newChildren.splice(idx + 1, 0, clone);
+      return {
+        ...container,
+        children: newChildren,
+      };
+    }
+    return {
+      ...container,
+      children: container.children.map((c) =>
+        c.type === 'container' ? insertClone(c) : c
+      ),
+    };
+  }
+
+  return insertClone(root);
+}
+
+/**
+ * Moves a cell forward or backward in its parent container's child order.
+ */
+export function moveCellInTree(
+  root: LayoutContainerNode,
+  cellId: string,
+  delta: -1 | 1
+): LayoutContainerNode {
+  function reorder(container: LayoutContainerNode): LayoutContainerNode {
+    const idx = container.children.findIndex((c) => c.id === cellId);
+    if (idx !== -1) {
+      const newIdx = idx + delta;
+      if (newIdx >= 0 && newIdx < container.children.length) {
+        const newChildren = [...container.children];
+        const temp = newChildren[idx];
+        newChildren[idx] = newChildren[newIdx];
+        newChildren[newIdx] = temp;
+        return {
+          ...container,
+          children: newChildren,
+        };
+      }
+      return container;
+    }
+    return {
+      ...container,
+      children: container.children.map((c) =>
+        c.type === 'container' ? reorder(c) : c
+      ),
+    };
+  }
+
+  return reorder(root);
+}
+
+/**
+ * Appends a new cell to the layout tree root.
+ */
+export function addCellToTree(
+  root: LayoutContainerNode,
+  direction: LayoutFlexDirection = 'row',
+  module: VisualiserModuleType = 'stream'
+): LayoutContainerNode {
+  const newCell: LayoutCellNode = {
+    id: createUniqueCellId(module),
+    type: 'cell',
+    module,
+    flex: 1,
+    title: module === 'orbital' ? 'Pitch Clock' : 'Note Stream',
+    configOverrides:
+      module === 'stream'
+        ? {
+            orientation: direction === 'row' ? 'vertical' : 'horizontal',
+            direction: direction === 'row' ? 'ttb' : 'rtl',
+          }
+        : undefined,
+  };
+
+  if (root.direction === direction) {
+    return {
+      ...root,
+      children: [...root.children, newCell],
+    };
+  }
+
+  if (root.children.length <= 1) {
+    return {
+      ...root,
+      direction,
+      children: [...root.children, newCell],
+    };
+  }
+
+  // Wrap existing root into a container
+  return {
+    id: createUniqueContainerId(),
+    type: 'container',
+    direction,
+    flex: 1,
+    gap: root.gap ?? 8,
+    children: [
+      root,
+      newCell,
+    ],
   };
 }
 

@@ -27,6 +27,19 @@ import {
   evaluateAllTonicCandidates,
   ScaleAlignmentTracker,
 } from './scale-alignment';
+import {
+  PRESET_BALANCED,
+  PRESET_MONUMENT,
+  PRESET_LAYOUTS,
+  splitCellInTree,
+  removeCellFromTree,
+  duplicateCellInTree,
+  moveCellInTree,
+  addCellToTree,
+  getAllCellNodes,
+  encodeLayoutToSlug,
+  decodeLayoutFromSlug,
+} from './layout-models';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -1091,6 +1104,121 @@ test('Standard MIDI File Encoder: SMF Format 0 binary encoding and round-trip ve
   assert.strictEqual(parsed[0].midi, expected[0].midi);
   assert.strictEqual(parsed[parsed.length - 1].midi, expected[expected.length - 1].midi);
 });
+
+test('Layout Models: Preset tree validation and cell extraction', () => {
+  const balancedCells = getAllCellNodes(PRESET_BALANCED.root);
+  assert.strictEqual(balancedCells.length, 2, 'Balanced layout must have 2 cells');
+  assert.strictEqual(balancedCells[0].module, 'orbital');
+  assert.strictEqual(balancedCells[1].module, 'stream');
+
+  const monumentCells = getAllCellNodes(PRESET_MONUMENT.root);
+  assert.strictEqual(monumentCells.length, 2);
+
+  for (const [key, layout] of Object.entries(PRESET_LAYOUTS)) {
+    assert.ok(layout.id, `Layout ${key} must have ID`);
+    assert.ok(layout.root, `Layout ${key} must have root container`);
+    const cells = getAllCellNodes(layout.root);
+    assert.ok(cells.length >= 1, `Layout ${key} must have at least 1 cell`);
+  }
+});
+
+test('Layout Models: splitCellInTree handles same-direction insertion and cross-direction container nesting', () => {
+  const root = PRESET_BALANCED.root; // direction: 'column', children: [clock, stream]
+  
+  // 1. Split in same direction ('column')
+  const splitCol = splitCellInTree(root, 'cell-stream-bottom', 'column', 'stream');
+  const splitColCells = getAllCellNodes(splitCol);
+  assert.strictEqual(splitColCells.length, 3, 'Should have 3 cells after same-direction split');
+  assert.strictEqual(splitCol.children.length, 3, 'Children directly inserted in root column container');
+
+  // 2. Split in cross direction ('row')
+  // When splitting 'cell-stream-bottom' horizontally (row), it should wrap the target cell and new cell in a row container
+  const splitRow = splitCellInTree(root, 'cell-stream-bottom', 'row', 'stream');
+  const splitRowCells = getAllCellNodes(splitRow);
+  assert.strictEqual(splitRowCells.length, 3, 'Should have 3 cells after cross-direction split');
+  assert.strictEqual(splitRow.children.length, 2, 'Root still has 2 main children (clock and subcontainer)');
+  const subContainer = splitRow.children[1] as any;
+  assert.strictEqual(subContainer.type, 'container');
+  assert.strictEqual(subContainer.direction, 'row', 'Subcontainer should have row direction');
+  assert.strictEqual(subContainer.children.length, 2, 'Subcontainer should contain target and new cell');
+});
+
+test('Layout Models: removeCellFromTree prunes cells and preserves minimum-1-cell invariant', () => {
+  const root = PRESET_BALANCED.root;
+  // Remove one cell
+  const reduced = removeCellFromTree(root, 'cell-stream-bottom');
+  const reducedCells = getAllCellNodes(reduced);
+  assert.strictEqual(reducedCells.length, 1, 'Should have 1 cell after removal');
+  assert.strictEqual(reducedCells[0].id, 'cell-clock-main');
+
+  // Attempting to remove the last remaining cell should be ignored (preserves layout)
+  const safeguard = removeCellFromTree(reduced, 'cell-clock-main');
+  const safeguardCells = getAllCellNodes(safeguard);
+  assert.strictEqual(safeguardCells.length, 1, 'Cannot remove the last cell in layout');
+  assert.strictEqual(safeguardCells[0].id, 'cell-clock-main');
+});
+
+test('Layout Models: duplicateCellInTree and moveCellInTree maintain order and configOverrides', () => {
+  const root = PRESET_BALANCED.root;
+  // Duplicate stream cell
+  const duplicated = duplicateCellInTree(root, 'cell-stream-bottom');
+  const dupCells = getAllCellNodes(duplicated);
+  assert.strictEqual(dupCells.length, 3, 'Should have 3 cells after duplication');
+  const clone = dupCells[2];
+  assert.strictEqual(clone.module, 'stream');
+  assert.strictEqual(clone.title, 'Note Stream (Copy)');
+  assert.strictEqual(clone.configOverrides?.orientation, 'horizontal');
+
+  // Move stream cell up/backward
+  const moved = moveCellInTree(root, 'cell-stream-bottom', -1);
+  const movedCells = getAllCellNodes(moved);
+  assert.strictEqual(movedCells[0].id, 'cell-stream-bottom', 'Stream cell should now be first');
+  assert.strictEqual(movedCells[1].id, 'cell-clock-main', 'Clock cell should now be second');
+});
+
+test('Layout Models: addCellToTree appends cells and nests appropriately', () => {
+  const root = PRESET_BALANCED.root;
+  const added = addCellToTree(root, 'column', 'stream');
+  const addedCells = getAllCellNodes(added);
+  assert.strictEqual(addedCells.length, 3);
+  assert.strictEqual(addedCells[2].module, 'stream');
+});
+
+test('Layout Models: URL Slug round-trip encoding and decoding with and without aesthetics', () => {
+  const layout = PRESET_BALANCED;
+
+  // 1. Without aesthetics
+  const slugNoAesthetics = encodeLayoutToSlug(layout, false);
+  assert.ok(slugNoAesthetics.length > 20, 'Slug must be non-empty base64 string');
+  const decodedNoAes = decodeLayoutFromSlug(slugNoAesthetics);
+  assert.ok(decodedNoAes);
+  assert.strictEqual(decodedNoAes.layout.id, layout.id);
+  assert.strictEqual(decodedNoAes.hasAesthetics, false);
+  assert.strictEqual(getAllCellNodes(decodedNoAes.layout.root).length, 2);
+
+  // 2. With aesthetics
+  const layoutWithAesthetics = {
+    ...layout,
+    aesthetics: {
+      backgroundTheme: 'cosmic-abyss' as const,
+      glowBloom: 0.8,
+      scanlineIntensity: 0.4,
+      crtVignette: 0.5,
+    },
+  };
+  const slugWithAesthetics = encodeLayoutToSlug(layoutWithAesthetics, true);
+  const decodedWithAes = decodeLayoutFromSlug(slugWithAesthetics);
+  assert.ok(decodedWithAes);
+  assert.strictEqual(decodedWithAes.hasAesthetics, true);
+  assert.strictEqual(decodedWithAes.layout.aesthetics?.backgroundTheme, 'cosmic-abyss');
+  assert.strictEqual(decodedWithAes.layout.aesthetics?.glowBloom, 0.8);
+  assert.strictEqual(decodedWithAes.layout.aesthetics?.scanlineIntensity, 0.4);
+
+  // 3. Corrupted slug handling
+  const corrupted = decodeLayoutFromSlug('not-a-valid-base64-json-slug!!!');
+  assert.strictEqual(corrupted, null, 'Corrupted slug should return null gracefully');
+});
+
 
 
 
