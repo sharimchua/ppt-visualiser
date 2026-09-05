@@ -491,27 +491,35 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
 
               {/* Primary Outbound Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Piano Puzzle Theory Link Card */}
+                {/* Prime Period Theory Link Card */}
                 <a
-                  href="https://pianopuzzletheory.com"
+                  href="https://ppt.midlifemuso.com"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="group bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/80 hover:border-red-500/80 rounded-xl p-4 sm:p-5 transition flex flex-col justify-between shadow-lg"
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <img src="/logo.svg" alt="PPT" className="w-6 h-6 object-contain" />
-                        <span className="font-bold text-white text-sm">pianopuzzletheory.com</span>
+                        <span className="font-bold text-white text-sm">ppt.midlifemuso.com</span>
                       </div>
                       <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-red-400 transition" />
                     </div>
-                    <p className="text-xs text-slate-300">
-                      The official hub for <strong>Piano Puzzle Theory</strong>. Read the comprehensive theory documentation, explore interactive harmonic geometry, and discover the principles behind Uniform Solfège.
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      The official compiled documentation for <strong>Prime Period Theory (PPT)</strong>. PPT is a descriptive framework treating pitch, rhythm, and timbre as unified expressions of periodic signals in time, organized through prime-ratio relationships (up to the 11-limit).
                     </p>
+                    <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-[11px] space-y-1 text-slate-400">
+                      <div className="text-red-400 font-semibold flex items-center gap-1">
+                        <span>A Lens, Not a Law</span>
+                      </div>
+                      <p>
+                        Explore curated foundational topics, interactive Web Components (sequencers, controllers, EventBus), and the human & agent-readable <strong>OKF Knowledge Bundle</strong>.
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center text-xs font-semibold text-red-400 group-hover:text-red-300">
-                    <span>Visit Piano Puzzle Theory</span>
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-red-400 group-hover:text-red-300">
+                    <span>Visit ppt.midlifemuso.com</span>
                     <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </a>
@@ -523,7 +531,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   rel="noopener noreferrer"
                   className="group bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/80 hover:border-purple-500/80 rounded-xl p-4 sm:p-5 transition flex flex-col justify-between shadow-lg"
                 >
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Music className="w-5 h-5 text-purple-400" />
@@ -531,15 +539,80 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                       </div>
                       <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-purple-400 transition" />
                     </div>
-                    <p className="text-xs text-slate-300">
-                      The creative project site of <strong>Midlife Muso</strong>. Music production, creative coding, learning logs, podcast reflections, and experiments in modern musical pedagogy.
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Founded by Melbourne multi-instrumentalist Sharim Chua. <strong>Learn music like a language</strong> through an ear-first, intuitive approach to contemporary piano and acoustic fingerstyle guitar.
                     </p>
+                    <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-[11px] space-y-1 text-slate-400">
+                      <div className="text-purple-400 font-semibold flex items-center gap-1">
+                        <span>Ear-First Pedagogy</span>
+                      </div>
+                      <p>
+                        Moving beyond rote classical drills to deep listening, understanding the <em>why</em> behind harmony, and unlocking creative musical fluency for midlife and beyond.
+                      </p>
+                    </div>
                   </div>
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center text-xs font-semibold text-purple-400 group-hover:text-purple-300">
-                    <span>Visit Midlife Muso</span>
+                  <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400 group-hover:text-purple-300">
+                    <span>Visit midlifemuso.com</span>
                     <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </a>
+              </div>
+
+              {/* Quick Links to PPT Knowledge Resources */}
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-2.5 text-xs">
+                <div className="font-semibold text-white flex items-center gap-2 text-xs uppercase tracking-wider">
+                  <BookOpen className="w-4 h-4 text-cyan-400" />
+                  <span>Key PPT Documentation & Resource Links</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <a
+                    href="https://ppt.midlifemuso.com/reference"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-cyan-500/60 transition group flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="font-bold text-white block group-hover:text-cyan-300 transition-colors">OKF Knowledge Bundle</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Reference library & agent semantic bundle</span>
+                    </div>
+                    <div className="flex items-center text-[10px] text-cyan-400 font-semibold mt-2">
+                      <span>/reference</span>
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://ppt.midlifemuso.com/topics"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-amber-500/60 transition group flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="font-bold text-white block group-hover:text-amber-300 transition-colors">Curated Topics</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Foundations, perception & acoustic anchors</span>
+                    </div>
+                    <div className="flex items-center text-[10px] text-amber-400 font-semibold mt-2">
+                      <span>/topics</span>
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://ppt.midlifemuso.com/components"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-red-500/60 transition group flex flex-col justify-between"
+                  >
+                    <div>
+                      <span className="font-bold text-white block group-hover:text-red-300 transition-colors">Web Components</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">Interactive sequencers, dials & EventBus</span>
+                    </div>
+                    <div className="flex items-center text-[10px] text-red-400 font-semibold mt-2">
+                      <span>/components</span>
+                      <ExternalLink className="w-3 h-3 ml-1" />
+                    </div>
+                  </a>
+                </div>
               </div>
 
               {/* How to re-open this modal */}
