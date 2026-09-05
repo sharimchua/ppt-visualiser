@@ -350,9 +350,10 @@ export class RenderCoordinator {
       }
     }
 
-    if (coords && orbitalCellCanvas && this.overlayCanvas) {
+    const targetCanvas = this.effectsCanvas || this.overlayCanvas || this.postProcessingCanvas;
+    if (coords && orbitalCellCanvas && targetCanvas) {
       const cellRect = orbitalCellCanvas.getBoundingClientRect();
-      const overlayRect = this.overlayCanvas.getBoundingClientRect();
+      const overlayRect = targetCanvas.getBoundingClientRect();
       sparkX = (cellRect.left - overlayRect.left) + coords.x;
       sparkY = (cellRect.top - overlayRect.top) + coords.y;
       radialAngle = coords.angle;
@@ -563,84 +564,37 @@ export class RenderCoordinator {
     // 4. Update procedural kinetics, sparks, and phosphor physics
     this.cosmeticsEngine.update();
 
-    // 5. Render 2D kinetic sparks & expanding shockwave rings
-    if (this.effectsCanvas && this.effectsCtx) {
-      const canvas = this.effectsCanvas;
-      const ctx = this.effectsCtx;
+    // 5. Render 2D kinetic sparks & expanding shockwave rings (+ 2D post-processing fallback if WebGL unavailable)
+    const effCanvas = this.effectsCanvas || this.overlayCanvas;
+    const effCtx = this.effectsCtx || this.overlayCtx;
+
+    if (effCanvas && effCtx) {
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
+      const width = effCanvas.width / dpr;
+      const height = effCanvas.height / dpr;
 
       if (width > 0 && height > 0) {
-        ctx.save();
-        ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, width, height);
-        this.cosmeticsEngine.renderEffects(ctx, this.config.glowBloom);
-        ctx.restore();
+        effCtx.save();
+        effCtx.scale(dpr, dpr);
+        effCtx.clearRect(0, 0, width, height);
+
+        // A. Kinetic sparks & shockwaves
+        this.cosmeticsEngine.renderEffects(effCtx, this.config.glowBloom);
+
+        // B. If WebGL is not active/supported, render 2D post-processing fallback directly on this context
+        if (!this.webglPipeline || !this.webglPipeline.supported) {
+          const lights = this.collectFlareLightSources();
+          this.render2DPostProcessingFallback(effCtx, width, height, lights);
+        }
+
+        effCtx.restore();
       }
     }
 
-    // 6. Render Fullscreen Atmospheric Post-Processing
+    // 6. Render Fullscreen Atmospheric Post-Processing on WebGL (if hardware pipeline active)
     if (this.webglPipeline && this.webglPipeline.supported) {
-      // Hardware GPU Shader Pipeline (WebGL)
       const lights = this.collectFlareLightSources();
       this.webglPipeline.render(this.config, lights, time);
-    } else if (this.overlayCanvas && this.overlayCtx) {
-      // Canvas 2D Fallback
-      const canvas = this.overlayCanvas;
-      const ctx = this.overlayCtx;
-      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
-
-      if (width > 0 && height > 0) {
-        ctx.save();
-        ctx.scale(dpr, dpr);
-        ctx.clearRect(0, 0, width, height);
-
-        // Analog halation, phosphor ghosts & photorealistic lens flares
-        const cx = width / 2;
-        const cy = height / 2;
-        const radius = Math.min(width, height) * 0.45;
-        this.cosmeticsEngine.renderAnalogArtifacts(
-          ctx,
-          width,
-          height,
-          this.activeNotes,
-          this.decayingNotes,
-          cx,
-          cy,
-          radius,
-          this.config
-        );
-
-        // Reactive sparks & shockwaves (if effects canvas not separately rendered)
-        if (!this.effectsCanvas) {
-          this.cosmeticsEngine.renderEffects(ctx, this.config.glowBloom);
-        }
-
-        // Whole-display CRT scanlines & glass curvature vignette
-        this.cosmeticsEngine.renderScanlines(
-          ctx,
-          width,
-          height,
-          this.config.scanlineIntensity,
-          this.config.scanlineDensity,
-          this.config.crtVignette
-        );
-
-        // Whole-display film grain overlay
-        this.cosmeticsEngine.renderFilmGrain(
-          ctx,
-          width,
-          height,
-          this.config.filmGrainIntensity,
-          this.config.filmGrainSize,
-          this.config.filmGrainContrast
-        );
-
-        ctx.restore();
-      }
     }
 
     this.animId = requestAnimationFrame(this.masterLoop);
@@ -666,7 +620,7 @@ export class RenderCoordinator {
       }
     }
 
-    const targetCanvas = this.postProcessingCanvas || this.overlayCanvas;
+    const targetCanvas = this.postProcessingCanvas || this.effectsCanvas || this.overlayCanvas;
     let offsetLeft = 0;
     let offsetTop = 0;
     if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
@@ -734,6 +688,98 @@ export class RenderCoordinator {
 
     return lights;
   }
+
+  /**
+   * Seamless 2D fallback for atmospheric post-processing (lens flares, CRT scanlines, vignette, film grain)
+   * executed directly on the 2D effects context without clearing between passes.
+   */
+  private render2DPostProcessingFallback(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    lights: PostProcessingLight[]
+  ) {
+    const bleed = this.config.lightBleedIntensity ?? 0;
+    const flare = this.config.lensFlareIntensity ?? 0;
+    const ghost = this.config.ghostingIntensity ?? 0;
+
+    // 1. Analog halation, phosphor ghosts & photorealistic lens flares
+    if ((bleed > 0.01 || flare > 0.01 || ghost > 0.01) && lights.length > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+
+      for (const light of lights) {
+        if (light.velocity <= 0.02) continue;
+
+        // Radial film halation (warm soft glow around active notes)
+        if (bleed > 0.01) {
+          const halationR = Math.max(35, Math.min(180, 60 * bleed + light.velocity * 50));
+          const radGrad = ctx.createRadialGradient(light.x, light.y, 2, light.x, light.y, halationR);
+          radGrad.addColorStop(0, hexToRgba(light.colorHex, light.velocity * bleed * 0.55));
+          radGrad.addColorStop(0.35, `rgba(251, 146, 60, ${light.velocity * bleed * 0.22})`);
+          radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = radGrad;
+          ctx.beginPath();
+          ctx.arc(light.x, light.y, halationR, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Anamorphic horizontal light streak bleed
+          const streakHalfW = Math.min(width * 0.45, 120 + 260 * bleed);
+          const streakH = Math.max(2, 6 * light.velocity);
+          const linGrad = ctx.createLinearGradient(light.x - streakHalfW, light.y, light.x + streakHalfW, light.y);
+          linGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+          linGrad.addColorStop(0.3, hexToRgba(light.colorHex, light.velocity * bleed * 0.12));
+          linGrad.addColorStop(0.5, `rgba(255, 255, 255, ${light.velocity * bleed * 0.5})`);
+          linGrad.addColorStop(0.7, hexToRgba(light.colorHex, light.velocity * bleed * 0.12));
+          linGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = linGrad;
+          ctx.fillRect(light.x - streakHalfW, light.y - streakH / 2, streakHalfW * 2, streakH);
+        }
+
+        // Multi-element optical lens flares
+        if (flare > 0.01) {
+          this.cosmeticsEngine.renderOpticalLensFlares(
+            ctx,
+            width,
+            height,
+            [{ x: light.x, y: light.y, color: light.colorHex, velocity: light.velocity }],
+            flare,
+            this.config.lensFlareStyle ?? 'cinematic'
+          );
+        }
+      }
+
+      ctx.restore();
+    }
+
+    // 2. Whole-display CRT scanlines & glass curvature vignette
+    this.cosmeticsEngine.renderScanlines(
+      ctx,
+      width,
+      height,
+      this.config.scanlineIntensity,
+      this.config.scanlineDensity,
+      this.config.crtVignette
+    );
+
+    // 3. Whole-display film grain overlay
+    this.cosmeticsEngine.renderFilmGrain(
+      ctx,
+      width,
+      height,
+      this.config.filmGrainIntensity,
+      this.config.filmGrainSize,
+      this.config.filmGrainContrast
+    );
+  }
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16) || 255;
+  const g = parseInt(clean.substring(2, 4), 16) || 255;
+  const b = parseInt(clean.substring(4, 6), 16) || 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export const renderCoordinatorInstance = new RenderCoordinator(DEFAULT_CONFIG);

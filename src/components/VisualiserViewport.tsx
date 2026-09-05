@@ -57,16 +57,14 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
     };
   }, [coord]);
 
-  // Register 2D kinetic effects canvas with coordinator (sparks & shockwaves)
+  // Register 2D kinetic effects canvas with coordinator (sparks, shockwaves & 2D fallback)
   useEffect(() => {
     const effects = effectsCanvasRef.current;
     if (effects) {
       coord.registerEffectsCanvas(effects);
-      coord.registerOverlayCanvas(effects); // Also serves as 2D fallback
     }
     return () => {
       coord.unregisterEffectsCanvas();
-      coord.unregisterOverlayCanvas();
     };
   }, [coord]);
 

@@ -1431,6 +1431,7 @@ test('WebGLPostProcessingPipeline: Headless fallback and mock GL execution', () 
     FLOAT: 5126,
     COLOR_BUFFER_BIT: 16384,
     BLEND: 3042,
+    ONE: 1,
     SRC_ALPHA: 770,
     ONE_MINUS_SRC_ALPHA: 771,
     TRIANGLE_STRIP: 5,

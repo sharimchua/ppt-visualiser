@@ -43,7 +43,7 @@ uniform vec2 u_opticalCenter;
 // PRNG hash for procedural animated film grain
 float hash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
+  p3 += vec3(dot(p3, p3.yzx + 33.33));
   return fract((p3.x + p3.y) * p3.z);
 }
 
@@ -96,8 +96,8 @@ void main() {
         float streakHalfW = min(u_resolution.x * 0.45, 120.0 + 260.0 * u_lightBleed);
         float streakH = max(2.0, 6.0 * vel);
         if (abs(d.y) < streakH * 2.0 && abs(d.x) < streakHalfW) {
-          float sX = 1.0 - abs(d.x) / streakHalfW;
-          float sY = 1.0 - abs(d.y) / (streakH * 2.0);
+          float sX = clamp(1.0 - abs(d.x) / streakHalfW, 0.0, 1.0);
+          float sY = clamp(1.0 - abs(d.y) / (streakH * 2.0), 0.0, 1.0);
           float sAlpha = sX * sY * vel * u_lightBleed * 0.45;
           additiveColor += lightColor * sAlpha;
           additiveAlpha = max(additiveAlpha, sAlpha);
@@ -121,8 +121,8 @@ void main() {
           if (dist < rayLen && dist > 1.0) {
             float angle = atan(d.y, d.x);
             // 6-pointed starburst diffraction pattern
-            float rayPattern = pow(abs(cos(angle * 3.0 + 0.2618)), 18.0);
-            float rFalloff = (1.0 - dist / rayLen);
+            float rayPattern = pow(max(0.0, abs(cos(angle * 3.0 + 0.2618))), 18.0);
+            float rFalloff = clamp(1.0 - dist / rayLen, 0.0, 1.0);
             float rAlpha = rayPattern * rFalloff * flareAlpha * 0.85;
             vec3 rayCol = mix(lightColor, vec3(1.0), 0.55);
             additiveColor += rayCol * rAlpha;
@@ -135,8 +135,8 @@ void main() {
           float aStreakW = min(u_resolution.x * 0.72, 220.0 + 460.0 * u_lensFlare);
           float aStreakH = max(3.0, 5.0 * vel);
           if (abs(d.y) < aStreakH * 2.5 && abs(d.x) < aStreakW) {
-            float aX = 1.0 - abs(d.x) / aStreakW;
-            float aY = 1.0 - abs(d.y) / (aStreakH * 2.5);
+            float aX = clamp(1.0 - abs(d.x) / aStreakW, 0.0, 1.0);
+            float aY = clamp(1.0 - abs(d.y) / (aStreakH * 2.5), 0.0, 1.0);
             float aAlpha = pow(aX, 2.0) * aY * flareAlpha * 0.75;
             vec3 streakCol = mix(lightColor, vec3(0.22, 0.74, 0.97), 0.4); // Sci-fi cyan anamorphic edge
             additiveColor += streakCol * aAlpha;
@@ -212,10 +212,10 @@ void main() {
     darkAttenuation += vAlpha;
   }
 
-  // Final Output Composition
+  // Final Output Composition (Premultiplied Alpha: additive color adds light, darkAttenuation subtracts)
   darkAttenuation = clamp(darkAttenuation, 0.0, 1.0);
   vec3 finalColor = additiveColor * (1.0 - darkAttenuation * 0.7);
-  float finalAlpha = clamp(additiveAlpha + darkAttenuation * 0.85, 0.0, 1.0);
+  float finalAlpha = clamp(darkAttenuation * 0.85, 0.0, 1.0);
 
   gl_FragColor = vec4(finalColor, finalAlpha);
 }
@@ -268,7 +268,7 @@ export class WebGLPostProcessingPipeline {
       const gl = (
         this.canvas.getContext('webgl', {
           alpha: true,
-          premultipliedAlpha: false,
+          premultipliedAlpha: true,
           antialias: false,
           depth: false,
           stencil: false,
@@ -276,7 +276,7 @@ export class WebGLPostProcessingPipeline {
         }) ||
         this.canvas.getContext('experimental-webgl', {
           alpha: true,
-          premultipliedAlpha: false,
+          premultipliedAlpha: true,
         })
       ) as WebGLRenderingContext | null;
 
@@ -386,9 +386,9 @@ export class WebGLPostProcessingPipeline {
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // Alpha blending
+    // Alpha blending (Premultiplied alpha pipeline)
     gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.useProgram(this.program);
 
