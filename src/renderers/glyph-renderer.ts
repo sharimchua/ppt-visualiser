@@ -55,14 +55,12 @@ export function drawUniformSolfegeOnCanvas(
   if (isFi) {
     // Fi (Obsidian / Tritone Boundary):
     if (isHighContrast) {
-      // High-Contrast mode: Luminous platinum-white fill with crisp obsidian border & radiant bloom!
+      // High-Contrast mode: Luminous platinum-white fill with crisp obsidian border
       ctx.fillStyle = '#f8fafc';
       ctx.fill(path);
 
       ctx.strokeStyle = '#0f172a';
       ctx.lineWidth = Math.max(4, strokeWidth * 1.6) / scale;
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 8;
       ctx.stroke(path);
     } else {
       // Canonical Solfège mode: Mysterious deep obsidian with sleek boundary
@@ -79,11 +77,9 @@ export function drawUniformSolfegeOnCanvas(
     ctx.fill(path);
 
     if (isHighContrast) {
-      // High-Contrast mode: Brilliant crisp white/platinum outline with shadow to ensure 100% legibility
+      // High-Contrast mode: Brilliant crisp white/platinum outline to ensure 100% legibility without CPU blur tax
       ctx.strokeStyle = strokeColor && strokeColor !== '#050811' && strokeColor !== '#0b0d13' ? strokeColor : '#ffffff';
       ctx.lineWidth = Math.max(4, strokeWidth * 1.6) / scale;
-      ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 4;
       ctx.stroke(path);
     } else if (strokeWidth > 0) {
       // Canonical Solfège mode: Sleek dark contour

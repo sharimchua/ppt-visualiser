@@ -566,7 +566,23 @@ export class PitchClockRenderer {
         ctx.fillStyle = `rgba(241, 245, 249, ${0.06 * (avgAlpha / 0.85)})`;
         ctx.fill();
 
-        // Stroke convex hull perimeter with radiant gradients
+        // Stroke convex hull perimeter with single unified radiant bloom pass + crisp segment gradients
+        if (config.glowBloom > 0.05) {
+          ctx.beginPath();
+          ctx.moveTo(hull[0].x, hull[0].y);
+          for (let i = 1; i < hull.length; i++) {
+            ctx.lineTo(hull[i].x, hull[i].y);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = hull[0].color;
+          ctx.lineWidth = 4.0;
+          ctx.globalAlpha = avgAlpha * 0.35 * config.glowBloom;
+          ctx.shadowColor = hull[0].color;
+          ctx.shadowBlur = 10 * config.glowBloom;
+          ctx.stroke();
+        }
+
+        ctx.shadowBlur = 0;
         for (let i = 0; i < hull.length; i++) {
           const p1 = hull[i];
           const p2 = hull[(i + 1) % hull.length];
@@ -580,8 +596,6 @@ export class PitchClockRenderer {
           ctx.strokeStyle = grad;
           ctx.globalAlpha = Math.min(p1.alpha, p2.alpha);
           ctx.lineWidth = 2.5;
-          ctx.shadowColor = p1.color;
-          ctx.shadowBlur = 10 * config.glowBloom;
           ctx.stroke();
         }
 
@@ -931,8 +945,6 @@ export class PitchClockRenderer {
 
               ctx.strokeStyle = '#f8fafc'; // Crisp platinum white rim
               ctx.lineWidth = 2.4;
-              ctx.shadowColor = '#ffffff';
-              ctx.shadowBlur = 5;
               ctx.stroke();
             } else {
               ctx.fillStyle = '#141414';

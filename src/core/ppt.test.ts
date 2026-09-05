@@ -79,7 +79,7 @@ test('Configuration Persistence: localStorage save, load, and clear', () => {
   clearSavedConfig();
   const reverted = loadSavedConfig();
   assert.strictEqual(reverted.tonic, 2);
-  assert.strictEqual(reverted.backgroundTheme, 'studio-obsidian');
+  assert.strictEqual(reverted.backgroundTheme, 'carbon-grid');
 });
 
 test('Nearest-Address Octave Boundary wrapping from So (7 oclock, -5) to Fi (6 oclock, +6)', () => {
@@ -917,10 +917,10 @@ test('Directional Stream Configurations: Valid orientations and directions in de
 
 test('Cosmetics Configuration & Persistence: CRT Scanlines, Optical Lens Flares, and Sparks Physics', () => {
   // Test defaults
-  assert.strictEqual(DEFAULT_CONFIG.scanlineIntensity, 0.0);
-  assert.strictEqual(DEFAULT_CONFIG.scanlineDensity, 2);
-  assert.strictEqual(DEFAULT_CONFIG.crtVignette, 0.2);
-  assert.strictEqual(DEFAULT_CONFIG.lensFlareIntensity, 0.35);
+  assert.strictEqual(DEFAULT_CONFIG.scanlineIntensity, 0.55);
+  assert.strictEqual(DEFAULT_CONFIG.scanlineDensity, 3);
+  assert.strictEqual(DEFAULT_CONFIG.crtVignette, 0.3);
+  assert.strictEqual(DEFAULT_CONFIG.lensFlareIntensity, 0.3);
   assert.strictEqual(DEFAULT_CONFIG.lensFlareStyle, 'cinematic');
   assert.strictEqual(DEFAULT_CONFIG.particleSize, 1.0);
   assert.strictEqual(DEFAULT_CONFIG.particleVolume, 1.0);

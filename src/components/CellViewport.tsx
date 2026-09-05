@@ -73,6 +73,28 @@ export const CellViewport: React.FC<CellViewportProps> = ({
     ...(cell.configOverrides || {}),
   };
 
+  // Keep live render data in a mutable ref so the RAF loop runs uninterrupted without restarts
+  const renderStateRef = useRef({
+    cell,
+    effectiveConfig,
+    activeNotes,
+    decayingNotes,
+    streamItems,
+    pitchClockRenderer,
+    pianoTrianglesRenderer,
+    streamRenderer,
+  });
+  renderStateRef.current = {
+    cell,
+    effectiveConfig,
+    activeNotes,
+    decayingNotes,
+    streamItems,
+    pitchClockRenderer,
+    pianoTrianglesRenderer,
+    streamRenderer,
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -82,6 +104,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
     let animId: number;
 
     const render = (time: number) => {
+      const state = renderStateRef.current;
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
@@ -97,35 +120,35 @@ export const CellViewport: React.FC<CellViewportProps> = ({
       // Clear cell canvas (transparent backdrop so global cosmetics shine through)
       ctx.clearRect(0, 0, width, height);
 
-      if (cell.module === 'orbital') {
-        pitchClockRenderer.render(
+      if (state.cell.module === 'orbital') {
+        state.pitchClockRenderer.render(
           ctx,
           width,
           height,
-          activeNotes,
-          decayingNotes,
-          effectiveConfig,
+          state.activeNotes,
+          state.decayingNotes,
+          state.effectiveConfig,
           time
         );
-      } else if (cell.module === 'triangles') {
-        pianoTrianglesRenderer.render(
+      } else if (state.cell.module === 'triangles') {
+        state.pianoTrianglesRenderer.render(
           ctx,
           width,
           height,
-          activeNotes,
-          decayingNotes,
-          effectiveConfig,
+          state.activeNotes,
+          state.decayingNotes,
+          state.effectiveConfig,
           time
         );
       } else {
-        streamRenderer.render(
+        state.streamRenderer.render(
           ctx,
           0,
           0,
           width,
           height,
-          streamItems,
-          effectiveConfig,
+          state.streamItems,
+          state.effectiveConfig,
           time
         );
       }
@@ -136,7 +159,7 @@ export const CellViewport: React.FC<CellViewportProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [cell, effectiveConfig, activeNotes, decayingNotes, streamItems, pitchClockRenderer, streamRenderer, pianoTrianglesRenderer]);
+  }, [cell.id]);
 
   // Handle high-DPI canvas resizing
   useEffect(() => {

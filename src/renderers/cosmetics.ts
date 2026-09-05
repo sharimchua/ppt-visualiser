@@ -50,9 +50,42 @@ export class CosmeticsEngine {
   private particles: KineticParticle[] = [];
   private shockwaves: ShockwaveRing[] = [];
   private ghosts: PhosphorGhost[] = [];
+  private scanlinePatternMap: Map<number, CanvasPattern | null> = new Map();
 
   constructor() {
     this.initGrain();
+  }
+
+  /**
+   * Retrieves or builds a cached repeating 1px line CanvasPattern for the given step.
+   * Collapses multi-hundred fillRect loops into 1 single GPU draw call.
+   */
+  private getScanlinePattern(ctx: CanvasRenderingContext2D, step: number): CanvasPattern | null {
+    if (this.scanlinePatternMap.has(step)) {
+      return this.scanlinePatternMap.get(step) ?? null;
+    }
+
+    if (typeof document !== 'undefined' && document.createElement) {
+      try {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = 4;
+        offscreen.height = step;
+        const offCtx = offscreen.getContext('2d');
+        if (offCtx) {
+          offCtx.fillStyle = '#000000';
+          offCtx.fillRect(0, 0, 4, 1);
+          const pattern = ctx.createPattern(offscreen, 'repeat');
+          if (pattern) {
+            this.scanlinePatternMap.set(step, pattern);
+            return pattern;
+          }
+        }
+      } catch {
+        // Fall back to direct drawing if offscreen canvas pattern fails
+      }
+    }
+    this.scanlinePatternMap.set(step, null);
+    return null;
   }
 
   /**
@@ -307,14 +340,24 @@ export class CosmeticsEngine {
       ctx.stroke();
     }
 
-    // Render particles
+    // Render particles:
+    // 1. Fast ambient radiant halo (without CPU/GPU Gaussian blur filter bottlenecks)
+    if (glowBloom > 0.05 && this.particles.length > 0) {
+      for (const p of this.particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius * 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha * 0.32 * glowBloom));
+        ctx.fill();
+      }
+    }
+
+    // 2. Crisp bright cores
     for (const p of this.particles) {
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
       ctx.fillStyle = p.color;
       ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 8 * glowBloom;
       ctx.fill();
     }
 
@@ -375,9 +418,14 @@ export class CosmeticsEngine {
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
 
+    // Prioritize top prominent light sources during dense chords to avoid linear gradient & blur explosion
+    const prominentSources = sources.length > 4
+      ? sources.slice().sort((a, b) => b.velocity - a.velocity).slice(0, 4)
+      : sources;
+
     // 1. Light Bleed: Radial Halation & Anamorphic Lens Streaks
-    if (bleed > 0.01 && sources.length > 0) {
-      for (const src of sources) {
+    if (bleed > 0.01 && prominentSources.length > 0) {
+      for (const src of prominentSources) {
         const velAlpha = Math.min(1.0, src.velocity * bleed);
         if (velAlpha <= 0.02) continue;
 
@@ -441,8 +489,8 @@ export class CosmeticsEngine {
 
     // 3. Multi-Element Optical Lens Flare & Diffraction Starburst Rays
     const flare = config.lensFlareIntensity ?? 0;
-    if (flare > 0.01 && sources.length > 0) {
-      this.renderOpticalLensFlares(ctx, width, _height, sources, flare, config.lensFlareStyle ?? 'cinematic');
+    if (flare > 0.01 && prominentSources.length > 0) {
+      this.renderOpticalLensFlares(ctx, width, _height, prominentSources, flare, config.lensFlareStyle ?? 'cinematic');
     }
 
     ctx.restore();
@@ -465,7 +513,12 @@ export class CosmeticsEngine {
     const opticalCx = width / 2;
     const opticalCy = height / 2;
 
-    for (const src of sources) {
+    // Optical flare sources capped to the top 3 loudest notes to guarantee 60 FPS
+    const topSources = sources.length > 3
+      ? sources.slice().sort((a, b) => b.velocity - a.velocity).slice(0, 3)
+      : sources;
+
+    for (const src of topSources) {
       const alpha = Math.min(1.0, src.velocity * intensity);
       if (alpha <= 0.02) continue;
 
@@ -477,30 +530,33 @@ export class CosmeticsEngine {
 
         ctx.save();
         ctx.translate(src.x, src.y);
-        ctx.strokeStyle = src.color;
-        ctx.shadowColor = src.color;
-        ctx.shadowBlur = 12 * intensity;
 
+        // Soft diffraction halo ray fan
+        ctx.beginPath();
         for (let i = 0; i < rayCount; i++) {
           const angle = (i * Math.PI) / rayCount + (Math.PI / 12);
-          ctx.beginPath();
-          ctx.moveTo(-Math.cos(angle) * rayLen, -Math.sin(angle) * rayLen);
-          ctx.lineTo(Math.cos(angle) * rayLen, Math.sin(angle) * rayLen);
-
-          const grad = ctx.createLinearGradient(
-            -Math.cos(angle) * rayLen, -Math.sin(angle) * rayLen,
-            Math.cos(angle) * rayLen, Math.sin(angle) * rayLen
-          );
-          grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-          grad.addColorStop(0.35, hexToRgba(src.color, alpha * 0.25));
-          grad.addColorStop(0.5, 'rgba(255, 255, 255, ' + (alpha * 0.8) + ')');
-          grad.addColorStop(0.65, hexToRgba(src.color, alpha * 0.25));
-          grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = rayWidth;
-          ctx.stroke();
+          const cos = Math.cos(angle) * rayLen;
+          const sin = Math.sin(angle) * rayLen;
+          ctx.moveTo(-cos, -sin);
+          ctx.lineTo(cos, sin);
         }
+        ctx.strokeStyle = hexToRgba(src.color, alpha * 0.4);
+        ctx.lineWidth = rayWidth * 2.2;
+        ctx.stroke();
+
+        // Brilliant ray center cores
+        ctx.beginPath();
+        for (let i = 0; i < rayCount; i++) {
+          const angle = (i * Math.PI) / rayCount + (Math.PI / 12);
+          const cos = Math.cos(angle) * rayLen * 0.75;
+          const sin = Math.sin(angle) * rayLen * 0.75;
+          ctx.moveTo(-cos, -sin);
+          ctx.lineTo(cos, sin);
+        }
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+        ctx.lineWidth = Math.max(1, rayWidth * 0.75);
+        ctx.stroke();
+
         ctx.restore();
       }
 
@@ -562,14 +618,24 @@ export class CosmeticsEngine {
 
     ctx.save();
 
-    // 1. Interlaced Scanlines
+    // 1. Interlaced Scanlines (using cached pattern for single-draw-call performance)
     if (intensity > 0.01) {
       // Density: 1=Fine (step 2), 2=Standard (step 3), 3=Retro (step 4), 4=Coarse Arcade (step 6)
       const step = Math.max(2, Math.min(8, [2, 3, 4, 6][(densityMultiplier || 2) - 1] || 3));
-      ctx.fillStyle = 'rgba(0, 0, 0, ' + Math.min(0.75, intensity * 0.48) + ')';
+      const scanlineAlpha = Math.min(0.75, intensity * 0.48);
+      const pattern = this.getScanlinePattern(ctx, step);
 
-      for (let y = 0; y < height; y += step) {
-        ctx.fillRect(0, y, width, 1);
+      if (pattern) {
+        ctx.save();
+        ctx.globalAlpha = scanlineAlpha;
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = 'rgba(0, 0, 0, ' + scanlineAlpha + ')';
+        for (let y = 0; y < height; y += step) {
+          ctx.fillRect(0, y, width, 1);
+        }
       }
     }
 

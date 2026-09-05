@@ -18,8 +18,8 @@ export class MidiFilePlayer {
   private stateListeners: Set<(state: MidiPlaybackState) => void> = new Set();
 
   constructor() {
-    // Load first demo track by default
-    this.loadDemoTrack(DEMO_TRACKS[1].id); // Default to PPT Tetrachord study (Do=D)
+    // Default to Concentric Clock Radial Orbit demo track
+    this.loadDemoTrack('radial-orbit');
   }
 
   public loadDemoTrack(trackId: string): boolean {

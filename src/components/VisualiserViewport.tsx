@@ -104,6 +104,22 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     }
   }, [config.tonic, config.keyboardLowestMidi, onToneCoordinatesResolved]);
 
+  const bgDataRef = useRef({ config, cosmeticsEngine });
+  bgDataRef.current = { config, cosmeticsEngine };
+
+  const overlayDataRef = useRef({
+    config,
+    activeNotes,
+    decayingNotes,
+    cosmeticsEngine,
+  });
+  overlayDataRef.current = {
+    config,
+    activeNotes,
+    decayingNotes,
+    cosmeticsEngine,
+  };
+
   // Unified global background canvas render loop
   useEffect(() => {
     const canvas = bgCanvasRef.current;
@@ -114,6 +130,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     let animId: number;
 
     const render = () => {
+      const { config: curConfig, cosmeticsEngine: curEngine } = bgDataRef.current;
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
@@ -127,7 +144,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
       ctx.scale(dpr, dpr);
 
       // Render seamless global theme gradient
-      cosmeticsEngine.renderBackground(ctx, width, height, config.backgroundTheme);
+      curEngine.renderBackground(ctx, width, height, curConfig.backgroundTheme);
 
       ctx.restore();
       animId = requestAnimationFrame(render);
@@ -135,7 +152,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [config.backgroundTheme, cosmeticsEngine]);
+  }, []);
 
   // Unified whole-display cosmetics overlay loop (film grain, CRT scanlines, optical lens flares)
   useEffect(() => {
@@ -147,6 +164,12 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
     let animId: number;
 
     const render = () => {
+      const {
+        config: curConfig,
+        activeNotes: curActiveNotes,
+        decayingNotes: curDecayingNotes,
+        cosmeticsEngine: curEngine,
+      } = overlayDataRef.current;
       const dpr = window.devicePixelRatio || 1;
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
@@ -157,7 +180,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
       }
 
       // Advance procedural grain, kinetics, and phosphor physics
-      cosmeticsEngine.update();
+      curEngine.update();
 
       ctx.save();
       ctx.scale(dpr, dpr);
@@ -169,39 +192,39 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
       const cx = width / 2;
       const cy = height / 2;
       const radius = Math.min(width, height) * 0.45;
-      cosmeticsEngine.renderAnalogArtifacts(
+      curEngine.renderAnalogArtifacts(
         overlayCtx,
         width,
         height,
-        activeNotes,
-        decayingNotes,
+        curActiveNotes,
+        curDecayingNotes,
         cx,
         cy,
         radius,
-        config
+        curConfig
       );
 
       // Reactive sparks & shockwaves
-      cosmeticsEngine.renderEffects(overlayCtx, config.glowBloom);
+      curEngine.renderEffects(overlayCtx, curConfig.glowBloom);
 
       // Whole-display CRT scanlines & glass curvature vignette
-      cosmeticsEngine.renderScanlines(
+      curEngine.renderScanlines(
         overlayCtx,
         width,
         height,
-        config.scanlineIntensity,
-        config.scanlineDensity,
-        config.crtVignette
+        curConfig.scanlineIntensity,
+        curConfig.scanlineDensity,
+        curConfig.crtVignette
       );
 
       // Whole-display film grain overlay (seamlessly spans all cells)
-      cosmeticsEngine.renderFilmGrain(
+      curEngine.renderFilmGrain(
         overlayCtx,
         width,
         height,
-        config.filmGrainIntensity,
-        config.filmGrainSize,
-        config.filmGrainContrast
+        curConfig.filmGrainIntensity,
+        curConfig.filmGrainSize,
+        curConfig.filmGrainContrast
       );
 
       ctx.restore();
@@ -210,12 +233,7 @@ export const VisualiserViewport: React.FC<VisualiserViewportProps> = ({
 
     animId = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animId);
-  }, [
-    config,
-    activeNotes,
-    decayingNotes,
-    cosmeticsEngine,
-  ]);
+  }, []);
 
   // High-DPI canvas resizing
   useEffect(() => {

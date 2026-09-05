@@ -1,5 +1,5 @@
 import { VisualiserConfig, LayoutMode } from './types';
-import { PRESET_BALANCED, PRESET_LAYOUTS } from './layout-models';
+import { PRESET_SIGNATURE, PRESET_LAYOUTS } from './layout-models';
 
 export const STORAGE_KEY = 'ppt_visualiser_config_v1';
 
@@ -58,28 +58,28 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   showCenterAnchor: true,
 
   // Cosmetics & Aesthetics
-  backgroundTheme: 'studio-obsidian',
-  filmGrainIntensity: 0.25,
-  filmGrainSize: 1,
-  filmGrainContrast: 0.5,
-  particleIntensity: 0.7,
+  backgroundTheme: 'carbon-grid',
+  filmGrainIntensity: 0.75,
+  filmGrainSize: 3,
+  filmGrainContrast: 0.45,
+  particleIntensity: 0.9,
   particleSize: 1.0,
   particleVolume: 1.0,
   particleGravity: 0.15,
   particleOriginDistance: 0,
-  glowBloom: 0.85,
-  motionTrails: 0.15,
-  ghostingIntensity: 0.0,
-  lightBleedIntensity: 0.25,
-  scanlineIntensity: 0.0,
-  scanlineDensity: 2,
-  crtVignette: 0.2,
-  lensFlareIntensity: 0.35,
+  glowBloom: 0.8,
+  motionTrails: 0.6,
+  ghostingIntensity: 0.35,
+  lightBleedIntensity: 0.55,
+  scanlineIntensity: 0.55,
+  scanlineDensity: 3,
+  crtVignette: 0.3,
+  lensFlareIntensity: 0.3,
   lensFlareStyle: 'cinematic',
 
   // Layout & Sound
-  layoutMode: 'balanced',
-  activeLayout: PRESET_BALANCED,
+  layoutMode: 'signature',
+  activeLayout: PRESET_SIGNATURE,
   showVirtualKeyboard: true,
   masterVolume: 0.75,
   soundEnabled: true,
@@ -173,7 +173,7 @@ export function loadSavedConfig(): VisualiserConfig {
 
     // Sanitize layout mode and activeLayout
     const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature']);
-    if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'balanced';
+    if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'signature';
 
     // Sanitize Piano Triangles (Scale Signature)
     merged.showVertexLabels = typeof merged.showVertexLabels === 'boolean' ? merged.showVertexLabels : true;
@@ -182,7 +182,7 @@ export function loadSavedConfig(): VisualiserConfig {
     merged.showCenterAnchor = typeof merged.showCenterAnchor === 'boolean' ? merged.showCenterAnchor : true;
 
     if (!merged.activeLayout || !merged.activeLayout.root) {
-      merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_BALANCED;
+      merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_SIGNATURE;
     }
 
     // Sanitize auto-tonic settings
