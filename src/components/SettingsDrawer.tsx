@@ -71,7 +71,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   onChange={(e) => onUpdateConfig({ autoTonicEnabled: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-red-600"></div>
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
               </label>
             </div>
 
@@ -352,7 +352,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   onChange={(e) => onUpdateConfig({ showOctaveNumbers: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-red-600"></div>
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
               </label>
             </div>
           </div>
@@ -619,18 +619,27 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
 
             {/* 8 Priority Slots */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Priority Slots (Outer → Inner):</span>
-              <div className="grid grid-cols-2 gap-1.5">
+            <div className="space-y-2 pt-1">
+              <div className="flex justify-between items-center text-[10px]">
+                <span className="text-slate-400 uppercase tracking-wider font-semibold">Priority Slots (Outer → Inner)</span>
+                <span className="text-slate-500 font-mono text-[9px]">S1 (Max) → S8 (Min)</span>
+              </div>
+              <div className="space-y-1.5 bg-slate-950/40 p-2 rounded-lg border border-slate-800/80">
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
                   const currentVal = config.clockLabelPriorities?.[idx] ?? 'glyphs';
+                  const slotLabel =
+                    idx === 0
+                      ? 'Slot 1 (Outermost)'
+                      : idx === 7
+                      ? 'Slot 8 (Innermost)'
+                      : `Slot ${idx + 1}`;
                   return (
                     <div
                       key={idx}
-                      className="flex items-center justify-between bg-slate-800/50 px-2 py-1.5 rounded border border-slate-700/50"
+                      className="flex items-center justify-between gap-2.5 bg-slate-900/80 px-2.5 py-1.5 rounded border border-slate-800 hover:border-slate-700 transition"
                     >
-                      <span className="font-mono text-[10px] text-slate-400 font-semibold">
-                        S{idx + 1} <span className="text-[9px] text-slate-500 font-normal">{idx === 0 ? 'Max' : idx === 7 ? 'Min' : ''}</span>:
+                      <span className="font-mono text-[11px] text-slate-300 font-medium whitespace-nowrap">
+                        {slotLabel}
                       </span>
                       <select
                         value={currentVal}
@@ -639,7 +648,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                           updated[idx] = e.target.value as ClockLabelType;
                           onUpdateConfig({ clockLabelPriorities: updated });
                         }}
-                        className="bg-slate-900 text-[10px] text-slate-200 rounded px-1.5 py-0.5 border border-slate-700 focus:outline-none focus:border-red-500 cursor-pointer"
+                        className="bg-slate-950 text-[11px] text-slate-200 rounded px-2 py-1 border border-slate-700/80 focus:outline-none focus:border-red-500 cursor-pointer flex-1 min-w-0"
                       >
                         <option value="glyphs">Uniform Solfège</option>
                         <option value="triangles">Piano Triangles</option>
@@ -675,15 +684,18 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
 
           {/* Chord Rays & Geometry */}
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2.5">
-            <label className="flex items-center justify-between cursor-pointer">
+            <div className="flex items-center justify-between">
               <span className="text-slate-300 font-medium">Chord Connection Rays</span>
-              <input
-                type="checkbox"
-                checked={config.connectChordRays}
-                onChange={(e) => onUpdateConfig({ connectChordRays: e.target.checked })}
-                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
-              />
-            </label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.connectChordRays}
+                  onChange={(e) => onUpdateConfig({ connectChordRays: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
 
             {config.connectChordRays && (
               <div className="pt-2 border-t border-slate-800/60 space-y-1.5">
@@ -725,28 +737,34 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           </div>
 
           {/* Radial Movement Trails & Shockwaves */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
-            <label className="flex items-center justify-between cursor-pointer">
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex items-center justify-between">
               <div>
                 <span className="text-slate-300 font-medium block">Radial Movement Trails</span>
                 <span className="text-[10px] text-slate-400 block">Arc trails between melodic notes on the same octave</span>
               </div>
-              <input
-                type="checkbox"
-                checked={config.showRadialMovementTrails}
-                onChange={(e) => onUpdateConfig({ showRadialMovementTrails: e.target.checked })}
-                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer ml-2"
-              />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer pt-2 border-t border-slate-800/60">
+              <label className="relative inline-flex items-center cursor-pointer ml-2 flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.showRadialMovementTrails}
+                  onChange={(e) => onUpdateConfig({ showRadialMovementTrails: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
               <span className="text-slate-300 font-medium">Kinetic Shockwave Rings</span>
-              <input
-                type="checkbox"
-                checked={config.pulseShockwaves}
-                onChange={(e) => onUpdateConfig({ pulseShockwaves: e.target.checked })}
-                className="rounded bg-slate-800 border-slate-700 text-red-600 focus:ring-0 cursor-pointer"
-              />
-            </label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.pulseShockwaves}
+                  onChange={(e) => onUpdateConfig({ pulseShockwaves: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-600"></div>
+              </label>
+            </div>
           </div>
         </section>
 
