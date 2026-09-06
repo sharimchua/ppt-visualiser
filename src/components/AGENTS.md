@@ -28,6 +28,7 @@ The `src/components` domain contains the React user interface layer, including t
   - Theory documentation: `https://ppt.midlifemuso.com` (and its reference library `https://ppt.midlifemuso.com/reference`).
   - Music coaching & pedagogy: `https://midlifemuso.com`.
 - **Responsive Geometry**: UI elements, drawer dropdowns, header buttons, modal bookmark navigation tabs, and vector theory diagrams must resize responsively without horizontal overflowing or boundary clipping on narrow mobile viewports. Row containers adapt flexibly to columns on mobile portrait viewports (< 640px) to prevent viewport compression.
+- **Non-Obstructive Layout Edit Mode**: Layout edit mode controls (status indicator, cell count, add cell, reset, share, done) are docked in normal document flow above the canvas viewport rather than floating over cells. This guarantees that cell-level controls (e.g. module dropdown selector, flex weight stepper, and cell split/delete actions) remain fully accessible and completely unobstructed regardless of the number or direction of cell splits.
 
 ## Work Guidance
 

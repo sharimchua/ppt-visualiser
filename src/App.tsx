@@ -21,6 +21,7 @@ import { SettingsDrawer } from './components/SettingsDrawer';
 import { InfoModal } from './components/InfoModal';
 import {
   decodeLayoutFromSlug,
+  encodeLayoutToSlug,
   updateCellInTree,
   splitCellInTree,
   removeCellFromTree,
@@ -256,6 +257,16 @@ export const App: React.FC = () => {
     }));
   }, []);
 
+  // Share current layout via URL hash
+  const handleShareLayout = useCallback(() => {
+    if (!config.activeLayout) return;
+    const slug = encodeLayoutToSlug(config.activeLayout, true);
+    const url = `${window.location.origin}${window.location.pathname}#layout=${slug}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).catch(console.warn);
+    }
+  }, [config.activeLayout]);
+
   // Reset session state: clears discovered tones, active notes, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
     renderCoordinatorInstance.resetSession();
@@ -360,6 +371,7 @@ export const App: React.FC = () => {
           onDuplicateCell={handleDuplicateCell}
           onAddCell={handleAddCell}
           onResetLayout={handleResetLayout}
+          onShareLayout={handleShareLayout}
           onUpdateCell={handleUpdateCell}
         />
       </main>

@@ -259,7 +259,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
             </div>
 
             {cell.title && (
-              <span className="text-[10px] text-slate-400 truncate max-w-[60px] sm:max-w-[120px] font-medium hidden sm:inline">
+              <span className="text-[10px] text-slate-400 truncate min-w-0 shrink max-w-[60px] sm:max-w-[120px] font-medium hidden sm:inline">
                 {cell.title}
               </span>
             )}
