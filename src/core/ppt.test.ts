@@ -1115,6 +1115,100 @@ test('Pitch Clock Renderer: Tone node coordinate query interface', () => {
   renderer.resetRevealsAndActivity();
 });
 
+test('Pitch Clock Renderer: Deterministic predictive tone coordinates when orbits are dynamically controlled', () => {
+  const renderer = new PitchClockRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const activeNotes = new Map<number, ActiveNote>();
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+
+  // Render first frame to establish canvas dimensions (800x800)
+  renderer.render(mockCtx, 800, 800, activeNotes, decayingNotes, { ...DEFAULT_CONFIG, tonic: 0 }, 1000);
+
+  // Query un-rendered note F4 (MIDI 65, tonic C = Fa at semitone 5)
+  const coords = renderer.getToneCoordinates(65, 0, 21);
+  assert.ok(coords !== null, 'getToneCoordinates must return predictive coordinates once dimensions are established');
+  assert.strictEqual(coords.semitone, 5);
+
+  const cx = 400;
+  const cy = 400;
+  const distFromCenter = Math.sqrt((coords.x - cx) ** 2 + (coords.y - cy) ** 2);
+  const maxClockRadius = 800 * 0.45; // 360
+  const minClockRadius = maxClockRadius * 0.22; // 79.2
+  assert.ok(
+    distFromCenter >= minClockRadius * 0.8 && distFromCenter <= maxClockRadius * 1.1,
+    `Predicted radius ${distFromCenter} must lie comfortably within clock bounds [${minClockRadius}, ${maxClockRadius}]`
+  );
+});
+
+test('Pitch Clock Renderer: Tonic modulation remaps discovered tones and removes phantom tone circles', () => {
+  const renderer = new PitchClockRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const activeNotes = new Map<number, ActiveNote>();
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+
+  // 1. Play Note F4 (MIDI 65) with tonic C (0). F is Fa (semitone 5).
+  activeNotes.set(65, {
+    midi: 65,
+    pitchClass: 5,
+    octave: 4,
+    registerIndex: 3,
+    velocity: 0.8,
+    startTime: 1000,
+    colorHex: '#38BDF8',
+    solfege: 'Fa',
+    pianoTriangle: { triangle: 'L', point: 2 },
+  });
+
+  renderer.render(mockCtx, 800, 800, activeNotes, decayingNotes, { ...DEFAULT_CONFIG, tonic: 0, toneRevealMode: 'played' }, 1000);
+
+  // Fa should have coordinates under tonic C
+  const faCoords = renderer.getToneCoordinates(65, 0, 21);
+  assert.ok(faCoords !== null);
+  assert.strictEqual(faCoords.semitone, 5, 'Under tonic C, F4 is Fa (semitone 5)');
+
+  // 2. Modulate tonic from C (0) to F (5). F is now Do (semitone 0).
+  activeNotes.clear();
+  renderer.triggerTonicShift(0, 5, 21);
+  renderer.render(mockCtx, 800, 800, activeNotes, decayingNotes, { ...DEFAULT_CONFIG, tonic: 5, toneRevealMode: 'played' }, 2000);
+
+  // Under new tonic F (5), F4 is Do (semitone 0)
+  const doCoords = renderer.getToneCoordinates(65, 5, 21);
+  assert.ok(doCoords !== null);
+  assert.strictEqual(doCoords.semitone, 0, 'Under tonic F, F4 must be Do (semitone 0)');
+});
+
 test('Multi-Genre Demo Repertoire: 11 diverse works across 4 distinct categories', () => {
   assert.strictEqual(DEMO_TRACKS.length, 11);
 

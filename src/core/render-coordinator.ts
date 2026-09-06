@@ -293,6 +293,9 @@ export class RenderCoordinator {
   public triggerTonicShift(oldTonic: number, newTonic: number, isAuto: boolean = false) {
     if (oldTonic === newTonic) return;
 
+    // Always re-align pitch clock tone circles even if kinetic animations are disabled
+    this.pitchClockRenderer.remapTonic(newTonic, this.config.keyboardLowestMidi);
+
     if (this.config.tonicShiftEffectsEnabled !== false) {
       // Find orbital clock center and radius on the effects canvas (if available)
       let orbitalCellCanvas: HTMLCanvasElement | null = null;
@@ -501,12 +504,24 @@ export class RenderCoordinator {
     }
 
     const targetCanvas = this.effectsCanvas || this.overlayCanvas || this.postProcessingCanvas;
-    if (coords && orbitalCellCanvas && targetCanvas) {
+    if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
       const cellRect = orbitalCellCanvas.getBoundingClientRect();
       const overlayRect = targetCanvas.getBoundingClientRect();
-      sparkX = (cellRect.left - overlayRect.left) + coords.x;
-      sparkY = (cellRect.top - overlayRect.top) + coords.y;
-      radialAngle = coords.angle;
+      const clockCx = (cellRect.left - overlayRect.left) + cellRect.width / 2;
+      const clockCy = (cellRect.top - overlayRect.top) + cellRect.height / 2;
+
+      if (coords) {
+        sparkX = (cellRect.left - overlayRect.left) + coords.x;
+        sparkY = (cellRect.top - overlayRect.top) + coords.y;
+        radialAngle = coords.angle;
+      } else {
+        const angle = getClockAngleRad(res.semitone);
+        const maxClockRadius = Math.min(cellRect.width, cellRect.height) * 0.45;
+        const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
+        sparkX = clockCx + radius * Math.cos(angle);
+        sparkY = clockCy + radius * Math.sin(angle);
+        radialAngle = angle;
+      }
     } else {
       const angle = getClockAngleRad(res.semitone);
       const vpW = typeof window !== 'undefined' ? window.innerWidth : 1920;
@@ -798,11 +813,20 @@ export class RenderCoordinator {
     const targetCanvas = this.postProcessingCanvas || this.effectsCanvas || this.overlayCanvas;
     let offsetLeft = 0;
     let offsetTop = 0;
+    let clockCx = (typeof window !== 'undefined' ? window.innerWidth : 1920) / 2;
+    let clockCy = (typeof window !== 'undefined' ? window.innerHeight : 1080) / 2;
+    let maxClockRadius = Math.min(clockCx, clockCy) * 0.45;
+    let hasOrbitalCell = false;
+
     if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
       const cellRect = orbitalCellCanvas.getBoundingClientRect();
       const targetRect = targetCanvas.getBoundingClientRect();
       offsetLeft = cellRect.left - targetRect.left;
       offsetTop = cellRect.top - targetRect.top;
+      clockCx = offsetLeft + cellRect.width / 2;
+      clockCy = offsetTop + cellRect.height / 2;
+      maxClockRadius = Math.min(cellRect.width, cellRect.height) * 0.45;
+      hasOrbitalCell = true;
     }
 
     // 1. Active notes
@@ -813,6 +837,12 @@ export class RenderCoordinator {
       if (coords) {
         lx = offsetLeft + coords.x;
         ly = offsetTop + coords.y;
+      } else if (hasOrbitalCell) {
+        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+        const angle = getClockAngleRad(res.semitone);
+        const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
+        lx = clockCx + radius * Math.cos(angle);
+        ly = clockCy + radius * Math.sin(angle);
       } else {
         const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
         const angle = getClockAngleRad(res.semitone);
@@ -840,6 +870,12 @@ export class RenderCoordinator {
       if (coords) {
         lx = offsetLeft + coords.x;
         ly = offsetTop + coords.y;
+      } else if (hasOrbitalCell) {
+        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+        const angle = getClockAngleRad(res.semitone);
+        const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
+        lx = clockCx + radius * Math.cos(angle);
+        ly = clockCy + radius * Math.sin(angle);
       } else {
         const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
         const angle = getClockAngleRad(res.semitone);

@@ -23,8 +23,8 @@ The `src/renderers` domain contains all high-performance 2D Canvas and WebGL gra
   - In `pitch-clock-canvas.ts`, if `glowBloomEnabled` is false, `ctx.shadowBlur` must remain strictly 0 to eliminate software Gaussian blur rasterisation costs in 2D contexts.
   - If `sparksEnabled` is false, particle physics loops must be skipped entirely.
   - If `tonicShiftEffectsEnabled` is false, tonic shift shockwaves, perimeter modulation arcs, Do anchor surges, and timeline barrier rendering must be completely bypassed with zero CPU/GPU overhead.
-- **High-DPI Awareness**: All canvases must scale by `window.devicePixelRatio` for razor-sharp rendering on Retina/HiDPI screens without visual blurring.
 - **Responsive Geometry & Soft-Centering**: When rendering in constrained viewports or mobile dimensions, canvas renderers must scale vertices and typography proportionally. In `piano-triangles-canvas.ts`, soft-centering prevents severe down-scaling of off-centre tonics, and idle chromatic labels are suppressed below 48px to eliminate collision.
+- **Pitch Clock Tonic Remapping & Predictive Origin Geometry**: Pitch clock tracks physical MIDI note discoveries as ground truth, deterministically recalculating tone keys, organic radii distributions, and pop animations whenever tonic modulates (automatically or manually) to prevent stale phantom tone circles. In `getToneCoordinates`, if a tone node has not yet completed a canvas draw pass, coordinates are predictively resolved from the active orbit layout to ensure cosmetic particle bursts originate precisely on-node from the initial strike.
 
 ## Work Guidance
 

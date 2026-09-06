@@ -41,7 +41,14 @@ interface TonicClockShiftAnimation {
 export class PitchClockRenderer {
   // Kinetic tonic shift animation state
   private activeTonicShift: TonicClockShiftAnimation | null = null;
-  // Set of tone keys ("${r}_${s}") that have been played in this session
+  // Physical MIDI notes that have been played in this session (source of truth across modulations)
+  private discoveredMidis: Set<number> = new Set();
+  // Dynamic per-note activity score [0..1] for organic window decay
+  private midiActivity: Map<number, number> = new Map();
+  // Animation scale for each discovered MIDI note (pops from 0 -> 1.25 -> 1.0)
+  private midiPopScale: Map<number, number> = new Map();
+
+  // Set of tone keys ("${r}_${s}") relative to current tonic
   private discoveredTones: Set<string> = new Set();
   // Dynamic per-tone activity score [0..1] for organic window decay
   private toneActivity: Map<string, number> = new Map();
@@ -57,6 +64,13 @@ export class PitchClockRenderer {
   private currentAlphas: number[] = [0, 0, 0, 0, 0, 0, 0, 0];
   private lastTime: number = 0;
 
+  // Last rendered canvas dimensions and layout context for predictive coordinate queries
+  private lastWidth: number = 0;
+  private lastHeight: number = 0;
+  private lastConfig?: VisualiserConfig;
+  private lastTonic?: number;
+  private lastLowestMidi: number = 21;
+
   // Radial movement trails tracking sequential note transitions in the same octave register
   private lastNotePerRegister: Array<{ semitone: number; time: number; color: string } | null> = [
     null, null, null, null, null, null, null, null
@@ -66,11 +80,13 @@ export class PitchClockRenderer {
 
   // Exact on-screen rendered coordinates of each tone node for pixel-precise cosmetic effects
   private toneCoordinates: Map<string, { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number }> = new Map();
+  private midiCoordinates: Map<number, { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number }> = new Map();
 
   /**
    * Triggers the kinetic compass modulation sweep arc and Do zenith beacon pulse.
+   * Immediately re-aligns tone circles to the new tonic, eliminating phantom lingering circles.
    */
-  public triggerTonicShift(oldTonic: number, newTonic: number): void {
+  public triggerTonicShift(oldTonic: number, newTonic: number, lowestMidi?: number): void {
     const semitoneOfNew = ((newTonic - oldTonic) % 12 + 12) % 12;
     const fromAngle = getClockAngleRad(semitoneOfNew);
     const toAngle = getClockAngleRad(0); // 12 o'clock Do
@@ -88,15 +104,97 @@ export class PitchClockRenderer {
       toAngle,
       deltaAngle: delta,
     };
+
+    this.remapTonic(newTonic, lowestMidi ?? this.lastLowestMidi ?? 21);
+    this.lastTonic = newTonic;
   }
 
   /**
-   * Look up exact on-screen rendered center coordinates and radius for a MIDI note.
+   * Re-aligns all discovered tones, tone activity, and animations when the tonic shifts.
+   * Eliminates phantom lingering tone circles (e.g. Fa modulated to Do).
    */
-  public getToneCoordinates(midi: number, tonic: number, lowestMidi: number = 21): { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number } | null {
+  public remapTonic(newTonic: number, lowestMidi: number = 21): void {
+    this.discoveredTones.clear();
+    this.toneActivity.clear();
+    this.tonePopScale.clear();
+    this.toneCoordinates.clear();
+    this.midiCoordinates.clear();
+    this.registerEverPlayed = [false, false, false, false, false, false, false, false];
+    this.lastNotePerRegister = [null, null, null, null, null, null, null, null];
+    this.radialTrails = [];
+
+    // Reconstruct all tone structures from discovered physical MIDI notes
+    for (const midi of this.discoveredMidis) {
+      const res = resolveMidiToRegisterAndSemitone(midi, newTonic, lowestMidi);
+      const toneKey = `${res.registerIndex}_${res.semitone}`;
+      this.discoveredTones.add(toneKey);
+      this.registerEverPlayed[res.registerIndex] = true;
+
+      const act = this.midiActivity.get(midi);
+      if (act !== undefined) {
+        this.toneActivity.set(toneKey, act);
+      }
+
+      const pop = this.midiPopScale.get(midi);
+      if (pop !== undefined) {
+        this.tonePopScale.set(toneKey, pop);
+      }
+    }
+  }
+
+  /**
+   * Look up exact on-screen rendered centre coordinates and radius for a MIDI note.
+   * If the note has not yet rendered (e.g. on initial note-on before the subsequent frame),
+   * deterministically computes and returns its predicted coordinates within the orbital cell canvas.
+   */
+  public getToneCoordinates(
+    midi: number,
+    tonic: number,
+    lowestMidi: number = 21
+  ): { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number } | null {
     const res = resolveMidiToRegisterAndSemitone(midi, tonic, lowestMidi);
     const key = `${res.registerIndex}_${res.semitone}`;
-    return this.toneCoordinates.get(key) || null;
+
+    const cached = this.toneCoordinates.get(key) || this.midiCoordinates.get(midi);
+    if (cached) return cached;
+
+    // Deterministic calculation if canvas dimensions are known
+    if (this.lastWidth > 0 && this.lastHeight > 0) {
+      const cx = this.lastWidth / 2;
+      const cy = this.lastHeight / 2;
+      const maxClockRadius = Math.min(this.lastWidth, this.lastHeight) * 0.45;
+      const minClockRadius = maxClockRadius * 0.22;
+
+      let radius = this.currentRadii[res.registerIndex];
+      if (!radius || radius <= 10) {
+        const { targetRadii } = this.calculateOrganicRadii(
+          minClockRadius,
+          maxClockRadius,
+          this.lastConfig || ({ registerWeightMode: 'organic' } as any),
+          res.registerIndex
+        );
+        radius = targetRadii[res.registerIndex] || (maxClockRadius * 0.6);
+      }
+
+      const angle = getClockAngleRad(res.semitone);
+      const nx = cx + radius * Math.cos(angle);
+      const ny = cy + radius * Math.sin(angle);
+
+      const coords = {
+        x: nx,
+        y: ny,
+        radius: 14,
+        angle,
+        semitone: res.semitone,
+        registerIndex: res.registerIndex,
+      };
+
+      this.toneCoordinates.set(key, coords);
+      this.midiCoordinates.set(midi, coords);
+      return coords;
+    }
+
+    return null;
   }
 
   /**
@@ -104,6 +202,9 @@ export class PitchClockRenderer {
    * without needing to reload the webpage.
    */
   public resetRevealsAndActivity(): void {
+    this.discoveredMidis.clear();
+    this.midiActivity.clear();
+    this.midiPopScale.clear();
     this.discoveredTones.clear();
     this.toneActivity.clear();
     this.tonePopScale.clear();
@@ -115,6 +216,8 @@ export class PitchClockRenderer {
     this.processedNoteStarts.clear();
     this.radialTrails = [];
     this.activeTonicShift = null;
+    this.toneCoordinates.clear();
+    this.midiCoordinates.clear();
   }
 
   public render(
@@ -131,6 +234,17 @@ export class PitchClockRenderer {
     const maxClockRadius = Math.min(width, height) * 0.45;
     const minClockRadius = maxClockRadius * 0.22;
 
+    this.lastWidth = width;
+    this.lastHeight = height;
+    this.lastConfig = config;
+    this.lastLowestMidi = config.keyboardLowestMidi ?? 21;
+
+    // Detect tonic re-alignment triggered outside triggerTonicShift
+    if (this.lastTonic !== undefined && this.lastTonic !== config.tonic) {
+      this.remapTonic(config.tonic, this.lastLowestMidi);
+    }
+    this.lastTonic = config.tonic;
+
     const tonic = config.tonic;
     const glowBloomOn = (config.glowBloomEnabled ?? true) && config.glowBloom > 0;
     const effectiveConfig = glowBloomOn ? config : { ...config, glowBloom: 0 };
@@ -144,6 +258,12 @@ export class PitchClockRenderer {
       const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, config.keyboardLowestMidi);
       this.registerActivity[res.registerIndex] = 1.0;
       this.registerEverPlayed[res.registerIndex] = true;
+
+      this.discoveredMidis.add(note.midi);
+      this.midiActivity.set(note.midi, 1.0);
+      if (!this.midiPopScale.has(note.midi)) {
+        this.midiPopScale.set(note.midi, 0.0);
+      }
 
       const toneKey = `${res.registerIndex}_${res.semitone}`;
       this.toneActivity.set(toneKey, 1.0);
@@ -210,6 +330,12 @@ export class PitchClockRenderer {
       this.registerActivity[res.registerIndex] = Math.max(this.registerActivity[res.registerIndex], 0.6);
       this.registerEverPlayed[res.registerIndex] = true;
 
+      this.discoveredMidis.add(note.midi);
+      this.midiActivity.set(note.midi, Math.max(this.midiActivity.get(note.midi) ?? 0, 0.6));
+      if (!this.midiPopScale.has(note.midi)) {
+        this.midiPopScale.set(note.midi, 0.0);
+      }
+
       const toneKey = `${res.registerIndex}_${res.semitone}`;
       this.toneActivity.set(toneKey, Math.max(this.toneActivity.get(toneKey) ?? 0, 0.6));
       if (!this.discoveredTones.has(toneKey)) {
@@ -238,11 +364,29 @@ export class PitchClockRenderer {
       }
     }
 
+    for (const [midi, act] of this.midiActivity.entries()) {
+      const nextAct = act * decayFactor;
+      if (nextAct < 0.015) {
+        this.midiActivity.delete(midi);
+        if (config.registerWeightMode === 'organic') {
+          this.discoveredMidis.delete(midi);
+          this.midiPopScale.delete(midi);
+        }
+      } else {
+        this.midiActivity.set(midi, nextAct);
+      }
+    }
+
     // Animate tone pop scales
     for (const [key, currentScale] of this.tonePopScale.entries()) {
       const target = 1.0;
       const nextScale = currentScale + (target - currentScale) * 0.16;
       this.tonePopScale.set(key, Math.min(1.0, nextScale));
+    }
+    for (const [midi, currentScale] of this.midiPopScale.entries()) {
+      const target = 1.0;
+      const nextScale = currentScale + (target - currentScale) * 0.16;
+      this.midiPopScale.set(midi, Math.min(1.0, nextScale));
     }
 
     // 2. Calculate Organic Radial Layout & Visual Weighting
@@ -436,7 +580,8 @@ export class PitchClockRenderer {
   private calculateOrganicRadii(
     _minR: number,
     maxR: number,
-    config: VisualiserConfig
+    config: VisualiserConfig,
+    forcedActiveRegister?: number
   ): { targetRadii: number[]; targetAlphas: number[]; activeRegisters: Set<number> } {
     const targetRadii = [0, 0, 0, 0, 0, 0, 0, 0];
     const targetAlphas = [0, 0, 0, 0, 0, 0, 0, 0];
@@ -486,7 +631,7 @@ export class PitchClockRenderer {
 
     if (config.registerWeightMode === 'discovered') {
       for (let r = minReg; r <= maxReg; r++) {
-        if (this.registerEverPlayed[r]) {
+        if (this.registerEverPlayed[r] || r === forcedActiveRegister) {
           activeRegisters.add(r);
           targetAlphas[r] = 1.0;
         }
@@ -496,9 +641,9 @@ export class PitchClockRenderer {
       // Octave registers remain active while registerActivity is above threshold (> 0.02)
       // Once inactive past the decay window, they drop out so the remaining active octaves expand!
       for (let r = minReg; r <= maxReg; r++) {
-        if (this.registerActivity[r] > 0.02) {
+        if (this.registerActivity[r] > 0.02 || r === forcedActiveRegister) {
           activeRegisters.add(r);
-          targetAlphas[r] = Math.min(1.0, 0.25 + this.registerActivity[r] * 0.75);
+          targetAlphas[r] = Math.min(1.0, 0.25 + (r === forcedActiveRegister ? 1.0 : this.registerActivity[r]) * 0.75);
         }
       }
     }
@@ -976,22 +1121,9 @@ export class PitchClockRenderer {
           if (config.registerWeightMode === 'organic' && toneAct <= 0.02) continue;
         }
 
-        const popScale = this.tonePopScale.get(toneKey) ?? 1.0;
         const angle = getClockAngleRad(s);
         const nx = cx + radius * Math.cos(angle);
         const ny = cy + radius * Math.sin(angle);
-
-        // Record exact rendered coordinates for particle bursts, lens flares, and shocks
-        this.toneCoordinates.set(toneKey, {
-          x: nx,
-          y: ny,
-          radius: baseNodeRadius,
-          angle,
-          semitone: s,
-          registerIndex: r,
-        });
-
-        const pitchClass = (tonic + s) % 12;
 
         const nearestAddress = s <= 6 ? s : s - 12;
         const nodeMidi = (baseCenterDo + r * 12) + nearestAddress;
@@ -1001,6 +1133,20 @@ export class PitchClockRenderer {
         if (!isWithinKeyboard && !isDiscovered) {
           continue;
         }
+
+        // Record exact rendered coordinates for particle bursts, lens flares, and shocks
+        const nodeCoords = {
+          x: nx,
+          y: ny,
+          radius: baseNodeRadius,
+          angle,
+          semitone: s,
+          registerIndex: r,
+        };
+        this.toneCoordinates.set(toneKey, nodeCoords);
+        this.midiCoordinates.set(nodeMidi, nodeCoords);
+
+        const pitchClass = (tonic + s) % 12;
 
         const syllable = SOLFEGE_SYLLABLES[s];
         const spec = SOLFEGE_SPECS[syllable];
@@ -1035,6 +1181,7 @@ export class PitchClockRenderer {
         const isActive = activeMatch !== null;
         const isDecaying = decayAlpha > 0.01;
         const effectiveVelocity = activeMatch ? activeMatch.velocity : (decayMatch ? decayMatch.velocity : 0);
+        const popScale = this.tonePopScale.get(toneKey) ?? 1.0;
 
         // Kinetic sizing with popScale intro
         let nodeR = baseNodeRadius * popScale;
