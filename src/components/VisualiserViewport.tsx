@@ -243,7 +243,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
         {/* 4. Fullscreen Hardware WebGL Post-Processing Shader (CRT scanlines, barrel curve, lens flares, film grain) */}
         <canvas
           ref={postProcessingCanvasRef}
-          className="absolute inset-0 block w-full h-full pointer-events-none z-25"
+          className="absolute inset-0 block w-full h-full pointer-events-none z-30"
         />
       </div>
     </div>
