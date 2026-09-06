@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Info,
+  Activity,
 } from 'lucide-react';
 import { PitchClockDiagram } from './PitchClockDiagram';
 import { UniformSolfegeDiagram } from './UniformSolfegeDiagram';
@@ -233,13 +234,13 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
               </p>
             </div>
 
-            {/* Three Core Modules */}
+            {/* Four Distinct Visual Modules */}
             <div>
               <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-red-400" />
-                Three Distinct Visual Modules
+                Four Distinct Visual Modules
               </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -261,12 +262,22 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase">
-                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                  <div className="flex items-center gap-2 text-blue-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                     Note Stream Ribbons
                   </div>
                   <p className="text-xs text-slate-300">
                     Flowing note ribbons that stream horizontally (left or right) or vertically (up or down), labelled with Uniform Solfège or Tri-Notation symbols.
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                    Overtone Waves
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Kinetic fluid wave simulation of the 7-harmonic acoustic overtone series, featuring Uniform Solfège colouring, velocity dynamics, and subterranean Plomp-Levelt dissonance curves.
                   </p>
                 </div>
               </div>
@@ -293,7 +304,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                  <span><strong>Customise Layout:</strong> Click <em>Edit Layout</em> in the top bar to split views, resize panes, or choose ready-made presets like <em>Signature Trio</em>.</span>
+                  <span><strong>Customise Layout:</strong> Click <em>Edit Layout</em> in the top bar to split views, resize panes, or choose ready-made presets like <em>Signature Trio</em> or <em>Harmonic Waves</em>.</span>
                 </li>
               </ul>
             </div>
@@ -465,6 +476,44 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   When <strong>Auto-Alignment</strong> is enabled in the settings or header toolbar, the engine continuously monitors incoming notes over an organic time decay window. It calculates diatonic correlation scores against all 12 candidate tonics and automatically rotates Do to match the musical key of the song in real time.
                 </p>
               </div>
+
+              {/* Concept 7: Acoustic Overtone Series & Harmonic Waves */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <span>7. Acoustic Overtone Series &amp; Fluid Waves</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
+                    Partials 1× to 7× &bull; Plomp-Levelt Curve
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Prime Period Theory grounds harmony in physical acoustic waveforms. Every musical tone excites an ascending series of <strong>harmonic partials</strong> at integer multiples of its fundamental frequency (1f, 2f, 3f... 7f). The <strong>Overtone cell</strong> translates these harmonics into an interactive kinetic fluid simulation:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-cyan-400 block">7 Harmonic Partials</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Derives fundamental, octave, perfect 5th, double octave, major 3rd, and 7th harmonics, each rendered in its canonical Uniform Solfège colour.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-cyan-400 block">Fluid Wave Mechanics</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Wave envelope widths scale with acoustic wavelengths (broader bass swells, sharper treble crests) with live velocity-sensitive heights.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-cyan-400 block">Plomp-Levelt Dissonance</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Computes psychoacoustic roughness between colliding partials, visualising auditory beating as a subterranean wave plunging beneath the baseline.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* Section Divider: Customise */}
@@ -494,11 +543,41 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Layout Presets</span>
-                    <p className="text-slate-400">Choose from ready-made presets in the top header toolbar: <em>Signature Trio</em>, <em>Full Orbital Clock</em>, <em>Dual Split</em>, <em>Focus Stream</em>, or <em>Balanced Tryptych</em>.</p>
+                    <p className="text-slate-400">Choose from ready-made presets in the top header toolbar: <em>Signature Trio</em>, <em>Harmonic Waves</em>, <em>Full Orbital Clock</em>, <em>Dual Split</em>, <em>Focus Stream</em>, or <em>Balanced Tryptych</em>.</p>
                   </div>
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Edit Mode & Resizing</span>
-                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules, duplicate cells, or drag border dividers to resize flex ratios.</p>
+                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, or Overtone Waves), duplicate cells, or drag border dividers to resize flex ratios.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Overtones Wave Simulation Controls */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyan-400" />
+                    Overtone Waves &amp; Dissonance Controls
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
+                    Acoustic Simulation
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-300">
+                  When viewing an Overtone cell, you can fine-tune the fluid simulation directly in the Settings sidebar or via the cell&apos;s hover settings menu:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-cyan-400 block">Dissonance Roughness Curve</span>
+                    <p className="text-[10px] text-slate-400">Toggle the subterranean inverted wave displaying Plomp-Levelt acoustic roughness and sensory dissonance.</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-cyan-400 block">Solfège &amp; Multipliers</span>
+                    <p className="text-[10px] text-slate-400">Display pitch syllables and harmonic multiplier badges (1× through 7×) over each partial wave crest.</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-cyan-400 block">Fluid Ripple Speed</span>
+                    <p className="text-[10px] text-slate-400">Adjust the kinetic oscillation velocity of the fluid surface from gentle swells to rapid undulations.</p>
                   </div>
                 </div>
               </div>
