@@ -65,7 +65,7 @@ export type StreamOrientation = 'horizontal' | 'vertical';
 export type StreamDirection = 'rtl' | 'ltr' | 'ttb' | 'btt';
 export type PresentationFormat = 'glyphs' | 'pianoTriangles' | 'syllables' | 'pitchNames' | 'triPitches';
 export type BackgroundTheme = 'studio-obsidian' | 'cosmic-abyss' | 'carbon-grid' | 'velvet-dark';
-export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature';
+export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature' | 'harmonic';
 export type SynthWaveform = 'warm-poly' | 'sine' | 'triangle' | 'sawtooth';
 export type ToneRevealMode = 'played' | 'all';
 export type RegisterWeightMode = 'organic' | 'discovered' | 'fixed8';
@@ -92,7 +92,7 @@ export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
 
 // --- FLEXBOX LAYOUT ARCHITECTURE ---
 export type LayoutFlexDirection = 'row' | 'column';
-export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles';
+export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones';
 
 export interface OrbitalModuleConfig {
   octaveMode: 'dynamic' | 'fixed8';
@@ -135,7 +135,16 @@ export interface PianoTrianglesModuleConfig {
   showCenterAnchor: boolean;
 }
 
-export type ModuleCellConfig = OrbitalModuleConfig | StreamModuleConfig | PianoTrianglesModuleConfig;
+export interface OvertonesModuleConfig {
+  showDissonanceCurve: boolean;
+  showOvertoneLabels: boolean;
+  fluidSpeed: number; // 0.2..3.0
+  waveFluidity: number; // 0..1
+  minFrequency: number;
+  maxFrequency: number;
+}
+
+export type ModuleCellConfig = OrbitalModuleConfig | StreamModuleConfig | PianoTrianglesModuleConfig | OvertonesModuleConfig;
 
 export interface LayoutCellNode {
   id: string;
@@ -144,7 +153,7 @@ export interface LayoutCellNode {
   title?: string;
   flex?: number; // flex-grow weight (default 1)
   minSize?: number; // min width/height in px
-  configOverrides?: Partial<OrbitalModuleConfig & StreamModuleConfig & PianoTrianglesModuleConfig>;
+  configOverrides?: Partial<OrbitalModuleConfig & StreamModuleConfig & PianoTrianglesModuleConfig & OvertonesModuleConfig>;
 }
 
 export interface LayoutContainerNode {
@@ -217,7 +226,7 @@ export interface LayoutDefinition {
   aesthetics?: Partial<AestheticsConfig>;
 }
 
-export interface VisualiserConfig extends SystemConfig, AestheticsConfig, OrbitalModuleConfig, StreamModuleConfig, PianoTrianglesModuleConfig {
+export interface VisualiserConfig extends SystemConfig, AestheticsConfig, OrbitalModuleConfig, StreamModuleConfig, PianoTrianglesModuleConfig, OvertonesModuleConfig {
   layoutMode: LayoutMode;
   activeLayout: LayoutDefinition;
 }

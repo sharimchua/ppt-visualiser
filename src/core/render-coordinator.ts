@@ -26,6 +26,7 @@ import { ScaleAlignmentTracker } from './scale-alignment';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import { OvertonesRenderer } from '../renderers/overtones-canvas';
 import {
   WebGLPostProcessingPipeline,
   PostProcessingLight,
@@ -65,6 +66,7 @@ export class RenderCoordinator {
   public readonly pitchClockRenderer: PitchClockRenderer;
   public readonly pianoTrianglesRenderer: PianoTrianglesRenderer;
   public readonly streamRenderer: StreamRenderer;
+  public readonly overtonesRenderer: OvertonesRenderer;
 
   // WebGL Post-Processing Pipeline
   private postProcessingCanvas: HTMLCanvasElement | null = null;
@@ -119,6 +121,7 @@ export class RenderCoordinator {
     this.pitchClockRenderer = new PitchClockRenderer();
     this.pianoTrianglesRenderer = new PianoTrianglesRenderer();
     this.streamRenderer = new StreamRenderer();
+    this.overtonesRenderer = new OvertonesRenderer();
 
     // Propagate initial focusMode setting to engines
     const focusMode = initialConfig.focusModeEnabled ?? true;
@@ -686,6 +689,16 @@ export class RenderCoordinator {
         );
       } else if (module === 'triangles') {
         this.pianoTrianglesRenderer.render(
+          ctx,
+          width,
+          height,
+          this.activeNotes,
+          this.decayingNotes,
+          effectiveConfig,
+          time
+        );
+      } else if (module === 'overtones') {
+        this.overtonesRenderer.render(
           ctx,
           width,
           height,

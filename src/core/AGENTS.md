@@ -9,7 +9,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - `src/core/ppt-constants.ts` — Canonical PPT specifications: Uniform Solfège, Piano Triangles, Tri Pitch-Class notation, and pitch class mapping.
 - `src/core/ppt-math.ts` — Coordinate geometry, clock angles, register wrapping (-5 So to +6 Fi), and polar calculations.
 - `src/core/scale-alignment.ts` — Real-time key/scale detection, 12 diatonic mode definitions, and hysteresis debouncing.
-- `src/core/layout-models.ts` — Flex tree manipulation, cell splitting, tree pruning, presets, and URL-safe Base64 slug serialization.
+- `src/core/layout-models.ts` — Flex tree manipulation, cell splitting, tree pruning, presets (including Harmonic Waves), and URL-safe Base64 slug serialisation.
 - `src/core/render-coordinator.ts` — Decoupled event bus managing note lifecycles, active note sets, and particle physics outside React.
 - `src/core/midi-manager.ts` — Web MIDI hardware access and device state tracking.
 - `src/core/midi-file-player.ts` — Standard MIDI file playback engine, transport controls, and demo track loader.

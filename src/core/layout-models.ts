@@ -276,6 +276,76 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
   },
 };
 
+export const PRESET_HARMONIC: LayoutDefinition = {
+  id: 'harmonic',
+  name: 'Harmonic Waves',
+  description: 'Concentric Pitch Clock paired with kinetic Overtone fluid wave simulation',
+  root: {
+    id: 'root-harmonic',
+    type: 'container',
+    direction: 'column',
+    gap: 8,
+    children: [
+      {
+        id: 'cell-clock-harmonic',
+        type: 'cell',
+        module: 'orbital',
+        flex: 2,
+        title: 'Pitch Clock',
+      },
+      {
+        id: 'container-harmonic-bottom',
+        type: 'container',
+        direction: 'row',
+        flex: 2,
+        gap: 8,
+        children: [
+          {
+            id: 'cell-overtones-harmonic',
+            type: 'cell',
+            module: 'overtones',
+            flex: 2,
+            title: 'Overtone Waves',
+            configOverrides: {
+              showDissonanceCurve: true,
+              showOvertoneLabels: true,
+              fluidSpeed: 1.0,
+            },
+          },
+          {
+            id: 'cell-stream-harmonic',
+            type: 'cell',
+            module: 'stream',
+            flex: 1,
+            title: 'Note Stream',
+            configOverrides: {
+              orientation: 'horizontal',
+              direction: 'rtl',
+              streamMode: 'continuous',
+            },
+          },
+        ],
+      },
+    ],
+  },
+  aesthetics: {
+    backgroundTheme: 'carbon-grid',
+    filmGrainIntensity: 0.35,
+    filmGrainSize: 3,
+    filmGrainContrast: 0.45,
+    particleIntensity: 0.9,
+    glowBloom: 0.8,
+    motionTrails: 0.6,
+    ghostingIntensity: 0.3,
+    lightBleedIntensity: 0.45,
+    scanlineIntensity: 0.4,
+    scanlineDensity: 2,
+    crtVignette: 0.3,
+    lensFlareIntensity: 0.55,
+    lensFlareStyle: 'cinematic',
+  },
+};
+
 export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'balanced': PRESET_BALANCED,
   'monument': PRESET_MONUMENT,
@@ -284,6 +354,7 @@ export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'dual-stream': PRESET_DUAL_STREAM,
   'orbital-focus': PRESET_ORBITAL_FOCUS,
   'signature': PRESET_SIGNATURE,
+  'harmonic': PRESET_HARMONIC,
 };
 
 /**
@@ -378,7 +449,7 @@ export function splitCellInTree(
         type: 'cell',
         module: newModule,
         flex: 1,
-        title: newModule === 'orbital' ? 'Pitch Clock' : newModule === 'triangles' ? 'Piano Triangles' : 'Note Stream',
+        title: newModule === 'orbital' ? 'Pitch Clock' : newModule === 'triangles' ? 'Piano Triangles' : newModule === 'overtones' ? 'Overtone Waves' : 'Note Stream',
         configOverrides:
           newModule === 'stream'
             ? {
@@ -570,7 +641,7 @@ export function addCellToTree(
     type: 'cell',
     module,
     flex: 1,
-    title: module === 'orbital' ? 'Pitch Clock' : module === 'triangles' ? 'Piano Triangles' : 'Note Stream',
+    title: module === 'orbital' ? 'Pitch Clock' : module === 'triangles' ? 'Piano Triangles' : module === 'overtones' ? 'Overtone Waves' : 'Note Stream',
     configOverrides:
       module === 'stream'
         ? {

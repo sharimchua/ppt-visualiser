@@ -42,22 +42,32 @@ import {
   PRESET_BALANCED,
   PRESET_MONUMENT,
   PRESET_SIGNATURE,
+  PRESET_HARMONIC,
   PRESET_LAYOUTS,
   splitCellInTree,
   removeCellFromTree,
   duplicateCellInTree,
   moveCellInTree,
   addCellToTree,
+  createUniqueCellId,
   getAllCellNodes,
   encodeLayoutToSlug,
   decodeLayoutFromSlug,
 } from './layout-models';
-import { LayoutDefinition } from './types';
+import { LayoutDefinition, ActiveNote } from './types';
 import {
   getScaleTetrachordChainTriangles,
   PIANO_TRIANGLE_POINT_TO_PITCH_CLASS,
   PianoTrianglesRenderer,
 } from '../renderers/piano-triangles-canvas';
+import {
+  NUM_PARTIALS,
+  midiToFrequency,
+  computeRegisterWaveWidth,
+  computeNotePartials,
+  calculatePlompLevelt,
+  OvertonesRenderer,
+} from '../renderers/overtones-canvas';
 import { RenderCoordinator } from './render-coordinator';
 import { WebGLPostProcessingPipeline } from '../renderers/webgl-post-processing';
 
@@ -1865,5 +1875,303 @@ test('Tonic Shift Kinetics: Zero-overhead bypass when tonicShiftEffectsEnabled i
 
   coordinator.destroy();
 });
+
+test('Overtones: 7 harmonic partials derivation and Uniform Solfege pitch colouring', () => {
+  // Test C4 (MIDI 60) with tonic C (0):
+  // Partials:
+  // 1: C (0, Do, #E13610)
+  // 2: C (0, Do, #E13610)
+  // 3: G (7, So, #0032A4)
+  // 4: C (0, Do, #E13610)
+  // 5: E (4, Mi, #F5D432)
+  // 6: G (7, So, #0032A4)
+  // 7: Bb/A# (10, Te, #F158A4)
+  const partials = computeNotePartials(60, 0.8, 0, 1000, 400, 400);
+
+  assert.strictEqual(partials.length, NUM_PARTIALS, 'Must generate exactly 7 partials');
+
+  // Test Plomp-Levelt roughness calculation
+  const unisonRoughness = calculatePlompLevelt(440, 1.0, 440, 1.0);
+  const clashRoughness = calculatePlompLevelt(440, 1.0, 465, 1.0);
+  assert.strictEqual(unisonRoughness, 0, 'Unison pure tones must have 0 roughness');
+  assert.ok(clashRoughness > 0, 'Minor second tones must have positive psychoacoustical roughness');
+
+  assert.strictEqual(partials[0].partialNumber, 1);
+  assert.strictEqual(partials[0].isFundamental, true);
+  assert.strictEqual(partials[0].solfege, 'Do');
+  assert.strictEqual(partials[0].colorHex, '#E13610');
+  assert.strictEqual(Math.round(partials[0].frequency), 262); // C4 ≈ 261.6 Hz
+
+  assert.strictEqual(partials[1].partialNumber, 2);
+  assert.strictEqual(partials[1].isFundamental, false);
+  assert.strictEqual(partials[1].solfege, 'Do');
+  assert.strictEqual(partials[1].colorHex, '#E13610');
+  assert.strictEqual(Math.round(partials[1].frequency), 523); // C5 ≈ 523.3 Hz
+
+  assert.strictEqual(partials[2].partialNumber, 3);
+  assert.strictEqual(partials[2].solfege, 'So');
+  assert.strictEqual(partials[2].colorHex, '#0032A4');
+
+  assert.strictEqual(partials[3].partialNumber, 4);
+  assert.strictEqual(partials[3].solfege, 'Do');
+
+  assert.strictEqual(partials[4].partialNumber, 5);
+  assert.strictEqual(partials[4].solfege, 'Mi');
+  assert.strictEqual(partials[4].colorHex, '#F5D432');
+
+  assert.strictEqual(partials[5].partialNumber, 6);
+  assert.strictEqual(partials[5].solfege, 'So');
+
+  assert.strictEqual(partials[6].partialNumber, 7);
+  assert.strictEqual(partials[6].solfege, 'Te');
+  assert.strictEqual(partials[6].colorHex, '#F158A4');
+
+  // Test D4 (MIDI 62) with default PPT tonic D (2):
+  const dPartials = computeNotePartials(62, 0.8, 2, 1000, 400, 400);
+  assert.strictEqual(dPartials[0].solfege, 'Do', 'D with tonic D must be Do');
+  assert.strictEqual(dPartials[2].solfege, 'So', '3rd partial of D is A, which is So in key of D');
+  assert.strictEqual(dPartials[4].solfege, 'Mi', '5th partial of D is F#, which is Mi in key of D');
+});
+
+test('Overtones: Velocity-dependent base height and overtone amplitude decay', () => {
+  const soft = computeNotePartials(60, 0.1, 0, 1000, 400, 400);
+  const hard = computeNotePartials(60, 1.0, 0, 1000, 400, 400);
+
+  // 1. Base height of fundamental is governed by velocity
+  assert.ok(
+    hard[0].amplitude > soft[0].amplitude * 2.5,
+    `Hard strike fundamental amplitude (${hard[0].amplitude}) must be significantly taller than soft (${soft[0].amplitude})`
+  );
+
+  // 2. Amplitude decay of higher overtones is governed by velocity
+  // Soft strike higher partials roll off much faster
+  const softRatio7to1 = soft[6].amplitude / soft[0].amplitude;
+  const hardRatio7to1 = hard[6].amplitude / hard[0].amplitude;
+
+  assert.ok(
+    hardRatio7to1 > softRatio7to1 * 3,
+    `Hard strike must sustain much richer higher harmonics (ratio ${hardRatio7to1.toFixed(3)}) than soft (ratio ${softRatio7to1.toFixed(3)})`
+  );
+});
+
+test('Overtones: Register-scaled spatial wave envelope width (bass wider than treble)', () => {
+  // A1 (MIDI 33 ≈ 55 Hz) bass note vs A6 (MIDI 93 ≈ 1760 Hz) treble note
+  const bassFreq = midiToFrequency(33);
+  const trebleFreq = midiToFrequency(93);
+
+  const bassWidth = computeRegisterWaveWidth(bassFreq);
+  const trebleWidth = computeRegisterWaveWidth(trebleFreq);
+
+  assert.ok(
+    bassWidth > trebleWidth * 2.5,
+    `Bass wave width (${bassWidth.toFixed(1)}px) must be significantly wider than treble (${trebleWidth.toFixed(1)}px)`
+  );
+  assert.ok(bassWidth <= 110, 'Width must respect maximum clamping');
+  assert.ok(trebleWidth >= 14, 'Width must respect minimum clamping');
+});
+
+test('Overtones: Layout models integration, unique IDs, and PRESET_HARMONIC serialization', () => {
+  // 1. Unique cell ID
+  const id = createUniqueCellId('overtones');
+  assert.ok(id.startsWith('cell-overtones-'), 'Unique cell ID must start with cell-overtones-');
+
+  // 2. addCellToTree
+  const rootContainer = { ...PRESET_BALANCED.root };
+  const updatedTree = addCellToTree(rootContainer, 'row', 'overtones');
+  const allCells = getAllCellNodes(updatedTree);
+  const overtoneCell = allCells.find((c) => c.module === 'overtones');
+  assert.ok(overtoneCell, 'Added overtones cell must be present in tree');
+  assert.strictEqual(overtoneCell?.title, 'Overtone Waves');
+
+  // 3. PRESET_HARMONIC
+  assert.ok(PRESET_HARMONIC, 'PRESET_HARMONIC must be defined');
+  assert.strictEqual(PRESET_LAYOUTS['harmonic'], PRESET_HARMONIC);
+  const harmonicCells = getAllCellNodes(PRESET_HARMONIC.root);
+  assert.ok(harmonicCells.some((c) => c.module === 'orbital'));
+  assert.ok(harmonicCells.some((c) => c.module === 'overtones'));
+  assert.ok(harmonicCells.some((c) => c.module === 'stream'));
+
+  // 4. URL slug round-trip
+  const slug = encodeLayoutToSlug(PRESET_HARMONIC, true);
+  assert.ok(slug.length > 0, 'Slug must be non-empty');
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded, 'Decoded layout must not be null');
+  assert.strictEqual(decoded?.layout.id, 'harmonic');
+  const decodedCells = getAllCellNodes(decoded!.layout.root);
+  assert.ok(decodedCells.some((c) => c.module === 'overtones'));
+});
+
+test('Overtones: OvertonesRenderer canvas execution with active/decaying notes and idle baseline', () => {
+  const renderer = new OvertonesRenderer();
+
+  // Mock CanvasRenderingContext2D
+  const drawCalls: string[] = [];
+  const mockCtx = {
+    save: () => drawCalls.push('save'),
+    restore: () => drawCalls.push('restore'),
+    beginPath: () => drawCalls.push('beginPath'),
+    closePath: () => drawCalls.push('closePath'),
+    moveTo: () => drawCalls.push('moveTo'),
+    lineTo: () => drawCalls.push('lineTo'),
+    arc: () => drawCalls.push('arc'),
+    stroke: () => drawCalls.push('stroke'),
+    fill: () => drawCalls.push('fill'),
+    fillRect: () => drawCalls.push('fillRect'),
+    strokeRect: () => drawCalls.push('strokeRect'),
+    fillText: () => drawCalls.push('fillText'),
+    setLineDash: () => drawCalls.push('setLineDash'),
+    createLinearGradient: () => ({
+      addColorStop: () => {},
+    }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const activeNotes = new Map<number, ActiveNote>();
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+
+  // 1. Idle render (no notes)
+  renderer.render(mockCtx, 800, 400, activeNotes, decayingNotes, DEFAULT_CONFIG, 1000);
+  assert.ok(drawCalls.includes('fillRect'), 'Must draw background');
+  assert.ok(drawCalls.includes('stroke'), 'Must draw idle baseline');
+
+  // 2. Render with active chord (C major: C4, E4, G4)
+  drawCalls.length = 0;
+  activeNotes.set(60, {
+    midi: 60,
+    pitchClass: 0,
+    octave: 4,
+    registerIndex: 3,
+    velocity: 0.8,
+    startTime: 900,
+    colorHex: '#E13610',
+    solfege: 'Do',
+    pianoTriangle: { triangle: 'R', point: 3 },
+  });
+  activeNotes.set(64, {
+    midi: 64,
+    pitchClass: 4,
+    octave: 4,
+    registerIndex: 3,
+    velocity: 0.7,
+    startTime: 900,
+    colorHex: '#F5D432',
+    solfege: 'Mi',
+    pianoTriangle: { triangle: 'L', point: 1 },
+  });
+
+  renderer.render(mockCtx, 800, 400, activeNotes, decayingNotes, DEFAULT_CONFIG, 1000);
+  assert.ok(drawCalls.includes('fill'), 'Must draw partial wave fills');
+  assert.ok(drawCalls.includes('arc'), 'Must draw Solfege label badges');
+
+  // 3. Fundamental coordinates helper
+  const coords = renderer.getFundamentalCoordinates(60, 800, 400);
+  assert.ok(coords, 'Coordinates must be found for C4');
+  assert.ok(coords!.x > 0 && coords!.x < 800, 'X coordinate must be within plot width');
+});
+
+test('Overtones: Consistent absolute dissonance scaling (P5 vs Tritone vs Minor 2nd)', () => {
+  const renderer = new OvertonesRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+  const config = { ...DEFAULT_CONFIG, showDissonanceCurve: true };
+
+  // 1. Render isolated Perfect 5th (C4 = 60, G4 = 67)
+  const p5Notes = new Map<number, ActiveNote>();
+  p5Notes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  p5Notes.set(67, { midi: 67, pitchClass: 7, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 1 } });
+  renderer.render(mockCtx, 1000, 500, p5Notes, decayingNotes, config, 1000);
+  const p5Diss = renderer.getPeakDissonance();
+  const p5Pct = renderer.getPeakRoughnessPercentage();
+
+  // 2. Render isolated Tritone (C4 = 60, F#4 = 66)
+  const ttNotes = new Map<number, ActiveNote>();
+  ttNotes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  ttNotes.set(66, { midi: 66, pitchClass: 6, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#6F2C91', solfege: 'Fi', pianoTriangle: { triangle: 'L', point: 3 } });
+  renderer.render(mockCtx, 1000, 500, ttNotes, decayingNotes, config, 1000);
+  const ttDiss = renderer.getPeakDissonance();
+  const ttPct = renderer.getPeakRoughnessPercentage();
+
+  // 3. Render isolated Minor 2nd (C4 = 60, C#4 = 61)
+  const m2Notes = new Map<number, ActiveNote>();
+  m2Notes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  m2Notes.set(61, { midi: 61, pitchClass: 1, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E56A54', solfege: 'Ra', pianoTriangle: { triangle: 'D', point: 2 } });
+  renderer.render(mockCtx, 1000, 500, m2Notes, decayingNotes, config, 1000);
+  const m2Diss = renderer.getPeakDissonance();
+  const m2Pct = renderer.getPeakRoughnessPercentage();
+
+  // 4. Render isolated Minor 3rd (C4 = 60, Eb4 = 63)
+  const m3Notes = new Map<number, ActiveNote>();
+  m3Notes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  m3Notes.set(63, { midi: 63, pitchClass: 3, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#00A86B', solfege: 'Me', pianoTriangle: { triangle: 'U', point: 3 } });
+  renderer.render(mockCtx, 1000, 500, m3Notes, decayingNotes, config, 1000);
+  const m3Diss = renderer.getPeakDissonance();
+  const m3Pct = renderer.getPeakRoughnessPercentage();
+
+  // 5. Render Major 7th chord in 4th register (C4, E4, G4, B4)
+  const maj7Notes = new Map<number, ActiveNote>();
+  maj7Notes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  maj7Notes.set(64, { midi: 64, pitchClass: 4, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#F5D432', solfege: 'Mi', pianoTriangle: { triangle: 'L', point: 1 } });
+  maj7Notes.set(67, { midi: 67, pitchClass: 7, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 1 } });
+  maj7Notes.set(71, { midi: 71, pitchClass: 11, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#B22222', solfege: 'Ti', pianoTriangle: { triangle: 'D', point: 3 } });
+  renderer.render(mockCtx, 1000, 500, maj7Notes, decayingNotes, config, 1000);
+  const maj7Diss = renderer.getPeakDissonance();
+  const maj7Pct = renderer.getPeakRoughnessPercentage();
+
+  // Assertions: Consistent absolute scaling across intervals and chords
+  assert.ok(p5Diss > 0, 'P5 must have some slight overtone interaction');
+  assert.ok(ttDiss > p5Diss * 5.0, `Tritone dissonance (${ttDiss.toFixed(4)}) must be much higher than P5 (${p5Diss.toFixed(4)})`);
+  assert.ok(ttDiss > m3Diss * 2.5, `Tritone dissonance (${ttDiss.toFixed(4)}) must be substantially higher than Minor 3rd (${m3Diss.toFixed(4)})`);
+  assert.ok(ttDiss > maj7Diss * 2.0, `Tritone dissonance (${ttDiss.toFixed(4)}) must be more than double a Major 7th chord (${maj7Diss.toFixed(4)})`);
+  assert.ok(m2Diss > ttDiss * 1.3, `Minor 2nd dissonance (${m2Diss.toFixed(4)}) must be higher than Tritone (${ttDiss.toFixed(4)})`);
+  assert.ok(p5Pct < 15, `P5 crunch (${p5Pct}%) must be very gentle`);
+  assert.ok(m3Pct < 30, `Minor 3rd crunch (${m3Pct}%) must be mild consonant coloration`);
+  assert.ok(maj7Pct < 35, `Major 7th chord crunch (${maj7Pct}%) must be gentle lush coloration`);
+  assert.ok(ttPct > maj7Pct * 2, `Tritone crunch (${ttPct}%) must be much greater than Major 7th chord (${maj7Pct}%)`);
+  assert.ok(ttPct > m3Pct * 2, `Tritone crunch (${ttPct}%) must be much greater than Minor 3rd (${m3Pct}%)`);
+  assert.ok(m2Pct > ttPct, `Minor 2nd crunch (${m2Pct}%) must exceed Tritone (${ttPct}%)`);
+});
+
+test('Overtones: Configuration sanitisation and persistence', () => {
+  const rawConfig = {
+    ...DEFAULT_CONFIG,
+    layoutMode: 'harmonic',
+    showDissonanceCurve: false,
+    showOvertoneLabels: false,
+    fluidSpeed: 1.8,
+    waveFluidity: 0.95,
+  };
+
+  const sanitized = sanitizeConfig(rawConfig);
+  assert.strictEqual(sanitized.layoutMode, 'harmonic');
+  assert.strictEqual(sanitized.showDissonanceCurve, false);
+  assert.strictEqual(sanitized.showOvertoneLabels, false);
+  assert.strictEqual(sanitized.fluidSpeed, 1.8);
+  assert.strictEqual(sanitized.waveFluidity, 0.95);
+
+  // Out of bounds values should clamp safely
+  const clamped = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    fluidSpeed: 10.0, // max 3.0
+    waveFluidity: -5.0, // min 0.0
+  });
+  assert.strictEqual(clamped.fluidSpeed, 3.0);
+  assert.strictEqual(clamped.waveFluidity, 0.0);
+});
+
 
 

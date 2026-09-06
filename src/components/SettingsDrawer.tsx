@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
@@ -1748,6 +1748,80 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           </div>
         </section>
 
+        {/* SECTION: OVERTONES & FLUID WAVE SIMULATION */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Activity className="w-4 h-4 text-cyan-400" />
+            <span>Overtones Wave Simulation</span>
+          </div>
+
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Dissonance / Roughness Curve</span>
+                <span className="text-[10px] text-slate-400 block">Visualise acoustic interference &amp; Plomp-Levelt crunch</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.showDissonanceCurve ?? true}
+                  onChange={(e) => onUpdateConfig({ showDissonanceCurve: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Solfège &amp; Multiplier Badges</span>
+                <span className="text-[10px] text-slate-400 block">Show pitch syllable and harmonic numbers (1×..7×)</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.showOvertoneLabels ?? true}
+                  onChange={(e) => onUpdateConfig({ showOvertoneLabels: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-slate-300 mb-1">
+                <span className="font-medium">Fluid Ripple Speed</span>
+                <span className="font-mono text-cyan-400">{(config.fluidSpeed ?? 1.0).toFixed(1)}×</span>
+              </div>
+              <input
+                type="range"
+                min="0.2"
+                max="2.5"
+                step="0.1"
+                value={config.fluidSpeed ?? 1.0}
+                onChange={(e) => onUpdateConfig({ fluidSpeed: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-500"
+              />
+            </div>
+
+            <div>
+              <div className="flex justify-between text-slate-300 mb-1">
+                <span className="font-medium">Wave Fluidity (Undulation)</span>
+                <span className="font-mono text-cyan-400">{Math.round((config.waveFluidity ?? 0.8) * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min="0.0"
+                max="1.0"
+                step="0.05"
+                value={config.waveFluidity ?? 0.8}
+                onChange={(e) => onUpdateConfig({ waveFluidity: parseFloat(e.target.value) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-500"
+              />
+            </div>
+          </div>
+        </section>
+
         {/* SECTION 5: LAYOUT & DEEP LINK SLUGS */}
         <section className="space-y-3">
           <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
@@ -1758,7 +1832,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <label className="block font-medium text-slate-300">Active Layout Preset</label>
             <div className="grid grid-cols-2 gap-1.5">
-              {(['balanced', 'signature', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
+              {(['balanced', 'signature', 'harmonic', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => onUpdateConfig({ layoutMode: mode, activeLayout: PRESET_LAYOUTS[mode] })}

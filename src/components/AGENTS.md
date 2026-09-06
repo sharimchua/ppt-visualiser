@@ -10,9 +10,9 @@ The `src/components` domain contains the React user interface layer, including t
 - `src/components/ControlToolbar.tsx` — Top header toolbar containing transport controls, tonic/scale selector, track picker (inbuilt demos and uploaded tracks from local storage), layout menu, and deep link sharing.
 - `src/components/VisualiserViewport.tsx` — Container managing the flexible layout canvas hierarchy and layout edit mode.
 - `src/components/FlexLayoutRenderer.tsx` — Recursive split-container renderer supporting draggable flex dividers, cell splitting, duplication, and removal.
-- `src/components/CellViewport.tsx` — Individual cell wrapper mounting specific canvas renderers (Orbital Clock, Piano Triangles, Note Stream) with local HUD controls.
+- `src/components/CellViewport.tsx` — Individual cell wrapper mounting specific canvas renderers (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves) with local HUD controls.
 - `src/components/VirtualKeyboard.tsx` — 88-key interactive velocity-sensitive piano keyboard with computer keybindings, Uniform Solfège colouring, and kinetic tonic-shift glow ring/border flashes upon modulation.
-- `src/components/SettingsDrawer.tsx` — Slide-out settings sidebar providing granular controls for pitch clock, cosmetics, display effect toggles (including kinetic tonic shift effects), priority slots, themes, audio synthesiser, and real-time focus mode.
+- `src/components/SettingsDrawer.tsx` — Slide-out settings sidebar providing granular controls for pitch clock, overtones wave simulation, cosmetics, display effect toggles (including kinetic tonic shift effects), priority slots, themes, audio synthesiser, and real-time focus mode.
 - `src/components/InfoModal.tsx` — Comprehensive introduction and theory guide modal dialogue featuring continuous single-piece scrolling, interactive top bookmark navigation, and rich vector diagrams for PPT concepts.
 - `src/components/PitchClockDiagram.tsx` — Interactive SVG polar pitch clock diagram rendering 12 radial pitch classes, movable Do zenith, and Fi nadir.
 - `src/components/UniformSolfegeDiagram.tsx` — Visual vector diagram explaining the 3 root glyphs and the 4-fold 90° symmetry matrix.

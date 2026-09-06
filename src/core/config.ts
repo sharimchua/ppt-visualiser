@@ -57,6 +57,14 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   vertexLabelType: 'syllables',
   showCenterAnchor: true,
 
+  // Overtones Waveform
+  showDissonanceCurve: true,
+  showOvertoneLabels: true,
+  fluidSpeed: 1.0,
+  waveFluidity: 0.8,
+  minFrequency: 27.5,
+  maxFrequency: 6000,
+
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
   filmGrainEnabled: true,
@@ -216,7 +224,7 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.showRadialMovementTrails = typeof merged.showRadialMovementTrails === 'boolean' ? merged.showRadialMovementTrails : true;
 
     // Sanitize layout mode and activeLayout
-    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature']);
+    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature', 'harmonic']);
     if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'signature';
 
     // Sanitize Piano Triangles (Scale Signature)
@@ -224,6 +232,14 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     const validVertexLabels = new Set(['syllables', 'pitches', 'triPitches', 'intervals', 'none']);
     if (!validVertexLabels.has(merged.vertexLabelType)) merged.vertexLabelType = 'syllables';
     merged.showCenterAnchor = typeof merged.showCenterAnchor === 'boolean' ? merged.showCenterAnchor : true;
+
+    // Sanitize Overtones Waveform
+    merged.showDissonanceCurve = typeof merged.showDissonanceCurve === 'boolean' ? merged.showDissonanceCurve : true;
+    merged.showOvertoneLabels = typeof merged.showOvertoneLabels === 'boolean' ? merged.showOvertoneLabels : true;
+    merged.fluidSpeed = Math.max(0.2, Math.min(3.0, typeof merged.fluidSpeed === 'number' ? merged.fluidSpeed : 1.0));
+    merged.waveFluidity = Math.max(0, Math.min(1.0, typeof merged.waveFluidity === 'number' ? merged.waveFluidity : 0.8));
+    merged.minFrequency = typeof merged.minFrequency === 'number' && merged.minFrequency > 0 ? merged.minFrequency : 27.5;
+    merged.maxFrequency = typeof merged.maxFrequency === 'number' && merged.maxFrequency > (merged.minFrequency || 27.5) ? merged.maxFrequency : 6000;
 
     if (!merged.activeLayout || !merged.activeLayout.root) {
       merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_SIGNATURE;

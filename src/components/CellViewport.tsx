@@ -12,6 +12,7 @@ import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coo
 import {
   Waves,
   Triangle,
+  Activity,
   ArrowRight,
   ArrowLeft,
   ArrowDown,
@@ -149,6 +150,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
           ? 'Pitch Clock'
           : nextModule === 'triangles'
           ? 'Piano Triangles'
+          : nextModule === 'overtones'
+          ? 'Overtone Waves'
           : 'Note Stream',
       configOverrides:
         nextModule === 'stream'
@@ -185,7 +188,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
         <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900/80 backdrop-blur-md px-1.5 py-0.5 rounded border border-slate-700/60 text-[10px] text-slate-300 pointer-events-auto z-10">
           <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 flex items-center">
             {cell.module === 'triangles' && <Triangle className="w-2.5 h-2.5 text-red-400 mr-1 fill-red-500/40" />}
-            {cell.title || (cell.module === 'orbital' ? 'Orbital' : cell.module === 'triangles' ? 'Scale Signature' : 'Stream')}
+            {cell.module === 'overtones' && <Activity className="w-2.5 h-2.5 text-cyan-400 mr-1" />}
+            {cell.title || (cell.module === 'orbital' ? 'Orbital' : cell.module === 'triangles' ? 'Scale Signature' : cell.module === 'overtones' ? 'Overtones' : 'Stream')}
           </span>
 
           {cell.module === 'stream' && onUpdateCell && (
@@ -229,6 +233,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
               <option value="orbital">🪐 Clock</option>
               <option value="stream">🌊 Stream</option>
               <option value="triangles">▲ Triangles</option>
+              <option value="overtones">〰️ Overtones</option>
             </select>
 
             {/* Flex weight adjuster */}
@@ -831,6 +836,86 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 >
                   {effectiveConfig.showCenterAnchor ? 'Active' : 'Hidden'}
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Overtones-Specific Options */}
+          {cell.module === 'overtones' && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <label className="text-[11px] text-cyan-400 font-medium block uppercase tracking-wider">
+                Overtone Wave Simulation
+              </label>
+
+              {/* Dissonance Roughness Curve Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-300 font-medium">Dissonance / Roughness Curve:</span>
+                <button
+                  onClick={() =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        showDissonanceCurve: !effectiveConfig.showDissonanceCurve,
+                      },
+                    })
+                  }
+                  className={`px-2.5 py-0.5 rounded border text-xs font-semibold transition ${
+                    effectiveConfig.showDissonanceCurve
+                      ? 'bg-cyan-950/60 border-cyan-500/70 text-cyan-300'
+                      : 'bg-slate-900 border-slate-700 text-slate-500'
+                  }`}
+                >
+                  {effectiveConfig.showDissonanceCurve ? 'Active' : 'Hidden'}
+                </button>
+              </div>
+
+              {/* Solfege & Multiplier Badges Toggle */}
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-slate-300 font-medium">Solfège &amp; Multiplier Badges:</span>
+                <button
+                  onClick={() =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        showOvertoneLabels: !effectiveConfig.showOvertoneLabels,
+                      },
+                    })
+                  }
+                  className={`px-2.5 py-0.5 rounded border text-xs font-semibold transition ${
+                    effectiveConfig.showOvertoneLabels
+                      ? 'bg-cyan-950/60 border-cyan-500/70 text-cyan-300'
+                      : 'bg-slate-900 border-slate-700 text-slate-500'
+                  }`}
+                >
+                  {effectiveConfig.showOvertoneLabels ? 'Active' : 'Hidden'}
+                </button>
+              </div>
+
+              {/* Fluid Ripple Speed Slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400">Fluid Ripple Speed:</span>
+                  <span className="font-mono text-cyan-400">{(effectiveConfig.fluidSpeed ?? 1.0).toFixed(1)}×</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.2"
+                  max="2.5"
+                  step="0.1"
+                  value={effectiveConfig.fluidSpeed ?? 1.0}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        fluidSpeed: parseFloat(e.target.value),
+                      },
+                    })
+                  }
+                  className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                />
               </div>
             </div>
           )}
