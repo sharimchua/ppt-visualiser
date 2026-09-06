@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Piano, Minus, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { Piano, Minus, Plus, Maximize2, Minimize2, X } from 'lucide-react';
 import {
   PITCH_CLASS_TO_PIANO_TRIANGLE,
   SOLFEGE_SYLLABLES,
@@ -15,6 +15,7 @@ interface VirtualKeyboardProps {
   onNoteOn: (midi: number, velocity?: number) => void;
   onNoteOff: (midi: number) => void;
   onUpdateConfig?: (partial: Partial<VisualiserConfig>) => void;
+  onClose?: () => void;
 }
 
 // 2-octave QWERTY computer keyboard offsets relative to base MIDI note (48 = C3 by default)
@@ -67,6 +68,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   onNoteOn,
   onNoteOff,
   onUpdateConfig,
+  onClose,
 }) => {
   const [flashingTonic, setFlashingTonic] = useState<number | null>(null);
   const [octaveOffset, setOctaveOffset] = useState<number>(0);
@@ -75,6 +77,14 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   const [availableWidth, setAvailableWidth] = useState<number>(() =>
     typeof window !== 'undefined' ? window.innerWidth : 1200
   );
+
+  const handleDismiss = useCallback(() => {
+    if (onClose) {
+      onClose();
+    } else if (onUpdateConfig) {
+      onUpdateConfig({ showVirtualKeyboard: false });
+    }
+  }, [onClose, onUpdateConfig]);
 
   // Measure available horizontal space of the window/container
   useEffect(() => {
@@ -230,13 +240,15 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   const totalWhite = whiteKeys.length;
   const blackKeyWidthPercent = (1 / totalWhite) * 58;
 
-  const isStretched = Boolean(config.virtualKeyboardStretchWidth);
-  // Calculate horizontal space: in stretch mode, uses available container width; in fixed mode, caps at 1152px (max-w-6xl)
-  const effectiveContainerWidth = isStretched
-    ? Math.max(300, availableWidth - 32)
-    : Math.min(1152, Math.max(300, availableWidth - 32));
+  const isFit = Boolean(config.virtualKeyboardStretchWidth);
+  const paddingX = availableWidth < 640 ? 12 : 32;
+  // Calculate horizontal space: in fit mode, uses available container width; in fixed mode, caps at 1152px (max-w-6xl)
+  const effectiveContainerWidth = isFit
+    ? Math.max(280, availableWidth - paddingX)
+    : Math.min(1152, Math.max(280, availableWidth - 32));
   const effectiveKeyWidth = totalWhite > 0 ? effectiveContainerWidth / totalWhite : 24;
   const isCompact = effectiveKeyWidth < 26;
+  const isUltraCompact = effectiveKeyWidth < 18;
 
   const tonicNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
   const startOctave = 3 + octaveOffset;
@@ -245,16 +257,16 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   return (
     <div
       ref={containerRef}
-      className="w-full bg-[#0e121b]/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-2.5 flex flex-col items-center select-none shadow-2xl"
+      className="w-full bg-[#0e121b]/95 backdrop-blur-md border-t border-slate-800/80 px-2 sm:px-4 py-2 sm:py-2.5 flex flex-col items-center select-none shadow-2xl"
     >
       {/* Header Toolbar */}
       <div
         className={`flex flex-wrap items-center justify-between gap-2 w-full mb-2 px-1 text-xs text-slate-400 transition-[max-width] duration-200 ${
-          isStretched ? 'max-w-none' : 'max-w-6xl'
+          isFit ? 'max-w-none' : 'max-w-6xl'
         }`}
       >
-        {/* Left: Piano branding, range presets, and stretch toggle */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Left: Piano branding, range presets, fit toggle, and dismiss toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 font-semibold text-slate-200">
             <Piano className="w-4 h-4 text-cyan-400 shrink-0" />
             <span>Virtual Piano</span>
@@ -289,28 +301,28 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
             </div>
           )}
 
-          {/* Width Mode Toggle (Stretch to window vs Fixed 1152px) */}
+          {/* Width Mode Toggle (Fit to window vs Fixed 1152px) */}
           {onUpdateConfig && (
             <button
               type="button"
               onClick={() =>
                 onUpdateConfig({
-                  virtualKeyboardStretchWidth: !isStretched,
+                  virtualKeyboardStretchWidth: !isFit,
                 })
               }
               className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border transition cursor-pointer ${
-                isStretched
+                isFit
                   ? 'bg-cyan-600/30 border-cyan-500 text-cyan-200 font-medium shadow-[0_0_8px_rgba(8,145,178,0.3)]'
                   : 'bg-slate-900/90 border-slate-800/80 text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
               }`}
               title={
-                isStretched
-                  ? 'Stretched to window width (Click to switch to fixed 1152px centre layout)'
-                  : 'Fixed 1152px width (Click to stretch across full window width)'
+                isFit
+                  ? 'Fit to window width active (Click to switch to fixed 1152px centre layout)'
+                  : 'Fixed 1152px width (Click to fit available window width)'
               }
-              aria-label={isStretched ? 'Switch to fixed width piano' : 'Stretch piano to window width'}
+              aria-label={isFit ? 'Switch to fixed width piano' : 'Fit piano to window width'}
             >
-              {isStretched ? (
+              {isFit ? (
                 <>
                   <Minimize2 className="w-3 h-3 text-cyan-400 shrink-0" />
                   <span>Fixed</span>
@@ -318,9 +330,23 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
               ) : (
                 <>
                   <Maximize2 className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span>Stretch</span>
+                  <span>Fit</span>
                 </>
               )}
+            </button>
+          )}
+
+          {/* Dismiss Toggle Button */}
+          {(onClose || onUpdateConfig) && (
+            <button
+              type="button"
+              onClick={handleDismiss}
+              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono border border-slate-800/80 bg-slate-900/90 text-slate-400 hover:text-rose-400 hover:border-rose-900/50 hover:bg-slate-800/70 transition cursor-pointer"
+              title="Dismiss Virtual Piano"
+              aria-label="Dismiss Virtual Piano"
+            >
+              <X className="w-3 h-3 shrink-0" />
+              <span>Dismiss</span>
             </button>
           )}
         </div>
@@ -371,14 +397,16 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
       </div>
 
       {/* Keyboard Keys Viewport */}
-      <div className="w-full flex justify-center overflow-x-auto pb-1 px-1">
+      <div className="w-full flex justify-center overflow-x-auto pb-1 px-0.5 sm:px-1">
         {/* Exact shared bounding container for both white and black key layers */}
         <div
           className={`relative flex h-28 w-full select-none rounded-b-md shadow-2xl bg-slate-950 transition-[max-width] duration-200 ${
-            isStretched ? 'max-w-none' : 'max-w-6xl'
+            isFit ? 'max-w-none' : 'max-w-6xl'
           }`}
           style={{
-            minWidth: `${Math.max(500, totalWhite * (isCompact ? 16 : 22))}px`,
+            minWidth: isFit
+              ? `${Math.max(effectiveContainerWidth, totalWhite * 12)}px`
+              : `${Math.max(500, totalWhite * (isCompact ? 16 : 22))}px`,
           }}
         >
           {/* White Keys Layer */}
@@ -445,7 +473,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                   {/* Key Labels: Keybindings shifted up, Solfège at bottom level */}
                   <div className="flex flex-col items-center gap-1 pointer-events-none w-full px-0.5">
                     {/* QWERTY Shortcut Keybinding Badge (above solfège) */}
-                    {key.shortcut && (
+                    {key.shortcut && !isUltraCompact && (
                       <span
                         className={`font-mono font-medium rounded ${
                           isCompact ? 'text-[7px] px-0.5' : 'text-[8.5px] px-1'
@@ -462,12 +490,12 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     {/* Solfège Label (bottom level): Piano triangle SVG or syllable text */}
                     {config.showPianoTriangles ? (
                       <div
-                        className={isCompact ? 'w-3 h-3' : 'w-4 h-4'}
+                        className={isUltraCompact ? 'w-2.5 h-2.5' : isCompact ? 'w-3 h-3' : 'w-4 h-4'}
                         dangerouslySetInnerHTML={{
                           __html: createPianoTriangleSvg(
                             key.ptInfo.triangle as PianoTriangleType,
                             key.ptInfo.point as PianoTrianglePoint,
-                            isCompact ? 12 : 16,
+                            isUltraCompact ? 9 : isCompact ? 12 : 16,
                             key.colorHex,
                             key.isActive ? '#ffffff' : '#334155'
                           ),
@@ -476,7 +504,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     ) : (
                       <span
                         className={`font-bold leading-none ${
-                          isCompact ? 'text-[8.5px]' : 'text-[10px]'
+                          isUltraCompact ? 'text-[7px]' : isCompact ? 'text-[8.5px]' : 'text-[10px]'
                         } ${key.isActive ? 'text-white' : 'text-slate-800'}`}
                       >
                         {key.syllable}
@@ -560,7 +588,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                   {/* Key Labels: Keybindings shifted up, Solfège at bottom level */}
                   <div className="flex flex-col items-center gap-0.5 pointer-events-none w-full px-0.5">
                     {/* QWERTY Shortcut Keybinding Badge (above solfège) */}
-                    {key.shortcut && (
+                    {key.shortcut && !isUltraCompact && (
                       <span
                         className={`font-mono font-medium leading-none px-0.5 rounded ${
                           isCompact ? 'text-[6.5px]' : 'text-[8px]'
@@ -575,12 +603,12 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     {/* Solfège Label (bottom level): Piano triangle SVG or syllable text */}
                     {config.showPianoTriangles ? (
                       <div
-                        className={isCompact ? 'w-2.5 h-2.5 mb-0.5' : 'w-3.5 h-3.5 mb-0.5'}
+                        className={isUltraCompact ? 'w-2 h-2 mb-0.5' : isCompact ? 'w-2.5 h-2.5 mb-0.5' : 'w-3.5 h-3.5 mb-0.5'}
                         dangerouslySetInnerHTML={{
                           __html: createPianoTriangleSvg(
                             key.ptInfo.triangle as PianoTriangleType,
                             key.ptInfo.point as PianoTrianglePoint,
-                            isCompact ? 10 : 13,
+                            isUltraCompact ? 8 : isCompact ? 10 : 13,
                             key.colorHex,
                             key.isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
                             true
@@ -590,7 +618,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     ) : (
                       <span
                         className={`font-bold leading-tight ${
-                          isCompact ? 'text-[7.5px]' : 'text-[8.5px]'
+                          isUltraCompact ? 'text-[6px]' : isCompact ? 'text-[7.5px]' : 'text-[8.5px]'
                         }`}
                         style={{ color: key.isActive ? '#ffffff' : key.colorHex }}
                       >

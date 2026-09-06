@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Info,
   Activity,
+  Play,
 } from 'lucide-react';
 import { PitchClockDiagram } from './PitchClockDiagram';
 import { UniformSolfegeDiagram } from './UniformSolfegeDiagram';
@@ -24,13 +25,14 @@ import { TriPitchClassDiagram } from './TriPitchClassDiagram';
 interface InfoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onPlayDemo?: () => void;
 }
 
 type TabType = 'overview' | 'concepts' | 'customise' | 'links';
 
 export const STORAGE_KEY_DONT_SHOW_INTRO = 'ppt_dont_show_intro_on_launch_v1';
 
-export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
+export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDemo }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [dontShowAgain, setDontShowAgain] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -827,10 +829,17 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
 
           <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
             <button
-              onClick={onClose}
-              className="w-full sm:w-auto px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-red-900/30 transition"
+              onClick={() => {
+                if (onPlayDemo) {
+                  onPlayDemo();
+                } else {
+                  onClose();
+                }
+              }}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-red-900/30 transition cursor-pointer"
             >
-              Explore Visualiser
+              <Play className="w-3.5 h-3.5 fill-current" />
+              <span>Play Demo</span>
             </button>
           </div>
         </div>

@@ -19,6 +19,7 @@ import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { InfoModal } from './components/InfoModal';
+import { Piano } from 'lucide-react';
 import {
   decodeLayoutFromSlug,
   encodeLayoutToSlug,
@@ -82,6 +83,12 @@ export const App: React.FC = () => {
       localStorage.setItem('ppt_has_seen_intro_modal_v1', 'true');
     }
   }, []);
+
+  const handlePlayDemoFromModal = useCallback(() => {
+    handleCloseInfoModal();
+    midiPlayerInstance.loadTrack('radial-orbit');
+    midiPlayerInstance.play();
+  }, [handleCloseInfoModal]);
 
   const [scaleFitInfo, setScaleFitInfo] = useState<ScaleFitInfo>({
     currentTonicFit: 1.0,
@@ -391,8 +398,24 @@ export const App: React.FC = () => {
             onNoteOn={renderCoordinatorInstance.triggerNoteOn}
             onNoteOff={renderCoordinatorInstance.triggerNoteOff}
             onUpdateConfig={updateConfig}
+            onClose={() => updateConfig({ showVirtualKeyboard: false })}
           />
         </div>
+      )}
+
+      {/* Floating Piano Toggle on Smaller Responsive Breakpoints */}
+      {!config.showVirtualKeyboard && (
+        <button
+          type="button"
+          onClick={() => updateConfig({ showVirtualKeyboard: true })}
+          className={`fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-30 xl:hidden flex items-center justify-center p-2.5 rounded-full bg-slate-900/90 hover:bg-slate-800 text-cyan-400 border border-slate-700/80 shadow-xl backdrop-blur-md transition-all active:scale-95 cursor-pointer group ${
+            isFullscreen && isMouseIdle ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          }`}
+          title="Show Virtual Piano"
+          aria-label="Show Virtual Piano"
+        >
+          <Piano className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        </button>
       )}
 
       {/* Settings Side Drawer */}
@@ -411,6 +434,7 @@ export const App: React.FC = () => {
       <InfoModal
         isOpen={isInfoModalOpen}
         onClose={handleCloseInfoModal}
+        onPlayDemo={handlePlayDemoFromModal}
       />
     </div>
   );

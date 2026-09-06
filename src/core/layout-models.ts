@@ -214,7 +214,7 @@ export const PRESET_ORBITAL_FOCUS: LayoutDefinition = {
 export const PRESET_SIGNATURE: LayoutDefinition = {
   id: 'signature',
   name: 'Scale Signature Trio',
-  description: 'Concentric Pitch Clock on top with side-by-side Piano Triangles and Note Stream below',
+  description: 'Concentric Pitch Clock on top with side-by-side Piano Triangles and Overtone Waves below',
   root: {
     id: 'root-signature',
     type: 'container',
@@ -243,15 +243,15 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
             title: 'Piano Triangles',
           },
           {
-            id: 'cell-stream-sig',
+            id: 'cell-overtones-sig',
             type: 'cell',
-            module: 'stream',
+            module: 'overtones',
             flex: 1,
-            title: 'Note Stream',
+            title: 'Overtone Waves',
             configOverrides: {
-              orientation: 'horizontal',
-              direction: 'rtl',
-              streamMode: 'continuous',
+              showDissonanceCurve: true,
+              showOvertoneLabels: true,
+              fluidSpeed: 1.0,
             },
           },
         ],

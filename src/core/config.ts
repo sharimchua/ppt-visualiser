@@ -1,5 +1,5 @@
 import { VisualiserConfig, LayoutMode } from './types';
-import { PRESET_SIGNATURE, PRESET_LAYOUTS } from './layout-models';
+import { PRESET_SIGNATURE, PRESET_LAYOUTS, getAllCellNodes } from './layout-models';
 
 export const STORAGE_KEY = 'ppt_visualiser_config_v1';
 
@@ -23,7 +23,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   keyboardHighestMidi: 108, // Highest note of instrument (default 108 = C8)
   virtualKeyboardStartMidi: 48, // Start note of on-screen virtual piano (default 48 = C3)
   virtualKeyboardEndMidi: 72, // End note of on-screen virtual piano (default 72 = C5)
-  virtualKeyboardStretchWidth: false, // Fixed 1152px width by default, or stretched to full window width
+  virtualKeyboardStretchWidth: false, // Fixed 1152px width by default, or fitted to available window width
   startOctave: 1, // 1..8 (lowest / outermost ring)
   endOctave: 8, // 1..8 (highest / innermost ring)
   showOctaveNumbers: true, // Display clean octave numbers (1..8) on rings
@@ -101,7 +101,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   // Layout & Sound
   layoutMode: 'signature',
   activeLayout: PRESET_SIGNATURE,
-  showVirtualKeyboard: true,
+  showVirtualKeyboard: false,
   masterVolume: 0.75,
   soundEnabled: true,
   synthWaveform: 'warm-poly',
@@ -160,6 +160,10 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.virtualKeyboardStretchWidth =
       typeof merged.virtualKeyboardStretchWidth === 'boolean'
         ? merged.virtualKeyboardStretchWidth
+        : false;
+    merged.showVirtualKeyboard =
+      typeof merged.showVirtualKeyboard === 'boolean'
+        ? merged.showVirtualKeyboard
         : false;
 
     // Sanitize octave bounds
@@ -258,6 +262,12 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
 
     if (!merged.activeLayout || !merged.activeLayout.root) {
       merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_SIGNATURE;
+    } else if (merged.layoutMode === 'signature' && merged.activeLayout.id === 'signature') {
+      // Upgrade legacy signature layout if it still has the old Note Stream cell
+      const cells = getAllCellNodes(merged.activeLayout.root);
+      if (cells.some((c) => c.module === 'stream')) {
+        merged.activeLayout = PRESET_SIGNATURE;
+      }
     }
 
     // Sanitize auto-tonic settings

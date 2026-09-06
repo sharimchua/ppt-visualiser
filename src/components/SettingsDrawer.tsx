@@ -1902,11 +1902,11 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               </label>
             </div>
 
-            {/* Stretch to Window Width Toggle */}
+            {/* Fit to Window Width Toggle */}
             <div className="flex justify-between items-center pt-2 border-t border-slate-800/60">
               <div>
-                <label className="block font-medium text-slate-200">Stretch to Window Width</label>
-                <span className="text-[10px] text-slate-500">Stretch virtual piano across full window width or retain fixed 1152px centre layout</span>
+                <label className="block font-medium text-slate-200">Fit to Window Width</label>
+                <span className="text-[10px] text-slate-500">Fit virtual piano to available window width or retain fixed 1152px centre layout</span>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input

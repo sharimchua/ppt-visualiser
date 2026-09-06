@@ -6,14 +6,14 @@ The `src/components` domain contains the React user interface layer, including t
 
 ## Ownership
 
-- `src/App.tsx` — Root application component, config synchronization, URL slug state, full-screen handling, and mouse idle management.
+- `src/App.tsx` — Root application component, config synchronisation, URL slug state, full-screen handling, mouse idle management, floating responsive virtual piano toggle button, and demo song launch from the primer modal.
 - `src/components/ControlToolbar.tsx` — Top header toolbar containing transport controls, tonic/scale selector, track picker (inbuilt demos and uploaded tracks from local storage), layout menu, and deep link sharing.
 - `src/components/VisualiserViewport.tsx` — Container managing the flexible layout canvas hierarchy and layout edit mode.
 - `src/components/FlexLayoutRenderer.tsx` — Recursive split-container renderer supporting draggable flex dividers, cell splitting, duplication, and removal.
 - `src/components/CellViewport.tsx` — Individual cell wrapper mounting specific canvas renderers (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves) with local HUD controls.
-- `src/components/VirtualKeyboard.tsx` — Interactive velocity-sensitive virtual piano with customisable keyboard range presets (25-key up to full 88-key acoustic piano), dynamic 2-octave QWERTY computer keybindings positioned above solfège, bottom-edge tonic Do indicator, left-aligned octave labels, window horizontal space calculation with stretch/fixed width toggle, Uniform Solfège colouring, and kinetic tonic-shift glow ring/border flashes upon modulation.
+- `src/components/VirtualKeyboard.tsx` — Interactive velocity-sensitive virtual piano with customisable keyboard range presets (25-key up to full 88-key acoustic piano), dynamic 2-octave QWERTY computer keybindings positioned above solfège, bottom-edge tonic Do indicator, left-aligned octave labels, window horizontal space calculation with fit/fixed width toggle, direct dismiss toggle button, Uniform Solfège colouring, and kinetic tonic-shift glow ring/border flashes upon modulation.
 - `src/components/SettingsDrawer.tsx` — Slide-out settings sidebar providing granular controls for pitch clock, virtual piano keyboard range presets, overtones wave simulation, cosmetics, display effect toggles (including kinetic tonic shift effects), priority slots, themes, audio synthesiser, and real-time focus mode.
-- `src/components/InfoModal.tsx` — Comprehensive introduction and theory guide modal dialogue featuring continuous single-piece scrolling, interactive top bookmark navigation, documentation of all 4 cell types (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves), and rich vector diagrams for PPT concepts.
+- `src/components/InfoModal.tsx` — Comprehensive introduction and theory guide modal dialogue featuring continuous single-piece scrolling, interactive top bookmark navigation, documentation of all 4 cell types (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves), rich vector diagrams for PPT concepts, and a "Play Demo" call-to-action button launching the "Boot Up" demo track.
 - `src/components/PitchClockDiagram.tsx` — Interactive SVG polar pitch clock diagram rendering 12 radial pitch classes, movable Do zenith, and Fi nadir.
 - `src/components/UniformSolfegeDiagram.tsx` — Visual vector diagram explaining the 3 root glyphs and the 4-fold 90° symmetry matrix.
 - `src/components/PianoTrianglesDiagram.tsx` — Vector diagram presenting the 4 geometric piano triangles and 2-octave keyboard with drawn vector overlays.

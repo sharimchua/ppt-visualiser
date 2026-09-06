@@ -1515,7 +1515,7 @@ test('Piano Triangles Layout: PRESET_SIGNATURE trio tree and URL slug round-trip
   assert.strictEqual(cells.length, 3, 'Signature layout must contain 3 cells');
   assert.strictEqual(cells[0].module, 'orbital');
   assert.strictEqual(cells[1].module, 'triangles');
-  assert.strictEqual(cells[2].module, 'stream');
+  assert.strictEqual(cells[2].module, 'overtones');
 
   // Slug round-trip
   const slug = encodeLayoutToSlug(PRESET_SIGNATURE, false);
@@ -1526,6 +1526,7 @@ test('Piano Triangles Layout: PRESET_SIGNATURE trio tree and URL slug round-trip
   const decodedCells = getAllCellNodes(decoded.layout.root);
   assert.strictEqual(decodedCells.length, 3);
   assert.strictEqual(decodedCells[1].module, 'triangles');
+  assert.strictEqual(decodedCells[2].module, 'overtones');
 });
 
 test('RenderCoordinator: Decoupled note lifecycle, subscriptions, and session reset', () => {
@@ -2338,18 +2339,63 @@ test('Virtual Keyboard: Configuration sanitisation and clamping', () => {
     virtualKeyboardStartMidi: 'invalid' as any,
     virtualKeyboardEndMidi: null as any,
     virtualKeyboardStretchWidth: 'not-a-boolean' as any,
+    showVirtualKeyboard: 'not-a-boolean' as any,
   });
   assert.strictEqual(fallback.virtualKeyboardStartMidi, 48);
   assert.strictEqual(fallback.virtualKeyboardEndMidi, 72);
   assert.strictEqual(fallback.virtualKeyboardStretchWidth, false);
+  assert.strictEqual(fallback.showVirtualKeyboard, false);
 
-  // Stretch width boolean sanitisation
+  // Stretch / fit width boolean sanitisation
   assert.strictEqual(DEFAULT_CONFIG.virtualKeyboardStretchWidth, false);
   const stretched = sanitizeConfig({
     ...DEFAULT_CONFIG,
     virtualKeyboardStretchWidth: true,
   });
   assert.strictEqual(stretched.virtualKeyboardStretchWidth, true);
+
+  // Virtual keyboard hidden by default
+  assert.strictEqual(DEFAULT_CONFIG.showVirtualKeyboard, false);
+  const keyboardEnabled = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    showVirtualKeyboard: true,
+  });
+  assert.strictEqual(keyboardEnabled.showVirtualKeyboard, true);
+});
+
+test('Layout Models: Upgrade legacy signature layout containing stream to new orbital/triangles/waves trio', () => {
+  const legacySignatureRoot = {
+    id: 'root-signature',
+    type: 'container' as const,
+    direction: 'column' as const,
+    gap: 8,
+    children: [
+      { id: 'cell-clock-sig', type: 'cell' as const, module: 'orbital' as const, flex: 3 },
+      {
+        id: 'container-sig-bottom',
+        type: 'container' as const,
+        direction: 'row' as const,
+        flex: 1,
+        children: [
+          { id: 'cell-triangles-sig', type: 'cell' as const, module: 'triangles' as const, flex: 1 },
+          { id: 'cell-stream-sig', type: 'cell' as const, module: 'stream' as const, flex: 1 },
+        ],
+      },
+    ],
+  };
+
+  const upgraded = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    layoutMode: 'signature',
+    activeLayout: {
+      id: 'signature',
+      name: 'Scale Signature Trio',
+      root: legacySignatureRoot,
+    },
+  });
+
+  const cells = getAllCellNodes(upgraded.activeLayout.root);
+  assert.strictEqual(cells[2].module, 'overtones', 'Legacy stream in signature must be upgraded to overtones');
 });
 
 test('Virtual Keyboard: 2-Octave QWERTY octave shifter offsets', () => {
