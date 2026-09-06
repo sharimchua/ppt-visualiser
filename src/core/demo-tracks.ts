@@ -670,36 +670,27 @@ function generateRadialOrbit(): TimedNoteEvent[] {
     t += stepDur;
   }
 
-  t += 0.3;
+  t += 0.25;
 
-  // 2. Quick descending dim7 arpeggios highlighting minor 3rd rotational symmetries
+  // 2. Single-family cardinal dim7 descent (D°7: D, B, Ab, F)
+  // Sweeps continuously across the four cardinal axes (12, 9, 6, 3 o'clock)
+  // spanning 6 full octaves from D7 (98) all the way down to D1 (26).
+  const dDim7Descent = [
+    98, 95, 92, 89, // D7, B6, Ab6, F6
+    86, 83, 80, 77, // D6, B5, Ab5, F5
+    74, 71, 68, 65, // D5, B4, Ab4, F4
+    62, 59, 56, 53, // D4, B3, Ab3, F3
+    50, 47, 44, 41, // D3, B2, Ab2, F2
+    38, 35, 32, 29, // D2, B1, Ab1, F1
+    26,             // D1 (Do1 at 12 o'clock zenith)
+  ];
   const arpeggioStep = 0.075;
   const arpeggioDur = 0.28;
-
-  // Arpeggio A: D°7 (D, B, Ab, F) - cardinal cross (12, 9, 6, 3 o'clock)
-  const dDim7 = [86, 83, 80, 77, 74, 71, 68, 65, 62]; // D6 down to D4
-  for (const midi of dDim7) {
+  for (const midi of dDim7Descent) {
     notes.push({ midi, velocity: 0.88, time: t, duration: arpeggioDur });
     t += arpeggioStep;
   }
-  t += 0.15;
-
-  // Arpeggio B: C#°7 (C#, Bb, G, E) - rotated square (11, 8, 5, 2 o'clock)
-  const csDim7 = [85, 82, 79, 76, 73, 70, 67, 64, 61]; // C#6 down to C#4
-  for (const midi of csDim7) {
-    notes.push({ midi, velocity: 0.88, time: t, duration: arpeggioDur });
-    t += arpeggioStep;
-  }
-  t += 0.15;
-
-  // Arpeggio C: D#°7 / Eb°7 (Eb, C, A, F#) - rotated square (1, 10, 7, 4 o'clock)
-  // Cascades down to Eb3 (51), setting up the half-step resolution to E
-  const dsDim7 = [87, 84, 81, 78, 75, 72, 69, 66, 63, 60, 57, 54, 51]; // Eb6 down to Eb3
-  for (const midi of dsDim7) {
-    notes.push({ midi, velocity: 0.90, time: t, duration: arpeggioDur });
-    t += arpeggioStep;
-  }
-  t += 0.35;
+  t += 0.3;
 
   // 3. Dominant 7th block chords in the circle of fifths from D to G
   // D7 -> A7 -> E7 -> B7 -> F#7 -> C#7 -> G#7 -> D#7 -> Bb7 -> F7 -> C7 -> G7
@@ -726,23 +717,28 @@ function generateRadialOrbit(): TimedNoteEvent[] {
     }
     t += blockStep;
   }
-  t += 0.2;
+  t += 0.25;
 
-  // 4. Chromatic walkdown with tritone substitutions targeting E (Em7)
-  // G7 -> Gb7 (sub for C7) -> F7 (sub for B7) -> E
-  const walkdown = [
-    { name: 'G7',  notes: [43, 53, 59, 62, 65] }, // G2 bass, F3, B3, D4, F4
-    { name: 'Gb7', notes: [42, 52, 58, 61, 64] }, // Gb2 bass, E3, Bb3, Db4, E4 (tritone sub for C7)
-    { name: 'F7',  notes: [41, 51, 57, 60, 63] }, // F2 bass, Eb3, A3, C4, Eb4 (tritone sub for B7)
+  // 4. Chromatic walkdown as slower descending arpeggios with tritone substitutions
+  // Lets the intense energy of the circle of fifths settle before the 2-5-1.
+  // G7 -> Gb7 (tritone sub for C7) -> F7 (tritone sub for B7) targeting E (Em7)
+  const walkdownArpeggios = [
+    // G7: F5, D5, B4, G4, D4, G2 (bass)
+    { name: 'G7',  notes: [77, 74, 71, 67, 62, 43] },
+    // Gb7: E5, Db5, Bb4, Gb4, Db4, Gb2 (bass) - tritone sub for C7
+    { name: 'Gb7', notes: [76, 73, 70, 66, 61, 42] },
+    // F7: Eb5, C5, A4, F4, C4, F2 (bass) - tritone sub for B7
+    { name: 'F7',  notes: [75, 72, 69, 65, 60, 41] },
   ];
 
-  const walkDur = 0.35;
-  const walkStep = 0.38;
-  for (const chord of walkdown) {
+  const walkStep = 0.11;
+  const walkDur = 0.50;
+  for (const chord of walkdownArpeggios) {
     for (const midi of chord.notes) {
-      notes.push({ midi, velocity: 0.94, time: t, duration: walkDur });
+      notes.push({ midi, velocity: 0.90, time: t, duration: walkDur });
+      t += walkStep;
     }
-    t += walkStep;
+    t += 0.10; // gentle breath between chords
   }
   t += 0.15;
 
@@ -884,9 +880,9 @@ export const DEMO_TRACKS: DemoTrack[] = [
     title: 'Boot Up',
     composer: 'PPT Soundlab',
     category: 'PPT Theory & Kinetics',
-    description: 'Concentric chromatic spiral from D, minor 3rd dim7 symmetries, circle of 5ths block chords, tritone walkdown, and jazz ii-V-I',
+    description: 'Concentric chromatic spiral from D, cardinal dim7 descent to D1, circle of 5ths block chords, slower tritone arpeggios, and jazz ii-V-I',
     defaultTonic: 2, // D
-    duration: 20.0,
+    duration: 21.0,
     notes: generateRadialOrbit(),
   },
 ];
