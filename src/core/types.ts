@@ -214,6 +214,7 @@ export interface SystemConfig {
   keyboardHighestMidi: number; // Highest note of instrument (default 108 = C8)
   virtualKeyboardStartMidi: number; // Start note of on-screen virtual piano (default 48 = C3)
   virtualKeyboardEndMidi: number; // End note of on-screen virtual piano (default 72 = C5)
+  virtualKeyboardStretchWidth: boolean; // Stretch virtual piano to window horizontal space (default false)
   autoTonicEnabled: boolean;
   autoTonicMode: AutoTonicMode;
   autoTonicCustomDegrees: number[];

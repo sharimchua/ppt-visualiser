@@ -1902,6 +1902,23 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               </label>
             </div>
 
+            {/* Stretch to Window Width Toggle */}
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800/60">
+              <div>
+                <label className="block font-medium text-slate-200">Stretch to Window Width</label>
+                <span className="text-[10px] text-slate-500">Stretch virtual piano across full window width or retain fixed 1152px centre layout</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(config.virtualKeyboardStretchWidth)}
+                  onChange={(e) => onUpdateConfig({ virtualKeyboardStretchWidth: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
             <p className="text-[10px] text-slate-500 italic">
               Computer keyboard keys (Z–M and Q–I) map to a 2-octave playable window. Use + and - keys to shift octaves dynamically.
             </p>

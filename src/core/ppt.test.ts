@@ -2337,9 +2337,19 @@ test('Virtual Keyboard: Configuration sanitisation and clamping', () => {
     ...DEFAULT_CONFIG,
     virtualKeyboardStartMidi: 'invalid' as any,
     virtualKeyboardEndMidi: null as any,
+    virtualKeyboardStretchWidth: 'not-a-boolean' as any,
   });
   assert.strictEqual(fallback.virtualKeyboardStartMidi, 48);
   assert.strictEqual(fallback.virtualKeyboardEndMidi, 72);
+  assert.strictEqual(fallback.virtualKeyboardStretchWidth, false);
+
+  // Stretch width boolean sanitisation
+  assert.strictEqual(DEFAULT_CONFIG.virtualKeyboardStretchWidth, false);
+  const stretched = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStretchWidth: true,
+  });
+  assert.strictEqual(stretched.virtualKeyboardStretchWidth, true);
 });
 
 test('Virtual Keyboard: 2-Octave QWERTY octave shifter offsets', () => {

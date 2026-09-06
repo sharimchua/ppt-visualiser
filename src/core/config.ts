@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   keyboardHighestMidi: 108, // Highest note of instrument (default 108 = C8)
   virtualKeyboardStartMidi: 48, // Start note of on-screen virtual piano (default 48 = C3)
   virtualKeyboardEndMidi: 72, // End note of on-screen virtual piano (default 72 = C5)
+  virtualKeyboardStretchWidth: false, // Fixed 1152px width by default, or stretched to full window width
   startOctave: 1, // 1..8 (lowest / outermost ring)
   endOctave: 8, // 1..8 (highest / innermost ring)
   showOctaveNumbers: true, // Display clean octave numbers (1..8) on rings
@@ -156,6 +157,10 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.virtualKeyboardEndMidi = typeof merged.virtualKeyboardEndMidi === 'number'
       ? Math.max(merged.virtualKeyboardStartMidi + 12, Math.min(108, Math.round(merged.virtualKeyboardEndMidi)))
       : 72;
+    merged.virtualKeyboardStretchWidth =
+      typeof merged.virtualKeyboardStretchWidth === 'boolean'
+        ? merged.virtualKeyboardStretchWidth
+        : false;
 
     // Sanitize octave bounds
     const rawStart = typeof merged.startOctave === 'number' ? merged.startOctave : 1;
