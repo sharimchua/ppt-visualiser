@@ -646,38 +646,127 @@ function generateTetrachordStudy(): TimedNoteEvent[] {
 }
 
 /**
- * 11. Radial Orbit across all 8 concentric pitch clocks
- * Sweeps from deep bass (A0/Do1) all the way up to treble (C8/Do8) and spirals back.
+ * 11. Boot Up (Default Demo Track)
+ * High-octane kinetic showcase across all 8 concentric pitch clock registers:
+ * 1. Ascending chromatic spiral starting at D1 (Do zenith) through D7.
+ * 2. Rapid descending dim7 arpeggios demonstrating minor 3rd rotational symmetries.
+ * 3. Dominant 7th block chords cycling the circle of fifths from D to G.
+ * 4. Chromatic walkdown with tritone substitutions (G7 -> Gb7 -> F7) targeting E.
+ * 5. Lush jazz ii-V-I cadence (Em7 -> A7 -> Dmaj7) resolving home to D.
  */
 function generateRadialOrbit(): TimedNoteEvent[] {
   const notes: TimedNoteEvent[] = [];
   let t = 0.2;
 
-  // Ascending chromatic spiral
-  for (let midi = 24; midi <= 96; midi += 1) {
-    const stepDur = 0.11;
+  // 1. Ascending chromatic spiral starting from D (MIDI 26 = D1 up to MIDI 98 = D7)
+  const stepDur = 0.08;
+  for (let midi = 26; midi <= 98; midi += 1) {
     notes.push({
       midi,
-      velocity: 0.7 + (Math.sin(midi * 0.4) * 0.2),
+      velocity: 0.72 + Math.sin((midi - 26) * 0.35) * 0.18,
       time: t,
-      duration: stepDur * 1.5,
+      duration: stepDur * 1.6,
     });
     t += stepDur;
   }
 
-  t += 0.5;
+  t += 0.3;
 
-  // Concentric ring chords (octave blasts across registers)
-  const tonicD = [26, 38, 50, 62, 74, 86, 98]; // D in all registers
-  for (const midi of tonicD) {
-    notes.push({ midi, velocity: 0.95, time: t, duration: 2.0 });
-  }
-  t += 1.8;
+  // 2. Quick descending dim7 arpeggios highlighting minor 3rd rotational symmetries
+  const arpeggioStep = 0.075;
+  const arpeggioDur = 0.28;
 
-  const fifthA = [21, 33, 45, 57, 69, 81, 93]; // So (A) in all registers
-  for (const midi of fifthA) {
-    notes.push({ midi, velocity: 0.95, time: t, duration: 2.0 });
+  // Arpeggio A: D°7 (D, B, Ab, F) - cardinal cross (12, 9, 6, 3 o'clock)
+  const dDim7 = [86, 83, 80, 77, 74, 71, 68, 65, 62]; // D6 down to D4
+  for (const midi of dDim7) {
+    notes.push({ midi, velocity: 0.88, time: t, duration: arpeggioDur });
+    t += arpeggioStep;
   }
+  t += 0.15;
+
+  // Arpeggio B: C#°7 (C#, Bb, G, E) - rotated square (11, 8, 5, 2 o'clock)
+  const csDim7 = [85, 82, 79, 76, 73, 70, 67, 64, 61]; // C#6 down to C#4
+  for (const midi of csDim7) {
+    notes.push({ midi, velocity: 0.88, time: t, duration: arpeggioDur });
+    t += arpeggioStep;
+  }
+  t += 0.15;
+
+  // Arpeggio C: D#°7 / Eb°7 (Eb, C, A, F#) - rotated square (1, 10, 7, 4 o'clock)
+  // Cascades down to Eb3 (51), setting up the half-step resolution to E
+  const dsDim7 = [87, 84, 81, 78, 75, 72, 69, 66, 63, 60, 57, 54, 51]; // Eb6 down to Eb3
+  for (const midi of dsDim7) {
+    notes.push({ midi, velocity: 0.90, time: t, duration: arpeggioDur });
+    t += arpeggioStep;
+  }
+  t += 0.35;
+
+  // 3. Dominant 7th block chords in the circle of fifths from D to G
+  // D7 -> A7 -> E7 -> B7 -> F#7 -> C#7 -> G#7 -> D#7 -> Bb7 -> F7 -> C7 -> G7
+  const circleOfFifths = [
+    { name: 'D7',  notes: [50, 60, 64, 66] }, // D3 bass, C4, E4, F#4
+    { name: 'A7',  notes: [45, 55, 61, 64] }, // A2 bass, G3, C#4, E4
+    { name: 'E7',  notes: [52, 59, 62, 68] }, // E3 bass, B3, D4, G#4
+    { name: 'B7',  notes: [47, 57, 63, 66] }, // B2 bass, A3, D#4, F#4
+    { name: 'F#7', notes: [54, 61, 64, 70] }, // F#3 bass, C#4, E4, A#4
+    { name: 'C#7', notes: [49, 59, 65, 68] }, // C#3 bass, B3, F4, G#4
+    { name: 'G#7', notes: [44, 56, 60, 66] }, // G#2 bass, G#3, C4, F#4
+    { name: 'D#7', notes: [51, 61, 67, 70] }, // D#3 bass, C#4, G4, A#4
+    { name: 'Bb7', notes: [46, 58, 62, 68] }, // Bb2 bass, Bb3, D4, Ab4
+    { name: 'F7',  notes: [53, 63, 65, 69] }, // F3 bass, Eb4, F4, A4
+    { name: 'C7',  notes: [48, 58, 64, 67] }, // C3 bass, Bb3, E4, G4
+    { name: 'G7',  notes: [43, 55, 59, 65] }, // G2 bass, G3, B3, F4
+  ];
+
+  const blockDur = 0.16;
+  const blockStep = 0.18;
+  for (const chord of circleOfFifths) {
+    for (const midi of chord.notes) {
+      notes.push({ midi, velocity: 0.92, time: t, duration: blockDur });
+    }
+    t += blockStep;
+  }
+  t += 0.2;
+
+  // 4. Chromatic walkdown with tritone substitutions targeting E (Em7)
+  // G7 -> Gb7 (sub for C7) -> F7 (sub for B7) -> E
+  const walkdown = [
+    { name: 'G7',  notes: [43, 53, 59, 62, 65] }, // G2 bass, F3, B3, D4, F4
+    { name: 'Gb7', notes: [42, 52, 58, 61, 64] }, // Gb2 bass, E3, Bb3, Db4, E4 (tritone sub for C7)
+    { name: 'F7',  notes: [41, 51, 57, 60, 63] }, // F2 bass, Eb3, A3, C4, Eb4 (tritone sub for B7)
+  ];
+
+  const walkDur = 0.35;
+  const walkStep = 0.38;
+  for (const chord of walkdown) {
+    for (const midi of chord.notes) {
+      notes.push({ midi, velocity: 0.94, time: t, duration: walkDur });
+    }
+    t += walkStep;
+  }
+  t += 0.15;
+
+  // 5. Jazz ii-V-I cadence (iim7 -> V7 -> Imaj7) in D major
+  // iim7: Em7
+  const em7 = [40, 52, 55, 59, 62, 67, 71, 76]; // E2, E3, G3, B3, D4, G4, B4, E5
+  for (const midi of em7) {
+    notes.push({ midi, velocity: 0.92, time: t, duration: 1.5 });
+  }
+  t += 1.6;
+
+  // V7: A7
+  const a7 = [33, 45, 55, 61, 64, 67, 69, 73]; // A1, A2, G3, C#4, E4, G4, A4, C#5
+  for (const midi of a7) {
+    notes.push({ midi, velocity: 0.94, time: t, duration: 1.5 });
+  }
+  t += 1.6;
+
+  // Imaj7: Dmaj7 (resolving home to D at 12 o'clock zenith)
+  const dmaj7 = [26, 38, 45, 54, 61, 66, 69, 73, 74, 78]; // D1, D2, A2, F#3, C#4, F#4, A4, C#5, D5, F#5
+  for (const midi of dmaj7) {
+    notes.push({ midi, velocity: 0.95, time: t, duration: 3.8 });
+  }
+  t += 3.8;
 
   return notes;
 }
@@ -792,12 +881,12 @@ export const DEMO_TRACKS: DemoTrack[] = [
   },
   {
     id: 'radial-orbit',
-    title: 'Concentric Clock Radial Orbit',
+    title: 'Boot Up',
     composer: 'PPT Soundlab',
     category: 'PPT Theory & Kinetics',
-    description: 'Full 8-octave kinetic journey highlighting nearest-address registers',
+    description: 'Concentric chromatic spiral from D, minor 3rd dim7 symmetries, circle of 5ths block chords, tritone walkdown, and jazz ii-V-I',
     defaultTonic: 2, // D
-    duration: 13.0,
+    duration: 20.0,
     notes: generateRadialOrbit(),
   },
 ];

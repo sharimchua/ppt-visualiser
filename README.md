@@ -46,7 +46,7 @@ Designed for students, performers, composers, and researchers to explore the geo
   - *J.S. Bach — Prelude in C Major (BWV 846)*
   - *PPT Piano Triangles & Tetrachord Study (Do = D)*
   - *Jazz ii-V-I Progression & Voicings*
-  - *Concentric Clock Radial Orbit (88-Key Spiral)*
+  - *Boot Up (Concentric Spiral, Dim7 Symmetries, Circle of 5ths & ii-V-I)*
   - Drag-and-drop support for any standard `.mid` file.
 
 ### 5. Viewport-Maximising Layout & Fullscreen

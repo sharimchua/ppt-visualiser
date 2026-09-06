@@ -55,7 +55,7 @@ export class MidiFilePlayer {
       document.addEventListener('visibilitychange', this.handleFocusChange);
     }
 
-    // Default to Concentric Clock Radial Orbit demo track
+    // Default to Boot Up demo track
     this.loadDemoTrack('radial-orbit');
   }
 
