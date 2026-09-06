@@ -338,8 +338,9 @@ export const App: React.FC = () => {
           onPause={() => midiPlayerInstance.pause()}
           onStop={() => midiPlayerInstance.stop()}
           onSeek={(t) => midiPlayerInstance.seek(t)}
-          onSelectTrack={(id) => midiPlayerInstance.loadDemoTrack(id)}
+          onSelectTrack={(id) => midiPlayerInstance.loadTrack(id)}
           onFileUpload={(f) => midiPlayerInstance.loadExternalMidiFile(f)}
+          onDeleteCustomTrack={(id) => midiPlayerInstance.removeCustomTrack(id)}
           onToggleFullscreen={toggleFullscreen}
           onToggleSettings={() => setIsSettingsOpen(!isSettingsOpen)}
           onResetState={handleResetSessionState}

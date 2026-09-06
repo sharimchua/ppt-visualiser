@@ -224,6 +224,7 @@ export interface MidiPlaybackState {
   currentTime: number;
   duration: number;
   tempoMultiplier: number;
+  trackId?: string;
   trackName?: string;
   loop: boolean;
 }

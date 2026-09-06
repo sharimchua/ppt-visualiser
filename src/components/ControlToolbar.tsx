@@ -1,4 +1,4 @@
-import { useRef, useState, memo } from 'react';
+import { useRef, useState, useEffect, memo } from 'react';
 import {
   Play,
   Pause,
@@ -10,6 +10,7 @@ import {
   Settings,
   Upload,
   Download,
+  Trash2,
   Layers,
   LayoutGrid,
   Radio,
@@ -25,6 +26,12 @@ import {
 } from 'lucide-react';
 import { VisualiserConfig, MidiPlaybackState, MidiDeviceState, LayoutMode } from '../core/types';
 import { DEMO_TRACKS } from '../core/demo-tracks';
+import {
+  CustomMidiTrack,
+  loadSavedCustomTracks,
+  subscribeCustomTracks,
+  findAnyTrackById,
+} from '../core/custom-midi-store';
 import { downloadNotesAsMidiFile } from '../core/midi-encoder';
 import { midiManagerInstance } from '../core/midi-manager';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
@@ -42,6 +49,7 @@ interface ControlToolbarProps {
   onSeek: (time: number) => void;
   onSelectTrack: (trackId: string) => void;
   onFileUpload: (file: File) => void;
+  onDeleteCustomTrack?: (trackId: string) => void;
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onResetState?: () => void;
@@ -77,6 +85,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
   onSeek,
   onSelectTrack,
   onFileUpload,
+  onDeleteCustomTrack,
   onToggleFullscreen,
   onToggleSettings,
   onResetState,
@@ -91,7 +100,27 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [includeAestheticsInSlug, setIncludeAestheticsInSlug] = useState(true);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [customTracks, setCustomTracks] = useState<CustomMidiTrack[]>(() => loadSavedCustomTracks());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return subscribeCustomTracks((tracks) => {
+      setCustomTracks([...tracks]);
+    });
+  }, []);
+
+  const selectedTrackId =
+    playbackState.trackId ||
+    DEMO_TRACKS.find((t) => t.title === playbackState.trackName)?.id ||
+    customTracks.find((t) => t.title === playbackState.trackName)?.id ||
+    '';
+
+  const activeTrack =
+    findAnyTrackById(selectedTrackId) ||
+    DEMO_TRACKS.find((t) => t.title === playbackState.trackName) ||
+    customTracks.find((t) => t.title === playbackState.trackName);
+
+  const isCustomTrack = customTracks.some((t) => t.id === selectedTrackId);
 
   const currentTonic = TONIC_PITCHES.find((t) => t.value === config.tonic) || TONIC_PITCHES[2];
 
@@ -318,24 +347,21 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                   </span>
                 </button>
 
-                {/* Download Demo Track MIDI */}
-                {DEMO_TRACKS.some((t) => t.title === playbackState.trackName) && (
+                {/* Download Track MIDI */}
+                {activeTrack && (
                   <button
                     onClick={() => {
-                      const currentTrack = DEMO_TRACKS.find((t) => t.title === playbackState.trackName);
-                      if (currentTrack) {
-                        downloadNotesAsMidiFile(
-                          currentTrack.notes,
-                          `${currentTrack.id}.mid`,
-                          `${currentTrack.title} (${currentTrack.composer})`
-                        );
-                      }
+                      downloadNotesAsMidiFile(
+                        activeTrack.notes,
+                        `${activeTrack.id}.mid`,
+                        `${activeTrack.title} (${activeTrack.composer})`
+                      );
                       setShowMoreMenu(false);
                     }}
                     className="w-full flex items-center gap-2 px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
                   >
                     <Download className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Download Demo MIDI</span>
+                    <span>Download Track MIDI</span>
                   </button>
                 )}
 
@@ -406,10 +432,31 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         {/* Track selector */}
         <div className="relative flex-1 min-w-0 max-w-full md:max-w-[180px] lg:max-w-[210px] xl:max-w-[240px]">
           <select
-            value={DEMO_TRACKS.some(t => t.title === playbackState.trackName) ? DEMO_TRACKS.find(t => t.title === playbackState.trackName)?.id : ''}
+            value={selectedTrackId}
             onChange={(e) => onSelectTrack(e.target.value)}
             className="w-full bg-slate-800/80 hover:bg-slate-800 text-[11px] sm:text-xs text-slate-200 rounded-md px-2 py-1.5 border border-slate-700 focus:outline-none truncate cursor-pointer touch-manipulation"
           >
+            {/* Uploaded Tracks (from localStorage) */}
+            {customTracks.length > 0 && (
+              <optgroup label="Uploaded Tracks" className="bg-slate-900 text-purple-400 font-semibold text-[11px]">
+                {customTracks.map((t) => (
+                  <option key={t.id} value={t.id} className="bg-slate-900 text-slate-200 font-normal text-xs">
+                    {t.title}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+
+            {/* Fallback option if active track is not yet indexed */}
+            {selectedTrackId &&
+              !DEMO_TRACKS.some((t) => t.id === selectedTrackId) &&
+              !customTracks.some((t) => t.id === selectedTrackId) && (
+                <option value={selectedTrackId} className="bg-slate-900 text-slate-200 font-normal text-xs">
+                  {playbackState.trackName || 'Uploaded MIDI'}
+                </option>
+              )}
+
+            {/* Inbuilt Demo Tracks */}
             {Array.from(new Set(DEMO_TRACKS.map((t) => t.category))).map((category) => (
               <optgroup key={category} label={category} className="bg-slate-900 text-slate-400 font-semibold text-[11px]">
                 {DEMO_TRACKS.filter((t) => t.category === category).map((t) => (
@@ -422,6 +469,17 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
           </select>
         </div>
 
+        {/* Delete Uploaded Track (shown when an uploaded custom track is currently active) */}
+        {isCustomTrack && onDeleteCustomTrack && (
+          <button
+            onClick={() => onDeleteCustomTrack(selectedTrackId)}
+            title="Delete uploaded track from local storage"
+            className="p-1.5 rounded-md hover:bg-red-950/60 text-slate-400 hover:text-red-400 border border-slate-700/60 hover:border-red-600/60 transition flex-shrink-0 touch-manipulation"
+          >
+            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          </button>
+        )}
+
         {/* Upload MIDI File */}
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -432,19 +490,16 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         </button>
 
         {/* Download Current Track MIDI File (Desktop / Tablet only; on mobile it's in More menu) */}
-        {DEMO_TRACKS.some((t) => t.title === playbackState.trackName) && (
+        {activeTrack && (
           <button
             onClick={() => {
-              const currentTrack = DEMO_TRACKS.find((t) => t.title === playbackState.trackName);
-              if (currentTrack) {
-                downloadNotesAsMidiFile(
-                  currentTrack.notes,
-                  `${currentTrack.id}.mid`,
-                  `${currentTrack.title} (${currentTrack.composer})`
-                );
-              }
+              downloadNotesAsMidiFile(
+                activeTrack.notes,
+                `${activeTrack.id}.mid`,
+                `${activeTrack.title} (${activeTrack.composer})`
+              );
             }}
-            title="Download demo track (.mid)"
+            title="Download track MIDI (.mid)"
             className="hidden sm:block p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition flex-shrink-0 touch-manipulation"
           >
             <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -457,7 +512,10 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) onFileUpload(file);
+            if (file) {
+              onFileUpload(file);
+              e.target.value = '';
+            }
           }}
         />
 

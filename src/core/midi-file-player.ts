@@ -1,9 +1,16 @@
-import { TimedNoteEvent, DEMO_TRACKS } from './demo-tracks';
+import { TimedNoteEvent } from './demo-tracks';
 import { MidiPlaybackState } from './types';
 import { midiManagerInstance } from './midi-manager';
+import {
+  CustomMidiTrack,
+  findAnyTrackById,
+  saveCustomTrack,
+  deleteCustomTrack,
+} from './custom-midi-store';
 
 export class MidiFilePlayer {
   private notes: TimedNoteEvent[] = [];
+  private currentTrackId: string = 'radial-orbit';
   private currentTrackName: string = '';
   private duration: number = 0;
   private currentTime: number = 0;
@@ -72,16 +79,29 @@ export class MidiFilePlayer {
   }
 
   public loadDemoTrack(trackId: string): boolean {
-    const track = DEMO_TRACKS.find(t => t.id === trackId);
+    const track = findAnyTrackById(trackId);
     if (!track) return false;
 
     this.stop();
     this.notes = [...track.notes].sort((a, b) => a.time - b.time);
+    this.currentTrackId = track.id;
     this.currentTrackName = track.title;
     this.duration = track.duration;
     this.currentTime = 0;
     this.notifyState();
     return true;
+  }
+
+  public loadTrack(trackId: string): boolean {
+    return this.loadDemoTrack(trackId);
+  }
+
+  public removeCustomTrack(trackId: string): boolean {
+    const removed = deleteCustomTrack(trackId);
+    if (this.currentTrackId === trackId) {
+      this.loadDemoTrack('radial-orbit');
+    }
+    return removed;
   }
 
   public loadExternalMidiFile(file: File): Promise<boolean> {
@@ -100,9 +120,28 @@ export class MidiFilePlayer {
 
           this.stop();
           this.notes = parsedNotes.sort((a, b) => a.time - b.time);
-          this.currentTrackName = file.name.replace(/\.[^/.]+$/, '');
+          const rawTitle = file.name.replace(/\.[^/.]+$/, '').trim();
+          const cleanTitle = rawTitle || 'Uploaded MIDI';
           const lastNote = this.notes[this.notes.length - 1];
-          this.duration = lastNote.time + lastNote.duration + 0.5;
+          const duration = lastNote ? lastNote.time + lastNote.duration + 0.5 : 0;
+          const id = `user-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+
+          const customTrack: CustomMidiTrack = {
+            id,
+            title: cleanTitle,
+            composer: 'Uploaded File',
+            category: 'Uploaded Tracks',
+            duration,
+            notes: this.notes,
+            filename: file.name,
+            timestamp: Date.now(),
+          };
+
+          saveCustomTrack(customTrack);
+
+          this.currentTrackId = id;
+          this.currentTrackName = cleanTitle;
+          this.duration = duration;
           this.currentTime = 0;
           this.notifyState();
           resolve(true);
@@ -172,6 +211,7 @@ export class MidiFilePlayer {
       currentTime: this.currentTime,
       duration: this.duration,
       tempoMultiplier: this.tempoMultiplier,
+      trackId: this.currentTrackId,
       trackName: this.currentTrackName,
       loop: this.loop,
     };

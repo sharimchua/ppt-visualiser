@@ -13,6 +13,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - `src/core/render-coordinator.ts` — Decoupled event bus managing note lifecycles, active note sets, and particle physics outside React.
 - `src/core/midi-manager.ts` — Web MIDI hardware access and device state tracking.
 - `src/core/midi-file-player.ts` — Standard MIDI file playback engine, transport controls, and demo track loader.
+- `src/core/custom-midi-store.ts` — Local storage persistence, quota eviction, and event subscriptions for uploaded user MIDI tracks.
 - `src/core/audio-synth.ts` — Web Audio API polyphonic sound synthesizer with envelope shaping.
 - `src/core/convex-hull.ts` & `src/core/chord-clustering.ts` — Geometric chord clustering and ray generation.
 - `src/core/config.ts` — Central configuration defaults, localStorage persistence, and sanitisation.

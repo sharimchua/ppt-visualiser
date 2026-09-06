@@ -18,6 +18,15 @@ import { encodeNotesToMidi } from './midi-encoder';
 import { midiPlayerInstance } from './midi-file-player';
 import { midiManagerInstance } from './midi-manager';
 import { synthInstance } from './audio-synth';
+import {
+  saveCustomTrack,
+  loadSavedCustomTracks,
+  deleteCustomTrack,
+  clearAllCustomTracks,
+  findAnyTrackById,
+  CustomMidiTrack,
+  CUSTOM_MIDI_STORAGE_KEY,
+} from './custom-midi-store';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { compute2DConvexHull } from './convex-hull';
@@ -1684,4 +1693,94 @@ test('Real-time Focus Mode: Configuration persistence and sanitisation defaults 
 
   clearSavedConfig();
 });
+
+test('Custom MIDI Tracks & LocalStorage Persistence: Store, load, playback state, and deletion', () => {
+  // 1. Mock localStorage environment
+  const storage: Record<string, string> = {};
+  (globalThis as any).window = {
+    localStorage: {
+      getItem: (k: string) => storage[k] || null,
+      setItem: (k: string, v: string) => { storage[k] = v; },
+      removeItem: (k: string) => { delete storage[k]; },
+    },
+  };
+
+  clearAllCustomTracks();
+  assert.strictEqual(loadSavedCustomTracks().length, 0, 'Initial custom tracks must be empty');
+
+  // 2. Save a custom track
+  const mockTrack1: CustomMidiTrack = {
+    id: 'user-track-1',
+    title: 'My Custom Song',
+    composer: 'Uploaded File',
+    category: 'Uploaded Tracks',
+    duration: 12.5,
+    notes: [
+      { midi: 62, velocity: 0.8, time: 0, duration: 1.0 },
+      { midi: 65, velocity: 0.7, time: 1.0, duration: 1.0 },
+    ],
+    filename: 'My Custom Song.mid',
+    timestamp: Date.now(),
+  };
+
+  const saved = saveCustomTrack(mockTrack1);
+  assert.strictEqual(saved, true, 'saveCustomTrack must succeed');
+
+  const loaded = loadSavedCustomTracks();
+  assert.strictEqual(loaded.length, 1);
+  assert.strictEqual(loaded[0].id, 'user-track-1');
+  assert.strictEqual(loaded[0].title, 'My Custom Song');
+  assert.strictEqual(loaded[0].notes.length, 2);
+  assert.ok(storage[CUSTOM_MIDI_STORAGE_KEY], 'Storage key must be populated in localStorage');
+
+  // 3. findAnyTrackById resolution (demo tracks and custom tracks)
+  const demoMatch = findAnyTrackById('bach-prelude');
+  assert.ok(demoMatch, 'findAnyTrackById must find inbuilt demo track');
+  assert.strictEqual(demoMatch?.title, 'Prelude in C Major (BWV 846)');
+
+  const customMatch = findAnyTrackById('user-track-1');
+  assert.ok(customMatch, 'findAnyTrackById must find uploaded custom track');
+  assert.strictEqual(customMatch?.title, 'My Custom Song');
+
+  // 4. MidiFilePlayer loading and playback state tracking
+  const loadedIntoPlayer = midiPlayerInstance.loadTrack('user-track-1');
+  assert.strictEqual(loadedIntoPlayer, true, 'MidiFilePlayer.loadTrack must return true for custom track');
+
+  const playerState = midiPlayerInstance.getState();
+  assert.strictEqual(playerState.trackId, 'user-track-1', 'playerState must report trackId');
+  assert.strictEqual(playerState.trackName, 'My Custom Song', 'playerState must report custom track title');
+  assert.strictEqual(playerState.duration, 12.5);
+
+  // 5. Delete custom track with automatic fallback to default demo track
+  const deleteResult = midiPlayerInstance.removeCustomTrack('user-track-1');
+  assert.strictEqual(deleteResult, true, 'removeCustomTrack must return true');
+
+  const afterDeleteState = midiPlayerInstance.getState();
+  assert.strictEqual(afterDeleteState.trackId, 'radial-orbit', 'Active track must fall back to radial-orbit on deletion');
+
+  // 6. Capping and quota management (limit to 20 tracks)
+  for (let i = 1; i <= 25; i++) {
+    saveCustomTrack({
+      id: `user-track-${i}`,
+      title: `Track ${i}`,
+      composer: 'Uploaded File',
+      category: 'Uploaded Tracks',
+      duration: 10,
+      notes: [{ midi: 60, velocity: 0.5, time: 0, duration: 0.5 }],
+      timestamp: Date.now() + i,
+    });
+  }
+  const cappedTracks = loadSavedCustomTracks();
+  assert.strictEqual(cappedTracks.length, 20, 'Custom tracks must be capped at 20');
+
+  // 7. Directly delete a custom track
+  const directDelete = deleteCustomTrack('user-track-25');
+  assert.strictEqual(directDelete, true, 'deleteCustomTrack must return true');
+  assert.strictEqual(loadSavedCustomTracks().length, 19);
+
+  // 8. Clear all custom tracks
+  clearAllCustomTracks();
+  assert.strictEqual(loadSavedCustomTracks().length, 0, 'clearAllCustomTracks must empty storage');
+});
+
 

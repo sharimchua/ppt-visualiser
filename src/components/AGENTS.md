@@ -7,7 +7,7 @@ The `src/components` domain contains the React user interface layer, including t
 ## Ownership
 
 - `src/App.tsx` — Root application component, config synchronization, URL slug state, full-screen handling, and mouse idle management.
-- `src/components/ControlToolbar.tsx` — Top header toolbar containing transport controls, tonic/scale selector, track picker, layout menu, and deep link sharing.
+- `src/components/ControlToolbar.tsx` — Top header toolbar containing transport controls, tonic/scale selector, track picker (inbuilt demos and uploaded tracks from local storage), layout menu, and deep link sharing.
 - `src/components/VisualiserViewport.tsx` — Container managing the flexible layout canvas hierarchy and layout edit mode.
 - `src/components/FlexLayoutRenderer.tsx` — Recursive split-container renderer supporting draggable flex dividers, cell splitting, duplication, and removal.
 - `src/components/CellViewport.tsx` — Individual cell wrapper mounting specific canvas renderers (Orbital Clock, Piano Triangles, Note Stream) with local HUD controls.
