@@ -25,6 +25,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - **Nearest-Address Octave Boundary**: Registers wrap from $So$ (7 o'clock, address $-5$) clockwise through $Do$ ($0$) to $Fi$ (6 o'clock, address $+6$).
 - **Uniform Solfège 4-Fold Symmetry**: 3 elemental glyph types (`base`, `sharp`, `flat`) rotated across 4 quadrants ($0^\circ, 90^\circ, 180^\circ, 270^\circ$) represent all 12 chromatic tones.
 - **Decoupled Render Lifecycle**: Never route per-frame note events, decay ticks, or particle emissions through React state. All high-frequency data must flow directly through `RenderCoordinator`.
+- **Real-time Focus & Multi-Instance Discipline**: When `focusModeEnabled` is active, background/unfocused windows must discard incoming Web MIDI messages, immediately silence active audio synthesis (`AudioSynth.stopAll(true)`), auto-pause MIDI file transport, and clear active/decaying notes. `MidiFilePlayer` must clamp per-tick delta time to $\le 100\text{ms}$ to eliminate backlog bursts upon restoring focus.
 - **Pure Tree Operations**: Operations in `layout-models.ts` (`splitCellInTree`, `removeCellFromTree`, `duplicateCellInTree`, `encodeLayoutToSlug`, `decodeLayoutFromSlug`) must remain pure and immutably return updated tree structures.
 
 ## Work Guidance

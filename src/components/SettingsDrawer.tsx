@@ -1682,7 +1682,46 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
         <section className="space-y-3">
           <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
             <Volume2 className="w-4 h-4 text-emerald-400" />
-            <span>Audio Synthesizer</span>
+            <span>Audio Synthesiser</span>
+          </div>
+
+          {/* Master Volume */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <div className="flex justify-between items-center text-slate-400 text-[11px]">
+              <span>Master Volume:</span>
+              <span className="font-mono text-emerald-400">{Math.round(config.masterVolume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={config.masterVolume}
+              onChange={(e) => onUpdateConfig({ masterVolume: parseFloat(e.target.value) })}
+              className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-emerald-500"
+            />
+          </div>
+
+          {/* Real-time Focus Mode */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Real-time Focus Mode</span>
+                <span className="text-[10px] text-slate-400 block">Only visualise and play audio when window is focused</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.focusModeEnabled ?? true}
+                  onChange={(e) => onUpdateConfig({ focusModeEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+              </label>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">
+              Discards background MIDI events and mutes audio when switching away, preventing event backlog bursts and duplicate sounds across multiple instances.
+            </p>
           </div>
 
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">

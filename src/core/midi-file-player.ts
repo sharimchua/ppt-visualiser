@@ -11,6 +11,11 @@ export class MidiFilePlayer {
   private isPlaying: boolean = false;
   private loop: boolean = true;
 
+  // Real-time focus and multi-instance management
+  private focusModeEnabled: boolean = true;
+  private wasPlayingBeforeBlur: boolean = false;
+  private mockFocusedState: boolean | null = null;
+
   private animFrameId: number | null = null;
   private lastPerfTime: number = 0;
   private activeNoteTimeouts: Set<number> = new Set();
@@ -18,9 +23,52 @@ export class MidiFilePlayer {
   private stateListeners: Set<(state: MidiPlaybackState) => void> = new Set();
   private lastStateNotifyTime: number = 0;
 
+  private handleFocusChange = () => {
+    if (!this.focusModeEnabled) return;
+    const focused = this.isWindowFocused();
+    if (!focused) {
+      if (this.isPlaying) {
+        this.wasPlayingBeforeBlur = true;
+        this.pause(true);
+      }
+    } else {
+      if (this.wasPlayingBeforeBlur) {
+        this.wasPlayingBeforeBlur = false;
+        this.play();
+      }
+    }
+  };
+
   constructor() {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('focus', this.handleFocusChange);
+      window.addEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', this.handleFocusChange);
+    }
+
     // Default to Concentric Clock Radial Orbit demo track
     this.loadDemoTrack('radial-orbit');
+  }
+
+  public isWindowFocused(): boolean {
+    if (this.mockFocusedState !== null) return this.mockFocusedState;
+    if (typeof document === 'undefined') return true;
+    return document.hasFocus() && !document.hidden;
+  }
+
+  public setFocusMode(enabled: boolean) {
+    this.focusModeEnabled = enabled;
+  }
+
+  public getFocusMode(): boolean {
+    return this.focusModeEnabled;
+  }
+
+  public setFocusedForTesting(focused: boolean | null) {
+    this.mockFocusedState = focused;
+    this.handleFocusChange();
   }
 
   public loadDemoTrack(trackId: string): boolean {
@@ -69,14 +117,18 @@ export class MidiFilePlayer {
 
   public play() {
     if (this.isPlaying) return;
+    this.wasPlayingBeforeBlur = false;
     this.isPlaying = true;
     this.lastPerfTime = performance.now();
     this.tick();
     this.notifyState();
   }
 
-  public pause() {
+  public pause(fromBlur: boolean = false) {
     if (!this.isPlaying) return;
+    if (!fromBlur) {
+      this.wasPlayingBeforeBlur = false;
+    }
     this.isPlaying = false;
     if (this.animFrameId) {
       cancelAnimationFrame(this.animFrameId);
@@ -87,6 +139,7 @@ export class MidiFilePlayer {
   }
 
   public stop() {
+    this.wasPlayingBeforeBlur = false;
     this.pause();
     this.currentTime = 0;
     this.releaseAllSounding();
@@ -153,8 +206,12 @@ export class MidiFilePlayer {
     if (!this.isPlaying) return;
 
     const now = performance.now();
-    const dt = ((now - this.lastPerfTime) / 1000) * this.tempoMultiplier;
+    const rawDt = ((now - this.lastPerfTime) / 1000) * this.tempoMultiplier;
     this.lastPerfTime = now;
+
+    // Suppress large backlog bursts if frame execution was paused or delayed (e.g. background tab).
+    // Never allow dt to exceed 100ms in a single animation frame tick.
+    const dt = Math.min(0.1, rawDt);
 
     const prevTime = this.currentTime;
     this.currentTime += dt;
@@ -358,6 +415,17 @@ export class MidiFilePlayer {
     }
 
     return finishedNotes;
+  }
+
+  public destroy() {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('focus', this.handleFocusChange);
+      window.removeEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', this.handleFocusChange);
+    }
+    this.stop();
   }
 }
 

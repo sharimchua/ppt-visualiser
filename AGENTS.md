@@ -80,6 +80,7 @@ Default section order:
 - **Architecture & Performance**:
   - Keep active audio/MIDI per-frame rendering decoupled from React state trees. High-frequency updates run directly on Canvas 2D and WebGL via `RenderCoordinator`.
   - Provide individual disable toggles and low-end hardware presets (*Eco Mode*) that bypass CPU/GPU shader execution when effects are toggled off.
+  - Maintain Real-time Focus: When focus is not on the application window, ignore incoming MIDI events, silence audio synthesis immediately, and clamp animation delta time to eliminate backlog bursts and multi-instance sound bleed.
 - **External Theory Links**:
   - Official theory documentation: `https://ppt.midlifemuso.com` (and its reference library `https://ppt.midlifemuso.com/reference`).
   - Project coaching & music pedagogy: `https://midlifemuso.com`.

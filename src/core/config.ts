@@ -93,6 +93,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   masterVolume: 0.75,
   soundEnabled: true,
   synthWaveform: 'warm-poly',
+  focusModeEnabled: true,
 };
 
 /**
@@ -223,6 +224,8 @@ export function loadSavedConfig(): VisualiserConfig {
     }
     const validSensitivities = new Set(['fast', 'balanced', 'conservative']);
     if (!validSensitivities.has(merged.autoTonicSensitivity)) merged.autoTonicSensitivity = 'balanced';
+
+    merged.focusModeEnabled = typeof merged.focusModeEnabled === 'boolean' ? merged.focusModeEnabled : true;
 
     return merged;
   } catch (err) {

@@ -16,6 +16,8 @@ import {
 import { DEMO_TRACKS } from './demo-tracks';
 import { encodeNotesToMidi } from './midi-encoder';
 import { midiPlayerInstance } from './midi-file-player';
+import { midiManagerInstance } from './midi-manager';
+import { synthInstance } from './audio-synth';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { compute2DConvexHull } from './convex-hull';
@@ -1572,5 +1574,114 @@ test('Information Modal: Storage keys and first-visit display contracts', () => 
   setItem(STORAGE_KEY_DONT_SHOW_INTRO, 'true');
   const shouldShowWithDontShowTicked = getItem(STORAGE_KEY_DONT_SHOW_INTRO) !== 'true' && getItem(STORAGE_KEY_HAS_SEEN) !== 'true';
   assert.strictEqual(shouldShowWithDontShowTicked, false, 'Users with dontShow ticked must not auto-open modal');
+});
+
+test('Real-time Focus Mode: MidiManager ignores background MIDI and releases held notes on blur', () => {
+  midiManagerInstance.setFocusMode(true);
+  midiManagerInstance.setFocusedForTesting(true);
+
+  const noteOns: number[] = [];
+  const noteOffs: number[] = [];
+  const unsubOn = midiManagerInstance.onNoteOn((midi) => noteOns.push(midi));
+  const unsubOff = midiManagerInstance.onNoteOff((midi) => noteOffs.push(midi));
+
+  // 1. When focused, note on is accepted
+  midiManagerInstance.triggerNoteOn(60, 0.8);
+  assert.strictEqual(noteOns.length, 1);
+  assert.strictEqual(noteOns[0], 60);
+
+  // 2. When losing focus, held notes are automatically released to prevent stuck notes
+  midiManagerInstance.setFocusedForTesting(false);
+  assert.strictEqual(noteOffs.length, 1);
+  assert.strictEqual(noteOffs[0], 60);
+
+  // 3. While unfocused, incoming MIDI events are ignored
+  midiManagerInstance.triggerNoteOn(62, 0.8);
+  assert.strictEqual(noteOns.length, 1, 'Incoming MIDI must be discarded when window lacks focus');
+
+  // 4. When focusMode is disabled, events pass through even when unfocused
+  midiManagerInstance.setFocusMode(false);
+  midiManagerInstance.triggerNoteOn(64, 0.8);
+  assert.strictEqual(noteOns.length, 2);
+  assert.strictEqual(noteOns[1], 64);
+
+  // Cleanup
+  unsubOn();
+  unsubOff();
+  midiManagerInstance.setFocusedForTesting(null);
+  midiManagerInstance.setFocusMode(true);
+});
+
+test('Real-time Focus Mode: AudioSynth silences voices and rejects notes when unfocused', () => {
+  synthInstance.setFocusMode(true);
+  synthInstance.setFocusedForTesting(false);
+
+  // NoteOn while unfocused should be rejected
+  synthInstance.noteOn(60, 0.8);
+
+  // Immediate stop on blur
+  synthInstance.stopAll(true);
+
+  synthInstance.setFocusedForTesting(null);
+});
+
+test('Real-time Focus Mode: RenderCoordinator clears active notes and discards background events', () => {
+  const coordinator = new RenderCoordinator(DEFAULT_CONFIG);
+  coordinator.setFocusedForTesting(true);
+
+  let activeNotesSeen = 0;
+  const unsub = coordinator.subscribeActiveNotes((notes) => {
+    activeNotesSeen = notes.size;
+  });
+
+  // 1. Play note while focused
+  coordinator.triggerNoteOn(62, 0.9);
+  assert.strictEqual(coordinator.activeNotes.size, 1);
+  assert.strictEqual(activeNotesSeen, 1);
+
+  // 2. Blur window -> active and decaying notes cleared immediately
+  coordinator.setFocusedForTesting(false);
+  assert.strictEqual(coordinator.activeNotes.size, 0, 'Active notes must be cleared on blur');
+  assert.strictEqual(coordinator.decayingNotes.size, 0, 'Decaying notes must be cleared on blur');
+  assert.strictEqual(activeNotesSeen, 0, 'Subscribers must receive empty map on blur');
+
+  // 3. Trigger note while unfocused -> discarded
+  coordinator.triggerNoteOn(65, 0.8);
+  assert.strictEqual(coordinator.activeNotes.size, 0, 'Notes triggered while unfocused must be discarded');
+
+  // 4. Disable focusMode -> notes accepted even when unfocused
+  coordinator.setConfig({ ...DEFAULT_CONFIG, focusModeEnabled: false });
+  coordinator.triggerNoteOn(67, 0.8);
+  assert.strictEqual(coordinator.activeNotes.size, 1, 'Notes accepted when focusModeEnabled is false');
+
+  // Cleanup
+  unsub();
+  coordinator.destroy();
+});
+
+test('Real-time Focus Mode: Configuration persistence and sanitisation defaults to true', () => {
+  // 1. Default config must have focusModeEnabled: true
+  assert.strictEqual(DEFAULT_CONFIG.focusModeEnabled, true, 'Default configuration must enable focusModeEnabled');
+
+  // 2. Sanitisation defaults to true if missing
+  const storage: Record<string, string> = {};
+  (globalThis as any).window = {
+    localStorage: {
+      getItem: (k: string) => storage[k] || null,
+      setItem: (k: string, v: string) => { storage[k] = v; },
+      removeItem: (k: string) => { delete storage[k]; },
+    },
+  };
+
+  storage['ppt_visualiser_config_v1'] = JSON.stringify({ tonic: 2 });
+  const loaded = loadSavedConfig();
+  assert.strictEqual(loaded.focusModeEnabled, true, 'Missing focusModeEnabled must sanitise to true');
+
+  // 3. User preference persistence
+  saveConfig({ ...DEFAULT_CONFIG, focusModeEnabled: false });
+  const reloaded = loadSavedConfig();
+  assert.strictEqual(reloaded.focusModeEnabled, false, 'Explicitly disabled focusModeEnabled must persist');
+
+  clearSavedConfig();
 });
 

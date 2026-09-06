@@ -186,6 +186,7 @@ export interface AestheticsConfig {
   masterVolume: number; // 0..1
   synthWaveform: SynthWaveform;
   showVirtualKeyboard: boolean;
+  focusModeEnabled?: boolean;
 }
 
 export interface SystemConfig {

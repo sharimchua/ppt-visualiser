@@ -12,7 +12,7 @@ The `src/components` domain contains the React user interface layer, including t
 - `src/components/FlexLayoutRenderer.tsx` — Recursive split-container renderer supporting draggable flex dividers, cell splitting, duplication, and removal.
 - `src/components/CellViewport.tsx` — Individual cell wrapper mounting specific canvas renderers (Orbital Clock, Piano Triangles, Note Stream) with local HUD controls.
 - `src/components/VirtualKeyboard.tsx` — 88-key interactive velocity-sensitive piano keyboard with computer keybindings and Uniform Solfège colouring.
-- `src/components/SettingsDrawer.tsx` — Slide-out settings sidebar providing granular controls for pitch clock, cosmetics, display effect toggles, priority slots, themes, and audio synth.
+- `src/components/SettingsDrawer.tsx` — Slide-out settings sidebar providing granular controls for pitch clock, cosmetics, display effect toggles, priority slots, themes, audio synthesiser, and real-time focus mode.
 - `src/components/InfoModal.tsx` — Comprehensive introduction and theory guide modal dialog covering PPT concepts, customisation, and community links.
 
 ## Local Contracts

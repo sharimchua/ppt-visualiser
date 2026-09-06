@@ -19,6 +19,7 @@ import {
 import { DEFAULT_CONFIG } from './config';
 import { midiManagerInstance } from './midi-manager';
 import { synthInstance } from './audio-synth';
+import { midiPlayerInstance } from './midi-file-player';
 import { CosmeticsEngine } from '../renderers/cosmetics';
 import { ScaleAlignmentTracker } from './scale-alignment';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
@@ -92,9 +93,19 @@ export class RenderCoordinator {
   private isRunning: boolean = false;
   private lastFitUpdateTime: number = 0;
 
+  // Real-time focus and multi-instance management
+  private mockFocusedState: boolean | null = null;
+
   // MIDI Unsubscribers
   private unsubMidiOn?: () => void;
   private unsubMidiOff?: () => void;
+
+  private handleFocusChange = () => {
+    const focused = this.isWindowFocused();
+    if (!focused && (this.config.focusModeEnabled ?? true)) {
+      this.clearActiveAndDecayingNotes();
+    }
+  };
 
   constructor(initialConfig: VisualiserConfig = DEFAULT_CONFIG) {
     this.config = initialConfig;
@@ -104,13 +115,50 @@ export class RenderCoordinator {
     this.pianoTrianglesRenderer = new PianoTrianglesRenderer();
     this.streamRenderer = new StreamRenderer();
 
+    // Propagate initial focusMode setting to engines
+    const focusMode = initialConfig.focusModeEnabled ?? true;
+    midiManagerInstance.setFocusMode(focusMode);
+    synthInstance.setFocusMode(focusMode);
+    midiPlayerInstance.setFocusMode(focusMode);
+
     // Subscribe to MIDI events directly
     this.unsubMidiOn = midiManagerInstance.onNoteOn((midi, vel) => this.triggerNoteOn(midi, vel));
     this.unsubMidiOff = midiManagerInstance.onNoteOff((midi) => this.triggerNoteOff(midi));
 
+    // Register focus/blur lifecycle listeners
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('focus', this.handleFocusChange);
+      window.addEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', this.handleFocusChange);
+    }
+
     // Start master animation loop if running in browser environment
     if (typeof window !== 'undefined' && typeof requestAnimationFrame !== 'undefined') {
       this.start();
+    }
+  }
+
+  public isWindowFocused(): boolean {
+    if (this.mockFocusedState !== null) return this.mockFocusedState;
+    if (typeof document === 'undefined') return true;
+    return document.hasFocus() && !document.hidden;
+  }
+
+  public setFocusedForTesting(focused: boolean | null) {
+    this.mockFocusedState = focused;
+    this.handleFocusChange();
+  }
+
+  public clearActiveAndDecayingNotes() {
+    if (this.activeNotes.size > 0 || this.decayingNotes.size > 0) {
+      this.activeNotes.clear();
+      this.decayingNotes.clear();
+      synthInstance.stopAll(true);
+      for (const listener of this.activeNotesListeners) {
+        listener(this.activeNotes);
+      }
     }
   }
 
@@ -132,6 +180,13 @@ export class RenderCoordinator {
 
   public destroy() {
     this.stop();
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('focus', this.handleFocusChange);
+      window.removeEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', this.handleFocusChange);
+    }
     if (this.unsubMidiOn) this.unsubMidiOn();
     if (this.unsubMidiOff) this.unsubMidiOff();
     this.activeNotesListeners.clear();
@@ -156,8 +211,19 @@ export class RenderCoordinator {
       config.soundEnabled !== this.config.soundEnabled ||
       config.masterVolume !== this.config.masterVolume ||
       config.synthWaveform !== this.config.synthWaveform;
+    const focusChanged = config.focusModeEnabled !== this.config.focusModeEnabled;
 
     this.config = config;
+
+    if (focusChanged) {
+      const focusMode = config.focusModeEnabled ?? true;
+      midiManagerInstance.setFocusMode(focusMode);
+      synthInstance.setFocusMode(focusMode);
+      midiPlayerInstance.setFocusMode(focusMode);
+      if (!this.isWindowFocused() && focusMode) {
+        this.clearActiveAndDecayingNotes();
+      }
+    }
 
     if (synthChanged) {
       synthInstance.setMuted(!config.soundEnabled);
@@ -294,6 +360,9 @@ export class RenderCoordinator {
   }
 
   public triggerNoteOn = (midi: number, velocity: number = 0.8) => {
+    if ((this.config.focusModeEnabled ?? true) && !this.isWindowFocused()) {
+      return;
+    }
     const now = performance.now();
     const pc = ((midi % 12) + 12) % 12;
     const res = resolveMidiToRegisterAndSemitone(midi, this.config.tonic, this.config.keyboardLowestMidi);

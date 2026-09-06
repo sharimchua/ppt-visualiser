@@ -138,7 +138,8 @@ export const App: React.FC = () => {
     synthInstance.setMuted(!config.soundEnabled);
     synthInstance.setVolume(config.masterVolume);
     synthInstance.setWaveform(config.synthWaveform);
-  }, [config.soundEnabled, config.masterVolume, config.synthWaveform]);
+    synthInstance.setFocusMode(config.focusModeEnabled ?? true);
+  }, [config.soundEnabled, config.masterVolume, config.synthWaveform, config.focusModeEnabled]);
 
   // Listen to MIDI playback & device changes
   useEffect(() => {

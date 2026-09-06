@@ -17,8 +17,49 @@ export class AudioSynth {
   private volume: number = 0.75;
   private waveform: SynthWaveform = 'warm-poly';
 
+  // Focus and multi-instance lifecycle management
+  private focusModeEnabled: boolean = true;
+  private mockFocusedState: boolean | null = null;
+
+  private handleFocusChange = () => {
+    const focused = this.isWindowFocused();
+    if (!focused && this.focusModeEnabled) {
+      this.stopAll(true);
+    }
+  };
+
   constructor() {
-    // Lazy AudioContext initialization on first user gesture
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('focus', this.handleFocusChange);
+      window.addEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', this.handleFocusChange);
+    }
+  }
+
+  public isWindowFocused(): boolean {
+    if (this.mockFocusedState !== null) return this.mockFocusedState;
+    if (typeof document === 'undefined') return true;
+    return document.hasFocus() && !document.hidden;
+  }
+
+  public setFocusMode(enabled: boolean) {
+    this.focusModeEnabled = enabled;
+    if (!this.isWindowFocused() && enabled) {
+      this.stopAll(true);
+    }
+  }
+
+  public getFocusMode(): boolean {
+    return this.focusModeEnabled;
+  }
+
+  public setFocusedForTesting(focused: boolean | null) {
+    this.mockFocusedState = focused;
+    if (focused === false && this.focusModeEnabled) {
+      this.stopAll(true);
+    }
   }
 
   private initContext() {
@@ -55,6 +96,9 @@ export class AudioSynth {
   }
 
   public noteOn(midi: number, velocity: number = 0.8) {
+    if (this.focusModeEnabled && !this.isWindowFocused()) {
+      return;
+    }
     this.initContext();
     if (!this.ctx || !this.masterGain) return;
 
@@ -147,11 +191,41 @@ export class AudioSynth {
     this.activeVoices.delete(midi);
   }
 
-  public stopAll() {
+  public stopAll(immediate: boolean = false) {
     if (!this.ctx) return;
-    for (const midi of Array.from(this.activeVoices.keys())) {
-      this.noteOff(midi);
+    const now = this.ctx.currentTime;
+    for (const [midi, voice] of this.activeVoices.entries()) {
+      if (immediate) {
+        try {
+          voice.gain.gain.cancelScheduledValues(now);
+          voice.gain.gain.setValueAtTime(0.00001, now);
+          voice.osc.stop(now + 0.01);
+          if (voice.subOsc) voice.subOsc.stop(now + 0.01);
+          voice.osc.disconnect();
+          if (voice.subOsc) voice.subOsc.disconnect();
+          voice.filter.disconnect();
+          voice.gain.disconnect();
+        } catch {
+          // Ignore if oscillator was already stopped
+        }
+      } else {
+        this.noteOff(midi);
+      }
     }
+    if (immediate) {
+      this.activeVoices.clear();
+    }
+  }
+
+  public destroy() {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('focus', this.handleFocusChange);
+      window.removeEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', this.handleFocusChange);
+    }
+    this.stopAll(true);
   }
 }
 

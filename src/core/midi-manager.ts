@@ -9,6 +9,11 @@ export class MidiManager {
   private noteOffCallbacks: Set<NoteOffCallback> = new Set();
   private stateChangeCallbacks: Set<(state: MidiDeviceState) => void> = new Set();
 
+  // Focus and multi-instance lifecycle management
+  private focusModeEnabled: boolean = true;
+  private heldMidiNotes: Set<number> = new Set();
+  private mockFocusedState: boolean | null = null;
+
   public state: MidiDeviceState = {
     inputs: [],
     selectedInputId: 'all', // Listen to all inputs by default
@@ -19,9 +24,52 @@ export class MidiManager {
     this.handleMidiMessage(event as MIDIMessageEvent);
   };
 
+  private handleFocusChange = () => {
+    const focused = this.isWindowFocused();
+    if (!focused && this.focusModeEnabled) {
+      this.releaseAllHeldNotes();
+    }
+  };
+
   constructor() {
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('focus', this.handleFocusChange);
+      window.addEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+      document.addEventListener('visibilitychange', this.handleFocusChange);
+    }
+
     // Attempt non-blocking request on startup
     this.requestAccess();
+  }
+
+  public isWindowFocused(): boolean {
+    if (this.mockFocusedState !== null) return this.mockFocusedState;
+    if (typeof document === 'undefined') return true;
+    return document.hasFocus() && !document.hidden;
+  }
+
+  public setFocusMode(enabled: boolean) {
+    this.focusModeEnabled = enabled;
+  }
+
+  public getFocusMode(): boolean {
+    return this.focusModeEnabled;
+  }
+
+  public setFocusedForTesting(focused: boolean | null) {
+    this.mockFocusedState = focused;
+    if (focused === false && this.focusModeEnabled) {
+      this.releaseAllHeldNotes();
+    }
+  }
+
+  public releaseAllHeldNotes() {
+    for (const note of Array.from(this.heldMidiNotes)) {
+      this.triggerNoteOff(note);
+    }
+    this.heldMidiNotes.clear();
   }
 
   public async requestAccess(): Promise<boolean> {
@@ -106,6 +154,11 @@ export class MidiManager {
   }
 
   private handleMidiMessage(event: MIDIMessageEvent) {
+    if (this.focusModeEnabled && !this.isWindowFocused()) {
+      // Discard background MIDI events when window does not have focus
+      return;
+    }
+
     const data = event.data;
     if (!data || data.length < 2) return;
 
@@ -115,22 +168,25 @@ export class MidiManager {
 
     if (status === 0x90 && velocity > 0) {
       // Note On
-      console.log(`[Web MIDI NoteOn] Note: ${note}, Velocity: ${Math.round(velocity * 127)}`);
       this.triggerNoteOn(note, velocity);
     } else if (status === 0x80 || (status === 0x90 && velocity === 0)) {
       // Note Off
-      console.log(`[Web MIDI NoteOff] Note: ${note}`);
       this.triggerNoteOff(note);
     }
   }
 
   public triggerNoteOn(midi: number, velocity: number = 0.8) {
+    if (this.focusModeEnabled && !this.isWindowFocused()) {
+      return;
+    }
+    this.heldMidiNotes.add(midi);
     for (const cb of this.noteOnCallbacks) {
       cb(midi, velocity);
     }
   }
 
   public triggerNoteOff(midi: number) {
+    this.heldMidiNotes.delete(midi);
     for (const cb of this.noteOffCallbacks) {
       cb(midi);
     }
@@ -156,6 +212,17 @@ export class MidiManager {
     for (const cb of this.stateChangeCallbacks) {
       cb(this.state);
     }
+  }
+
+  public destroy() {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('focus', this.handleFocusChange);
+      window.removeEventListener('blur', this.handleFocusChange);
+    }
+    if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
+      document.removeEventListener('visibilitychange', this.handleFocusChange);
+    }
+    this.releaseAllHeldNotes();
   }
 }
 
