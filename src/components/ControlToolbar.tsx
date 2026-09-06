@@ -14,7 +14,7 @@ import {
   Layers,
   LayoutGrid,
   Radio,
-  Music2,
+  Piano,
   RotateCcw,
   Share2,
   Check,
@@ -330,7 +330,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                   <span>Share Layout Link</span>
                 </button>
 
-                {/* Virtual Keyboard */}
+                {/* Virtual Piano */}
                 <button
                   onClick={() => {
                     onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard });
@@ -339,8 +339,8 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
                 >
                   <div className="flex items-center gap-2">
-                    <Music2 className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Virtual Keyboard</span>
+                    <Piano className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Virtual Piano</span>
                   </div>
                   <span className="text-[10px] text-slate-400">
                     {config.showVirtualKeyboard ? 'Hide' : 'Show'}
@@ -705,7 +705,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                 <span>Share Layout Link</span>
               </button>
 
-              {/* Virtual Keyboard */}
+              {/* Virtual Piano */}
               <button
                 onClick={() => {
                   onUpdateConfig({ showVirtualKeyboard: !config.showVirtualKeyboard });
@@ -714,8 +714,8 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                 className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
               >
                 <div className="flex items-center gap-2">
-                  <Music2 className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Virtual Keyboard</span>
+                  <Piano className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Virtual Piano</span>
                 </div>
                 <span className="text-[10px] text-slate-400">
                   {config.showVirtualKeyboard ? 'Hide' : 'Show'}
@@ -772,9 +772,9 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
               ? 'bg-slate-800 border-slate-600 text-white'
               : 'border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
           }`}
-          title="Toggle On-Screen Keyboard"
+          title="Toggle Virtual Piano"
         >
-          <Music2 className="w-4 h-4" />
+          <Piano className="w-4 h-4" />
         </button>
 
         <button

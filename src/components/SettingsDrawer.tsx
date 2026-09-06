@@ -1,8 +1,8 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
-import { SOLFEGE_SYLLABLES, INTERVAL_NAMES } from '../core/ppt-constants';
+import { SOLFEGE_SYLLABLES, INTERVAL_NAMES, PIANO_RANGE_PRESETS } from '../core/ppt-constants';
 import { PRESET_LAYOUTS } from '../core/layout-models';
 
 interface SettingsDrawerProps {
@@ -1819,6 +1819,92 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-500"
               />
             </div>
+          </div>
+        </section>
+
+        {/* SECTION: VIRTUAL PIANO KEYBOARD */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Piano className="w-4 h-4 text-cyan-400" />
+            <span>Virtual Piano Keyboard</span>
+          </div>
+
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            {/* Visibility Toggle */}
+            <div className="flex justify-between items-center">
+              <label className="block font-medium text-slate-200">Show Virtual Piano</label>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showVirtualKeyboard}
+                  onChange={(e) => onUpdateConfig({ showVirtualKeyboard: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
+            {/* Piano Range Presets */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-800/60">
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400 font-medium">Keyboard Range:</span>
+                <span className="font-mono text-cyan-400 text-[10px]">
+                  {PIANO_RANGE_PRESETS.find(
+                    (p) =>
+                      (config.virtualKeyboardStartMidi ?? 48) === p.startMidi &&
+                      (config.virtualKeyboardEndMidi ?? 72) === p.endMidi
+                  )?.name ?? `${config.virtualKeyboardStartMidi ?? 48}–${config.virtualKeyboardEndMidi ?? 72}`}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {PIANO_RANGE_PRESETS.map((preset) => {
+                  const isSelected =
+                    (config.virtualKeyboardStartMidi ?? 48) === preset.startMidi &&
+                    (config.virtualKeyboardEndMidi ?? 72) === preset.endMidi;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() =>
+                        onUpdateConfig({
+                          virtualKeyboardStartMidi: preset.startMidi,
+                          virtualKeyboardEndMidi: preset.endMidi,
+                        })
+                      }
+                      className={`py-1.5 px-1 rounded border text-[10px] text-center transition cursor-pointer ${
+                        isSelected
+                          ? 'bg-cyan-600/30 border-cyan-500 text-white font-medium shadow-[0_0_8px_rgba(8,145,178,0.3)]'
+                          : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <div className="font-semibold">{preset.shortName}</div>
+                      <div className="text-[8px] opacity-70">{preset.rangeLabel}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Piano Triangles Glyph Toggle */}
+            <div className="flex justify-between items-center pt-2 border-t border-slate-800/60">
+              <div>
+                <label className="block font-medium text-slate-200">Show Piano Triangles</label>
+                <span className="text-[10px] text-slate-500">Render PPT geometric triangle glyphs on keys</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showPianoTriangles}
+                  onChange={(e) => onUpdateConfig({ showPianoTriangles: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
+            <p className="text-[10px] text-slate-500 italic">
+              Computer keyboard keys (Z–M and Q–I) map to a 2-octave playable window. Use + and - keys to shift octaves dynamically.
+            </p>
           </div>
         </section>
 

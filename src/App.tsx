@@ -378,6 +378,7 @@ export const App: React.FC = () => {
             activeNotes={activeNotesForKeyboard}
             onNoteOn={renderCoordinatorInstance.triggerNoteOn}
             onNoteOff={renderCoordinatorInstance.triggerNoteOff}
+            onUpdateConfig={updateConfig}
           />
         </div>
       )}

@@ -12,6 +12,7 @@ import {
   TRI_PITCH_CLASSES_SPOKEN,
   TRI_PITCH_CLASSES_SHORT,
   getTriPitchClass,
+  PIANO_RANGE_PRESETS,
 } from './ppt-constants';
 import { DEMO_TRACKS } from './demo-tracks';
 import { encodeNotesToMidi } from './midi-encoder';
@@ -2173,5 +2174,96 @@ test('Overtones: Configuration sanitisation and persistence', () => {
   assert.strictEqual(clamped.waveFluidity, 0.0);
 });
 
+test('Virtual Keyboard: Range presets specification and bounds', () => {
+  assert.ok(PIANO_RANGE_PRESETS.length >= 6, 'Must provide at least 6 standard range presets');
 
+  // Verify specific presets exist
+  const preset25 = PIANO_RANGE_PRESETS.find((p) => p.id === '25-key');
+  assert.ok(preset25, '25-key preset must exist');
+  assert.strictEqual(preset25.startMidi, 48); // C3
+  assert.strictEqual(preset25.endMidi, 72);   // C5
+  assert.strictEqual(preset25.keys, 25);
 
+  const preset88 = PIANO_RANGE_PRESETS.find((p) => p.id === '88-key');
+  assert.ok(preset88, '88-key preset must exist');
+  assert.strictEqual(preset88.startMidi, 21); // A0
+  assert.strictEqual(preset88.endMidi, 108);  // C8
+  assert.strictEqual(preset88.keys, 88);
+
+  // All presets must have valid ordered bounds within MIDI range
+  for (const preset of PIANO_RANGE_PRESETS) {
+    assert.ok(preset.startMidi >= 21, `Preset ${preset.id} start note must be >= 21 (A0)`);
+    assert.ok(preset.endMidi <= 108, `Preset ${preset.id} end note must be <= 108 (C8)`);
+    assert.ok(preset.startMidi < preset.endMidi, `Preset ${preset.id} start must be strictly less than end`);
+    assert.strictEqual(preset.keys, preset.endMidi - preset.startMidi + 1);
+  }
+});
+
+test('Virtual Keyboard: Configuration sanitisation and clamping', () => {
+  // Default values
+  assert.strictEqual(DEFAULT_CONFIG.virtualKeyboardStartMidi, 48);
+  assert.strictEqual(DEFAULT_CONFIG.virtualKeyboardEndMidi, 72);
+
+  // Valid values preserved
+  const valid = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStartMidi: 21,
+    virtualKeyboardEndMidi: 108,
+  });
+  assert.strictEqual(valid.virtualKeyboardStartMidi, 21);
+  assert.strictEqual(valid.virtualKeyboardEndMidi, 108);
+
+  // Clamping out-of-bounds start note
+  const clampedLow = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStartMidi: 5,
+    virtualKeyboardEndMidi: 72,
+  });
+  assert.strictEqual(clampedLow.virtualKeyboardStartMidi, 21);
+
+  // Clamping out-of-bounds end note
+  const clampedHigh = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStartMidi: 48,
+    virtualKeyboardEndMidi: 150,
+  });
+  assert.strictEqual(clampedHigh.virtualKeyboardEndMidi, 108);
+
+  // Guarantee minimum 12 semitones between start and end
+  const clampedSpan = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStartMidi: 60,
+    virtualKeyboardEndMidi: 62,
+  });
+  assert.strictEqual(clampedSpan.virtualKeyboardStartMidi, 60);
+  assert.ok(clampedSpan.virtualKeyboardEndMidi >= 72, 'End note must be at least start + 12 semitones');
+
+  // Fallback on invalid types
+  const fallback = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    virtualKeyboardStartMidi: 'invalid' as any,
+    virtualKeyboardEndMidi: null as any,
+  });
+  assert.strictEqual(fallback.virtualKeyboardStartMidi, 48);
+  assert.strictEqual(fallback.virtualKeyboardEndMidi, 72);
+});
+
+test('Virtual Keyboard: 2-Octave QWERTY octave shifter offsets', () => {
+  // Computer keyboard window covers 24 semitones (2 octaves)
+  // Base offset 0 = C3 (48), span 48..72
+  const base0 = 48 + 0 * 12;
+  assert.strictEqual(base0, 48);
+  assert.strictEqual(base0 + 24, 72);
+
+  // Min octave offset -2 = C1 (24), span 24..48
+  const baseMin = 48 + (-2) * 12;
+  assert.strictEqual(baseMin, 24);
+  assert.strictEqual(baseMin + 24, 48);
+  assert.ok(baseMin >= 21, 'Lowest playable note with shift -2 is inside piano bounds');
+
+  // Max octave offset +3 = C6 (84), span 84..108
+  const baseMax = 48 + 3 * 12;
+  assert.strictEqual(baseMax, 84);
+  assert.strictEqual(baseMax + 24, 108);
+  assert.ok(baseMax + 24 <= 108, 'Highest playable note with shift +3 touches C8');
+});

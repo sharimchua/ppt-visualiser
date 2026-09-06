@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { PITCH_CLASS_TO_PIANO_TRIANGLE, SOLFEGE_SYLLABLES, SOLFEGE_SPECS } from '../core/ppt-constants';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { Piano, Minus, Plus } from 'lucide-react';
+import {
+  PITCH_CLASS_TO_PIANO_TRIANGLE,
+  SOLFEGE_SYLLABLES,
+  SOLFEGE_SPECS,
+  PIANO_RANGE_PRESETS,
+} from '../core/ppt-constants';
 import { ActiveNote, VisualiserConfig, PianoTriangleType, PianoTrianglePoint } from '../core/types';
 import { createPianoTriangleSvg } from '../renderers/glyph-renderer';
 
@@ -8,22 +14,20 @@ interface VirtualKeyboardProps {
   activeNotes: Map<number, ActiveNote>;
   onNoteOn: (midi: number, velocity?: number) => void;
   onNoteOff: (midi: number) => void;
+  onUpdateConfig?: (partial: Partial<VisualiserConfig>) => void;
 }
 
-// 25-key range: C3 (48) to C5 (72) (2 octaves)
-const START_MIDI = 48; // C3
-const END_MIDI = 72;   // C5
-
-const KEYBOARD_SHORTCUTS: Record<string, number> = {
-  // Lower octave: C3 to B3
-  'z': 48, 's': 49, 'x': 50, 'd': 51, 'c': 52, 'v': 53, 'g': 54, 'b': 55, 'h': 56, 'n': 57, 'j': 58, 'm': 59,
-  // Upper octave: C4 to C5
-  'q': 60, '2': 61, 'w': 62, '3': 63, 'e': 64, 'r': 65, '5': 66, 't': 67, '6': 68, 'y': 69, '7': 70, 'u': 71, 'i': 72
+// 2-octave QWERTY computer keyboard offsets relative to base MIDI note (48 = C3 by default)
+const QWERTY_SEMITONE_OFFSETS: Record<string, number> = {
+  // Lower octave: semitones 0 to 11 (C to B)
+  'z': 0, 's': 1, 'x': 2, 'd': 3, 'c': 4, 'v': 5, 'g': 6, 'b': 7, 'h': 8, 'n': 9, 'j': 10, 'm': 11,
+  // Upper octave: semitones 12 to 24 (C to C)
+  'q': 12, '2': 13, 'w': 14, '3': 15, 'e': 16, 'r': 17, '5': 18, 't': 19, '6': 20, 'y': 21, '7': 22, 'u': 23, 'i': 24,
 };
 
-const MIDI_TO_SHORTCUT: Record<number, string> = {
-  48: 'Z', 49: 'S', 50: 'X', 51: 'D', 52: 'C', 53: 'V', 54: 'G', 55: 'B', 56: 'H', 57: 'N', 58: 'J', 59: 'M',
-  60: 'Q', 61: '2', 62: 'W', 63: '3', 64: 'E', 65: 'R', 66: '5', 67: 'T', 68: '6', 69: 'Y', 70: '7', 71: 'U', 72: 'I',
+const OFFSET_TO_QWERTY_BADGE: Record<number, string> = {
+  0: 'Z', 1: 'S', 2: 'X', 3: 'D', 4: 'C', 5: 'V', 6: 'G', 7: 'B', 8: 'H', 9: 'N', 10: 'J', 11: 'M',
+  12: 'Q', 13: '2', 14: 'W', 15: '3', 16: 'E', 17: 'R', 18: '5', 19: 'T', 20: '6', 21: 'Y', 22: '7', 23: 'U', 24: 'I',
 };
 
 // Subtle acoustic piano key offsets so white key heads (cutouts) have balanced widths
@@ -62,8 +66,28 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   activeNotes,
   onNoteOn,
   onNoteOff,
+  onUpdateConfig,
 }) => {
   const [flashingTonic, setFlashingTonic] = useState<number | null>(null);
+  const [octaveOffset, setOctaveOffset] = useState<number>(0);
+  const activeQwertyKeysRef = useRef<Map<string, number>>(new Map());
+
+  // Octave shifter callback with note safety (clears sounding keys to prevent stuck notes)
+  const shiftOctave = useCallback(
+    (delta: number) => {
+      setOctaveOffset((current) => {
+        const next = Math.max(-2, Math.min(3, current + delta));
+        if (next !== current) {
+          activeQwertyKeysRef.current.forEach((midi) => {
+            onNoteOff(midi);
+          });
+          activeQwertyKeysRef.current.clear();
+        }
+        return next;
+      });
+    },
+    [onNoteOff]
+  );
 
   // Trigger kinetic flash on all matching keys when tonic changes
   useEffect(() => {
@@ -75,26 +99,47 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     return () => window.clearTimeout(timer);
   }, [config.tonic, config.tonicShiftEffectsEnabled]);
 
-  // Keyboard listener for QWERTY playing
+  // Keyboard listener for QWERTY playing and octave shifting
   useEffect(() => {
-    const activeKeys = new Set<string>();
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat || e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLSelectElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Octave shift shortcuts (+ / -)
+      if (e.key === '+' || e.key === '=' || e.code === 'NumpadAdd' || e.code === 'Equal') {
+        e.preventDefault();
+        shiftOctave(1);
+        return;
+      }
+      if (e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract' || e.code === 'Minus') {
+        e.preventDefault();
+        shiftOctave(-1);
+        return;
+      }
+
+      if (e.repeat) return;
+
       const key = e.key.toLowerCase();
-      const midi = KEYBOARD_SHORTCUTS[key];
-      if (midi !== undefined && !activeKeys.has(key)) {
-        activeKeys.add(key);
+      const semitoneOffset = QWERTY_SEMITONE_OFFSETS[key];
+      if (semitoneOffset !== undefined && !activeQwertyKeysRef.current.has(key)) {
+        const baseMidi = 48 + octaveOffset * 12;
+        const midi = baseMidi + semitoneOffset;
+        activeQwertyKeysRef.current.set(key, midi);
         onNoteOn(midi, 0.85);
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
-      const midi = KEYBOARD_SHORTCUTS[key];
-      if (midi !== undefined) {
-        activeKeys.delete(key);
-        onNoteOff(midi);
+      const playingMidi = activeQwertyKeysRef.current.get(key);
+      if (playingMidi !== undefined) {
+        activeQwertyKeysRef.current.delete(key);
+        onNoteOff(playingMidi);
       }
     };
 
@@ -104,10 +149,14 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [onNoteOn, onNoteOff]);
+  }, [octaveOffset, shiftOctave, onNoteOn, onNoteOff]);
+
+  const startMidi = config.virtualKeyboardStartMidi ?? 48;
+  const endMidi = config.virtualKeyboardEndMidi ?? 72;
+  const baseMidi = 48 + octaveOffset * 12;
 
   const keys: KeyItem[] = [];
-  for (let midi = START_MIDI; midi <= END_MIDI; midi++) {
+  for (let midi = startMidi; midi <= endMidi; midi++) {
     const pc = midi % 12;
     const isBlack = [1, 3, 6, 8, 10].includes(pc);
     const semitone = ((pc - config.tonic) % 12 + 12) % 12;
@@ -115,12 +164,20 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     const colorHex = SOLFEGE_SPECS[syllable].colorHex;
     const isActive = activeNotes.has(midi);
     const ptInfo = PITCH_CLASS_TO_PIANO_TRIANGLE[pc];
-    const shortcut = MIDI_TO_SHORTCUT[midi];
+
+    // Shortcut badge shown dynamically only if note falls within currently active 2-octave QWERTY range
+    const offsetFromBase = midi - baseMidi;
+    const shortcut =
+      offsetFromBase >= 0 && offsetFromBase <= 24
+        ? OFFSET_TO_QWERTY_BADGE[offsetFromBase]
+        : undefined;
 
     let octaveLabel: string | undefined;
     if (pc === 0) {
       const octave = Math.floor(midi / 12) - 1;
-      octaveLabel = octave === 4 ? 'C4' : `C${octave}`;
+      octaveLabel = `C${octave}`;
+    } else if (midi === 21) {
+      octaveLabel = 'A0';
     }
 
     keys.push({
@@ -140,27 +197,108 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   const whiteKeys = keys.filter((k) => !k.isBlack);
   const totalWhite = whiteKeys.length;
   const blackKeyWidthPercent = (1 / totalWhite) * 58;
+  const isCompact = totalWhite > 30;
 
   const tonicNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  const startOctave = 3 + octaveOffset;
+  const endOctave = 5 + octaveOffset;
 
   return (
     <div className="w-full bg-[#0e121b]/95 backdrop-blur-md border-t border-slate-800/80 px-4 py-2.5 flex flex-col items-center select-none shadow-2xl">
-      <div className="flex items-center justify-between w-full max-w-4xl mb-2 px-1 text-xs text-slate-400">
-        <span className="flex items-center gap-2">
-          <span className="font-semibold text-slate-200">Virtual Keyboard</span>
-          <span className="text-[10px] text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700/60 font-mono">
-            QWERTY: Z–M (C3–B3) & Q–I (C4–C5)
+      {/* Header Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 w-full max-w-6xl mb-2 px-1 text-xs text-slate-400">
+        {/* Left: Piano branding & range presets */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200">
+            <Piano className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span>Virtual Piano</span>
+          </div>
+
+          {/* Range Presets */}
+          {onUpdateConfig && (
+            <div className="flex items-center gap-0.5 bg-slate-900/90 p-0.5 rounded-md border border-slate-800/80 shadow-inner">
+              {PIANO_RANGE_PRESETS.map((preset) => {
+                const isSelected = startMidi === preset.startMidi && endMidi === preset.endMidi;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() =>
+                      onUpdateConfig({
+                        virtualKeyboardStartMidi: preset.startMidi,
+                        virtualKeyboardEndMidi: preset.endMidi,
+                      })
+                    }
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-cyan-600 text-white font-bold shadow-[0_0_8px_rgba(8,145,178,0.5)]'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
+                    }`}
+                    title={`${preset.name} (${preset.rangeLabel})`}
+                  >
+                    {preset.shortName}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Right: Octave shifter and tonic indicator */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Octave Shifter Stepper */}
+          <div className="flex items-center gap-1.5 bg-slate-900/90 px-2 py-0.5 rounded-md border border-slate-800/80 shadow-inner">
+            <span className="text-[10px] text-slate-400 font-medium">QWERTY:</span>
+            <button
+              type="button"
+              onClick={() => shiftOctave(-1)}
+              disabled={octaveOffset <= -2}
+              className="p-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+              title="Shift Octave Down (Minus key: -)"
+              aria-label="Shift octave down"
+            >
+              <Minus className="w-3 h-3" />
+            </button>
+            <span
+              className="text-[10px] font-mono font-bold text-cyan-400 min-w-[42px] text-center select-none"
+              title={`2-octave computer keyboard mapping: C${startOctave}–C${endOctave} (Shift: ${
+                octaveOffset > 0 ? `+${octaveOffset}` : octaveOffset
+              })`}
+            >
+              C{startOctave}–C{endOctave}
+            </span>
+            <button
+              type="button"
+              onClick={() => shiftOctave(1)}
+              disabled={octaveOffset >= 3}
+              className="p-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+              title="Shift Octave Up (Plus key: +)"
+              aria-label="Shift octave up"
+            >
+              <Plus className="w-3 h-3" />
+            </button>
+            <span className="text-[9px] text-slate-500 font-mono pl-0.5 hidden sm:inline">
+              [- / +]
+            </span>
+          </div>
+
+          {/* Tonic readout */}
+          <span className="text-[11px] text-slate-400 font-mono">
+            Tonic <span className="text-red-400 font-bold">Do</span> = {tonicNames[config.tonic]}
           </span>
-        </span>
-        <span className="text-[11px] text-slate-400 font-mono">
-          Tonic <span className="text-red-400 font-bold">Do</span> = {tonicNames[config.tonic]}
-        </span>
+        </div>
       </div>
 
+      {/* Keyboard Keys Viewport */}
       <div className="w-full flex justify-center overflow-x-auto pb-1 px-1">
         {/* Exact shared bounding container for both white and black key layers */}
-        <div className="relative flex h-28 w-full max-w-4xl min-w-[560px] select-none rounded-b-md shadow-2xl bg-slate-950">
-          {/* White Keys Row */}
+        <div
+          className="relative flex h-28 w-full max-w-6xl select-none rounded-b-md shadow-2xl bg-slate-950 transition-all duration-200"
+          style={{
+            minWidth: `${Math.max(540, totalWhite * (isCompact ? 18 : 24))}px`,
+          }}
+        >
+          {/* White Keys Layer */}
           <div className="flex w-full h-full">
             {whiteKeys.map((key, i) => {
               const isFirst = i === 0;
@@ -207,7 +345,7 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     backgroundColor: key.isActive ? key.colorHex : undefined,
                   }}
                 >
-                  {/* Octave Marker (C3, C4, C5) */}
+                  {/* Octave Marker (C1, C2, C3, C4...) */}
                   {key.octaveLabel && (
                     <span
                       className={`absolute top-2 text-[9px] font-bold font-mono tracking-tighter ${
@@ -222,12 +360,12 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                   <div className="flex flex-col items-center gap-1 pointer-events-none w-full px-0.5">
                     {config.showPianoTriangles ? (
                       <div
-                        className="w-4 h-4"
+                        className={isCompact ? 'w-3 h-3' : 'w-4 h-4'}
                         dangerouslySetInnerHTML={{
                           __html: createPianoTriangleSvg(
                             key.ptInfo.triangle as PianoTriangleType,
                             key.ptInfo.point as PianoTrianglePoint,
-                            16,
+                            isCompact ? 12 : 16,
                             key.colorHex,
                             key.isActive ? '#ffffff' : '#334155'
                           ),
@@ -235,9 +373,9 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                       />
                     ) : (
                       <span
-                        className={`text-[10px] font-bold leading-none ${
-                          key.isActive ? 'text-white' : 'text-slate-800'
-                        }`}
+                        className={`font-bold leading-none ${
+                          isCompact ? 'text-[8.5px]' : 'text-[10px]'
+                        } ${key.isActive ? 'text-white' : 'text-slate-800'}`}
                       >
                         {key.syllable}
                       </span>
@@ -246,7 +384,9 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     <div className="flex items-center gap-1">
                       {key.shortcut && (
                         <span
-                          className={`text-[8.5px] font-mono font-medium px-1 rounded ${
+                          className={`font-mono font-medium rounded ${
+                            isCompact ? 'text-[7px] px-0.5' : 'text-[8.5px] px-1'
+                          } ${
                             key.isActive
                               ? 'bg-black/20 text-white'
                               : 'bg-slate-200/80 text-slate-600'
@@ -329,12 +469,12 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                   <div className="flex flex-col items-center gap-0.5 pointer-events-none w-full px-0.5">
                     {config.showPianoTriangles ? (
                       <div
-                        className="w-3.5 h-3.5 mb-0.5"
+                        className={isCompact ? 'w-2.5 h-2.5 mb-0.5' : 'w-3.5 h-3.5 mb-0.5'}
                         dangerouslySetInnerHTML={{
                           __html: createPianoTriangleSvg(
                             key.ptInfo.triangle as PianoTriangleType,
                             key.ptInfo.point as PianoTrianglePoint,
-                            13,
+                            isCompact ? 10 : 13,
                             key.colorHex,
                             key.isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.7)',
                             true
@@ -343,7 +483,9 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                       />
                     ) : (
                       <span
-                        className="text-[8.5px] font-bold leading-tight"
+                        className={`font-bold leading-tight ${
+                          isCompact ? 'text-[7.5px]' : 'text-[8.5px]'
+                        }`}
                         style={{ color: key.isActive ? '#ffffff' : key.colorHex }}
                       >
                         {key.syllable}
@@ -353,10 +495,10 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     <div className="flex items-center gap-1">
                       {key.shortcut && (
                         <span
-                          className={`text-[8px] font-mono font-medium leading-none px-0.5 rounded ${
-                            key.isActive
-                              ? 'bg-black/30 text-white'
-                              : 'text-slate-400/80'
+                          className={`font-mono font-medium leading-none px-0.5 rounded ${
+                            isCompact ? 'text-[6.5px]' : 'text-[8px]'
+                          } ${
+                            key.isActive ? 'bg-black/30 text-white' : 'text-slate-400/80'
                           }`}
                         >
                           {key.shortcut}
@@ -379,3 +521,4 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
     </div>
   );
 };
+

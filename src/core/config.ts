@@ -21,6 +21,8 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   octaveMode: 'dynamic', // Starts with dynamic organic discovery
   keyboardLowestMidi: 21, // Lowest note of instrument (default 21 = A1)
   keyboardHighestMidi: 108, // Highest note of instrument (default 108 = C8)
+  virtualKeyboardStartMidi: 48, // Start note of on-screen virtual piano (default 48 = C3)
+  virtualKeyboardEndMidi: 72, // End note of on-screen virtual piano (default 72 = C5)
   startOctave: 1, // 1..8 (lowest / outermost ring)
   endOctave: 8, // 1..8 (highest / innermost ring)
   showOctaveNumbers: true, // Display clean octave numbers (1..8) on rings
@@ -146,6 +148,14 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.keyboardHighestMidi = typeof merged.keyboardHighestMidi === 'number'
       ? Math.max(merged.keyboardLowestMidi + 12, Math.min(127, Math.round(merged.keyboardHighestMidi)))
       : 108;
+
+    // Sanitize on-screen virtual piano range bounds (21 = A0, 108 = C8, minimum 12 semitones)
+    merged.virtualKeyboardStartMidi = typeof merged.virtualKeyboardStartMidi === 'number'
+      ? Math.max(21, Math.min(96, Math.round(merged.virtualKeyboardStartMidi)))
+      : 48;
+    merged.virtualKeyboardEndMidi = typeof merged.virtualKeyboardEndMidi === 'number'
+      ? Math.max(merged.virtualKeyboardStartMidi + 12, Math.min(108, Math.round(merged.virtualKeyboardEndMidi)))
+      : 72;
 
     // Sanitize octave bounds
     const rawStart = typeof merged.startOctave === 'number' ? merged.startOctave : 1;

@@ -212,6 +212,8 @@ export interface SystemConfig {
   accidentalStyle: AccidentalStyle;
   keyboardLowestMidi: number; // Lowest note of instrument (default 21 = A1)
   keyboardHighestMidi: number; // Highest note of instrument (default 108 = C8)
+  virtualKeyboardStartMidi: number; // Start note of on-screen virtual piano (default 48 = C3)
+  virtualKeyboardEndMidi: number; // End note of on-screen virtual piano (default 72 = C5)
   autoTonicEnabled: boolean;
   autoTonicMode: AutoTonicMode;
   autoTonicCustomDegrees: number[];

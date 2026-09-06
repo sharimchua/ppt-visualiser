@@ -240,3 +240,25 @@ export function resolveMidiToRegisterAndSemitone(
     octave,
   };
 }
+
+/**
+ * Standard acoustic and synthesiser keyboard range presets for the virtual piano.
+ */
+export interface PianoRangePreset {
+  id: string;
+  name: string;
+  shortName: string;
+  keys: number;
+  startMidi: number;
+  endMidi: number;
+  rangeLabel: string;
+}
+
+export const PIANO_RANGE_PRESETS: PianoRangePreset[] = [
+  { id: '25-key', name: '25 Keys (C3–C5)', shortName: '25k', keys: 25, startMidi: 48, endMidi: 72, rangeLabel: 'C3–C5' },
+  { id: '37-key', name: '37 Keys (C3–C6)', shortName: '37k', keys: 37, startMidi: 48, endMidi: 84, rangeLabel: 'C3–C6' },
+  { id: '49-key', name: '49 Keys (C2–C6)', shortName: '49k', keys: 49, startMidi: 36, endMidi: 84, rangeLabel: 'C2–C6' },
+  { id: '61-key', name: '61 Keys (C2–C7)', shortName: '61k', keys: 61, startMidi: 36, endMidi: 96, rangeLabel: 'C2–C7' },
+  { id: '76-key', name: '76 Keys (E1–G7)', shortName: '76k', keys: 76, startMidi: 28, endMidi: 103, rangeLabel: 'E1–G7' },
+  { id: '88-key', name: '88 Keys (A0–C8)', shortName: '88k', keys: 88, startMidi: 21, endMidi: 108, rangeLabel: 'A0–C8' },
+];
