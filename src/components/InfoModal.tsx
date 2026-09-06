@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Compass,
@@ -14,7 +14,10 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
-import { SOLFEGE_SPECS, SOLFEGE_SYLLABLES } from '../core/ppt-constants';
+import { PitchClockDiagram } from './PitchClockDiagram';
+import { UniformSolfegeDiagram } from './UniformSolfegeDiagram';
+import { PianoTrianglesDiagram } from './PianoTrianglesDiagram';
+import { ConcentricOrbitsDiagram } from './ConcentricOrbitsDiagram';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -31,6 +34,60 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem(STORAGE_KEY_DONT_SHOW_INTRO) === 'true';
   });
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isManualScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<number | null>(null);
+
+  const scrollToSection = (tab: TabType) => {
+    setActiveTab(tab);
+    const container = scrollContainerRef.current;
+    const target = document.getElementById(`ppt-section-${tab}`);
+    if (container && target) {
+      isManualScrollRef.current = true;
+      if (scrollTimeoutRef.current !== null) {
+        window.clearTimeout(scrollTimeoutRef.current);
+      }
+      const targetTop = target.offsetTop - container.offsetTop;
+      container.scrollTo({ top: Math.max(0, targetTop - 12), behavior: 'smooth' });
+      scrollTimeoutRef.current = window.setTimeout(() => {
+        isManualScrollRef.current = false;
+      }, 700);
+    }
+  };
+
+  const handleScroll = useCallback(() => {
+    if (isManualScrollRef.current || !scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const scrollTop = container.scrollTop;
+
+    // If scrolled to the bottom, highlight the final 'links' bookmark
+    if (container.scrollHeight - (scrollTop + container.clientHeight) < 40) {
+      setActiveTab('links');
+      return;
+    }
+
+    const sections: TabType[] = ['overview', 'concepts', 'customise', 'links'];
+    let currentTab: TabType = 'overview';
+    for (const tab of sections) {
+      const el = document.getElementById(`ppt-section-${tab}`);
+      if (el) {
+        const top = el.offsetTop - container.offsetTop;
+        if (scrollTop >= top - 60) {
+          currentTab = tab;
+        }
+      }
+    }
+    setActiveTab(currentTab);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current !== null) {
+        window.clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle ESC key to dismiss
   useEffect(() => {
@@ -94,13 +151,13 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-800 bg-[#0e1424]/60 px-3 sm:px-5 shrink-0 overflow-x-auto gap-1 sm:gap-2">
+        {/* Navigation Bookmarks Bar */}
+        <div className="flex border-b border-slate-800 bg-[#0e1424]/80 backdrop-blur px-3 sm:px-5 shrink-0 overflow-x-auto gap-1 sm:gap-2">
           <button
-            onClick={() => setActiveTab('overview')}
+            onClick={() => scrollToSection('overview')}
             className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
               activeTab === 'overview'
-                ? 'border-red-500 text-white bg-slate-800/40'
+                ? 'border-red-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
@@ -108,10 +165,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
             <span>Visualiser Overview</span>
           </button>
           <button
-            onClick={() => setActiveTab('concepts')}
+            onClick={() => scrollToSection('concepts')}
             className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
               activeTab === 'concepts'
-                ? 'border-red-500 text-white bg-slate-800/40'
+                ? 'border-amber-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
@@ -119,10 +176,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
             <span>PPT Musical Concepts</span>
           </button>
           <button
-            onClick={() => setActiveTab('customise')}
+            onClick={() => scrollToSection('customise')}
             className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
               activeTab === 'customise'
-                ? 'border-red-500 text-white bg-slate-800/40'
+                ? 'border-cyan-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
@@ -130,10 +187,10 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
             <span>Customisation & Controls</span>
           </button>
           <button
-            onClick={() => setActiveTab('links')}
+            onClick={() => scrollToSection('links')}
             className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
               activeTab === 'links'
-                ? 'border-red-500 text-white bg-slate-800/40'
+                ? 'border-purple-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
@@ -142,255 +199,252 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        {/* Scrollable Tab Content */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-xs sm:text-sm leading-relaxed">
-          {/* TAB 1: OVERVIEW */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6 animate-in fade-in duration-150">
-              <div className="bg-gradient-to-br from-red-950/40 via-slate-900/60 to-slate-900/40 border border-red-900/40 rounded-xl p-4 sm:p-5">
-                <h3 className="text-sm sm:text-base font-bold text-white mb-2 flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-red-400" />
-                  What is the PPT Visualiser?
-                </h3>
-                <p className="text-slate-300">
-                  The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualiser built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and tetrachordal triangles</strong>.
-                </p>
-                <p className="text-slate-400 mt-2 text-xs">
-                  Whether listening to built-in classical and modern demo tracks, playing via a connected USB MIDI keyboard, or uploading your own MIDI files, the visualiser translates harmonic structure into dynamic light, phosphorescent trails, and geometric resonance.
-                </p>
-              </div>
+        {/* Single Continuous Scrollable Content with Interactive Bookmarks */}
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 text-xs sm:text-sm leading-relaxed scroll-smooth"
+        >
+          {/* SECTION 1: OVERVIEW */}
+          <section id="ppt-section-overview" className="space-y-6 scroll-mt-2">
+            <div className="bg-gradient-to-br from-red-950/40 via-slate-900/60 to-slate-900/40 border border-red-900/40 rounded-xl p-4 sm:p-5">
+              <h3 className="text-sm sm:text-base font-bold text-white mb-2 flex items-center gap-2">
+                <Compass className="w-5 h-5 text-red-400" />
+                What is the PPT Visualiser?
+              </h3>
+              <p className="text-slate-300">
+                The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualiser built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and tetrachordal triangles</strong>.
+              </p>
+              <p className="text-slate-400 mt-2 text-xs">
+                Whether listening to built-in classical and modern demo tracks, playing via a connected USB MIDI keyboard, or uploading your own MIDI files, the visualiser translates harmonic structure into dynamic light, phosphorescent trails, and geometric resonance.
+              </p>
+            </div>
 
-              {/* Three Core Modules */}
-              <div>
-                <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-red-400" />
-                  Three Distinct Visual Modules
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                    <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase">
-                      <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                      Orbital Pitch Clock
-                    </div>
-                    <p className="text-xs text-slate-300">
-                      An 8-octave polar clock. Tonic (Do) sits permanently at the 12 o&apos;clock zenith, with registers 1 to 8 organised into concentric orbits. Displays chord polygons, convex hulls, and organic particle sparks.
-                    </p>
+            {/* Three Core Modules */}
+            <div>
+              <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
+                <Layers className="w-4 h-4 text-red-400" />
+                Three Distinct Visual Modules
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    Orbital Pitch Clock
                   </div>
-
-                  <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                    <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase">
-                      <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                      Piano Triangles
-                    </div>
-                    <p className="text-xs text-slate-300">
-                      Deconstructs the 12 keys of the piano into 4 geometric tetrachords (Down, Left, Up, Right). Illuminates active notes and harmonic clusters directly across physical keyboard geometry.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
-                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase">
-                      <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-                      Note Stream Ribbons
-                    </div>
-                    <p className="text-xs text-slate-300">
-                      High-velocity directional note ribbons with configurable orientation (Horizontal RTL/LTR or Vertical TTB/BTT) labeled with Uniform Solfège or Tri-Notation glyphs.
-                    </p>
-                  </div>
+                  <p className="text-xs text-slate-300">
+                    An 8-octave polar clock. Tonic (Do) sits permanently at the 12 o&apos;clock zenith, with registers 1 to 8 organised into concentric orbits. Displays chord polygons, convex hulls, and organic particle sparks.
+                  </p>
                 </div>
-              </div>
 
-              {/* Quick Start Guide */}
-              <div className="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 space-y-3">
-                <h4 className="font-semibold text-white text-xs uppercase tracking-wider flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-yellow-400" />
-                  Quick Interaction Tips
-                </h4>
-                <ul className="space-y-2 text-xs text-slate-300">
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Select Demo Music:</strong> Use the track dropdown in the top toolbar to explore classical piano works, jazz progressions, or polyphonic etudes.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Connect MIDI:</strong> Plug in any USB MIDI keyboard or controller. The visualiser instantly detects incoming notes with zero setup required.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Change Key (Do):</strong> Click the Tonic selector in the top toolbar to set the musical key, or enable <em>Auto-Alignment</em> to let the visualiser track key changes automatically.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span><strong>Customise Layout:</strong> Click <em>Edit Layout</em> in the top bar to split views, resize panes, or choose ready-made presets like <em>Signature Trio</em>.</span>
-                  </li>
-                </ul>
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    Piano Triangles
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Deconstructs the 12 keys of the piano into 4 geometric tetrachords (Down, Left, Up, Right). Illuminates active notes and harmonic clusters directly across physical keyboard geometry.
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+                    Note Stream Ribbons
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Flowing note ribbons that stream horizontally (left or right) or vertically (up or down), labelled with Uniform Solfège or Tri-Notation symbols.
+                  </p>
+                </div>
               </div>
             </div>
-          )}
 
-          {/* TAB 2: PPT MUSICAL CONCEPTS */}
-          {activeTab === 'concepts' && (
-            <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Quick Start Guide */}
+            <div className="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 space-y-3">
+              <h4 className="font-semibold text-white text-xs uppercase tracking-wider flex items-center gap-2">
+                <Zap className="w-4 h-4 text-yellow-400" />
+                Quick Interaction Tips
+              </h4>
+              <ul className="space-y-2 text-xs text-slate-300">
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Select Demo Music:</strong> Use the track dropdown in the top toolbar to explore classical piano works, jazz progressions, or polyphonic etudes.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Connect MIDI:</strong> Plug in any USB MIDI keyboard or controller. The visualiser instantly detects incoming notes with zero setup required.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Change Key (Do):</strong> Click the Tonic selector in the top toolbar to set the musical key, or enable <em>Auto-Alignment</em> to let the visualiser track key changes automatically.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span><strong>Customise Layout:</strong> Click <em>Edit Layout</em> in the top bar to split views, resize panes, or choose ready-made presets like <em>Signature Trio</em>.</span>
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          {/* Section Divider: Concepts */}
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center" aria-hidden="true">
+              <div className="w-full border-t border-slate-800" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-[#0b0f19] px-3.5 py-1 rounded-full border border-slate-800 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-amber-400 flex items-center gap-1.5 shadow-sm">
+                <Music className="w-3.5 h-3.5" />
+                <span>Theoretical Foundations</span>
+              </span>
+            </div>
+          </div>
+
+          {/* SECTION 2: PPT MUSICAL CONCEPTS */}
+          <section id="ppt-section-concepts" className="space-y-6 scroll-mt-2">
               {/* Concept 1: The Pitch Clock */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                    <Compass className="w-5 h-5 text-red-500" />
-                    1. The 12-Tone Pitch Class Clock
+                    <Compass className="w-5 h-5 text-red-500 shrink-0" />
+                    <span>1. The 12-Tone Pitch Class Clock</span>
                   </h3>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                    Do at 12 o&apos;clock
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-red-400 border border-slate-700/60 self-start sm:self-auto">
+                    Movable Do at 12 o&apos;clock Zenith
                   </span>
                 </div>
+
                 <p className="text-xs sm:text-sm text-slate-300">
-                  In Prime Period Theory, the 12 chromatic semitones are arranged clockwise in a circular pitch space:
+                  In Prime Period Theory, the 12 chromatic semitones are arranged clockwise around a circular pitch space. PPT follows a <strong>movable Do</strong> philosophy: whichever key the music is in, that home tonic pitch is positioned at the 12 o&apos;clock zenith as <strong>Do</strong>.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
-                  <div>
-                    <span className="font-semibold text-red-400">12 o&apos;clock (Zenith) = Do (Tonic)</span>
-                    <p className="text-slate-400 mt-1">The fundamental home pitch of the key (0 semitones). All melodic and harmonic distances are perceived relative to this origin.</p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center pt-1">
+                  {/* Left: Vector Pitch Clock Diagram */}
+                  <div className="lg:col-span-5 flex justify-center w-full min-w-0 shrink-0">
+                    <PitchClockDiagram size={230} />
                   </div>
-                  <div>
-                    <span className="font-semibold text-slate-200">6 o&apos;clock (Nadir) = Fi (Tritone)</span>
-                    <p className="text-slate-400 mt-1">Exactly 6 semitones away from Do, forming a vertical polar axis of harmonic tension and symmetry across the circle.</p>
+
+                  {/* Right: Key Geometric Principles */}
+                  <div className="lg:col-span-7 space-y-3 text-xs">
+                    <div className="bg-slate-950/70 p-3 sm:p-3.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                      <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                        <span>Movable Do Philosophy</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        Whether playing in C, D, or F♯, the home key always rotates to 12 o&apos;clock. This allows musical tension, resolution, and chord function to be perceived consistently across all 12 keys.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950/70 p-3 sm:p-3.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                      <div className="font-semibold text-red-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        <span>12 o&apos;clock (Zenith) = Do (Tonic)</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        The fundamental home pitch of the key (0 semitones). All melodic and harmonic distances are measured relative to this anchor.
+                      </p>
+                    </div>
+
+                    <div className="bg-slate-950/70 p-3 sm:p-3.5 rounded-lg border border-slate-800/80 space-y-1.5">
+                      <div className="font-semibold text-slate-200 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-slate-400" />
+                        <span>6 o&apos;clock (Nadir) = Fi (Tritone)</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        Exactly 6 semitones away from Do, forming the primary vertical polar axis of harmonic tension and symmetry across the circle.
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400">
-                  Moving clockwise from 12 o&apos;clock: <strong>Do (0)</strong> &rarr; Ra (1) &rarr; Re (2) &rarr; Me (3) &rarr; Mi (4) &rarr; Fa (5) &rarr; <strong>Fi (6)</strong> &rarr; So (7) &rarr; Le (8) &rarr; La (9) &rarr; Te (10) &rarr; Ti (11).
-                </p>
               </div>
 
               {/* Concept 2: Uniform Solfège */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-amber-400" />
-                    2. Uniform Solfège & 4-Fold Symmetry
+                    <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                    <span>2. Uniform Solfège & 4-Fold Symmetry</span>
                   </h3>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-amber-400">
-                    3 Glyphs &times; 4 Rotations
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/60 self-start sm:self-auto">
+                    3 Glyphs &times; 4 Rotations = 12 Tones
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  Traditional music notation relies on historical accidentals (♯, ♭, ♮) that introduce visual asymmetry. Uniform Solfège replaces them with <strong>three elemental geometric glyphs</strong> that rotate in 90° quadrants:
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Traditional music notation relies on historical accidentals (♯, ♭, ♮) that introduce visual asymmetry. Uniform Solfège replaces them with <strong>three elemental geometric glyphs</strong> that rotate in 90&deg; orthogonal quadrants. Each 90&deg; rotation corresponds to advancing by a minor third (+3 semitones):
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 text-center space-y-1.5">
-                    <div className="font-bold text-white uppercase tracking-wider">Base Glyph</div>
-                    <div className="text-[11px] text-slate-400">Neutral / Balanced</div>
-                    <p className="text-[10px] text-slate-500">Do (0°), Me (90°), Fi (180°), La (270°)</p>
-                  </div>
-                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 text-center space-y-1.5">
-                    <div className="font-bold text-amber-400 uppercase tracking-wider">Sharp Glyph</div>
-                    <div className="text-[11px] text-slate-400">Outward Peak / Clockwise</div>
-                    <p className="text-[10px] text-slate-500">Ra (0°), Mi (90°), So (180°), Te (270°)</p>
-                  </div>
-                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 text-center space-y-1.5">
-                    <div className="font-bold text-cyan-400 uppercase tracking-wider">Flat Glyph</div>
-                    <div className="text-[11px] text-slate-400">Inward Dip / Counter-Clockwise</div>
-                    <p className="text-[10px] text-slate-500">Ti (0°), Re (90°), Fa (180°), Le (270°)</p>
-                  </div>
-                </div>
-
-                {/* Solfege Syllables Colour Preview */}
-                <div className="pt-2">
-                  <div className="text-[11px] font-semibold text-slate-400 mb-1.5">12 Chromatic Solfège Degrees:</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {SOLFEGE_SYLLABLES.map((syl) => {
-                      const spec = SOLFEGE_SPECS[syl];
-                      return (
-                        <div
-                          key={syl}
-                          className="px-2 py-1 rounded bg-slate-950 border border-slate-800 flex items-center gap-1.5 text-xs font-mono"
-                        >
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: spec.colorHex }} />
-                          <span className="font-bold text-white">{syl}</span>
-                          <span className="text-[10px] text-slate-500">+{spec.semitone}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* Rich Vector Solfège Diagram Component */}
+                <UniformSolfegeDiagram />
               </div>
 
               {/* Concept 3: Piano Triangles */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-                <div className="flex items-center justify-between">
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-indigo-400" />
-                    3. Piano Triangles (Tetrachord Topography)
+                    <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
+                    <span>3. Piano Triangles (Tetrachord Topography)</span>
                   </h3>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300">
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 self-start sm:self-auto">
                     Down &bull; Left &bull; Up &bull; Right
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  Piano Triangles map the irregular physical geometry of the piano keyboard into four repeating triangular groups, tiling all 12 chromatic tones:
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  The piano keyboard is physically asymmetrical: an irregular 2-pack (C♯, D♯) and 3-pack (F♯, G♯, A♯) of raised black keys separated by two natural semitone chasms (E–F and B–C). <strong>Piano Triangles</strong> bridge this irregularity by partitioning all 12 chromatic keys into four balanced 3-note geometric units ($4 \times 3 = 12$):
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                  <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-center">
-                    <span className="font-bold text-red-400 block">Down (D)</span>
-                    <span className="text-[10px] text-slate-400">C♯ &bull; D &bull; D♯</span>
-                    <p className="text-[9px] text-slate-500 mt-1">Inverted apex pointing down at D</p>
-                  </div>
-                  <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-center">
-                    <span className="font-bold text-amber-400 block">Left (L)</span>
-                    <span className="text-[10px] text-slate-400">E &bull; F &bull; F♯</span>
-                    <p className="text-[9px] text-slate-500 mt-1">Right-angle triangle at E-F</p>
-                  </div>
-                  <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-center">
-                    <span className="font-bold text-emerald-400 block">Up (U)</span>
-                    <span className="text-[10px] text-slate-400">G &bull; G♯ &bull; A</span>
-                    <p className="text-[9px] text-slate-500 mt-1">Equilateral apex pointing up at G♯</p>
-                  </div>
-                  <div className="bg-slate-950/70 p-2.5 rounded-lg border border-slate-800 text-center">
-                    <span className="font-bold text-purple-400 block">Right (R)</span>
-                    <span className="text-[10px] text-slate-400">A♯ &bull; B &bull; C</span>
-                    <p className="text-[9px] text-slate-500 mt-1">Right-angle triangle at B-C</p>
-                  </div>
-                </div>
+
+                {/* Rich Vector Piano Triangles Diagram Component */}
+                <PianoTrianglesDiagram />
               </div>
 
               {/* Concept 4: Concentric Orbits & Nearest-Address */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-                <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-cyan-400" />
-                  4. 8 Concentric Orbits & Nearest-Address Octave Wrapping
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300">
-                  The visualiser renders up to <strong>8 concentric octave orbits</strong> from the lowest bass (Register 1, outermost) to the highest treble (Register 8, innermost).
-                </p>
-                <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-xs space-y-1.5">
-                  <div className="font-semibold text-slate-200">Nearest-Address Polar Coordinate Wrapping:</div>
-                  <p className="text-slate-400">
-                    To maintain spatial coherence, notes are addressed relative to the nearest tonic:
-                  </p>
-                  <div className="font-mono text-[11px] text-cyan-300 bg-slate-900/90 p-2 rounded border border-slate-800">
-                    <div>Upper Branch (0 to +6): Do (0), Ra (+1), Re (+2), Me (+3), Mi (+4), Fa (+5), Fi (+6)</div>
-                    <div className="mt-1">Lower Branch (-5 to -1): So (-5), Le (-4), La (-3), Te (-2), Ti (-1)</div>
-                  </div>
-                  <p className="text-[11px] text-slate-500 italic mt-1">
-                    This prevents arbitrary register jumps and connects harmonious chord voicings across minimum radial distance.
-                  </p>
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <span>4. Concentric Orbits & Octave Wrapping</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
+                    Octave Seam at 6 to 7 o&apos;clock
+                  </span>
                 </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  The visualiser renders up to <strong>8 concentric octave orbits</strong> from the lowest bass (Register 1, outermost) to the highest treble (Register 8, innermost). Rather than arbitrarily resetting at C, each register is centred symmetrically around <strong>Do</strong>.
+                </p>
+
+                {/* Rich Vector Concentric Orbits Diagram */}
+                <ConcentricOrbitsDiagram />
               </div>
 
               {/* Concept 5: Auto-Alignment */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
                 <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-                  <Compass className="w-5 h-5 text-red-400" />
-                  5. Auto-Alignment of Do (Diatonic Key Tracking)
+                  <Compass className="w-5 h-5 text-red-400 shrink-0" />
+                  <span>5. Auto-Alignment of Do (Diatonic Key Tracking)</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  When <strong>Auto-Alignment</strong> is enabled in the settings or header, the engine continuously monitors incoming notes over an organic time decay window. It calculates diatonic correlation scores against 12 candidate tonics and automatically rotates Do to match the musical key of the song in real time.
+                  When <strong>Auto-Alignment</strong> is enabled in the settings or header toolbar, the engine continuously monitors incoming notes over an organic time decay window. It calculates diatonic correlation scores against all 12 candidate tonics and automatically rotates Do to match the musical key of the song in real time.
                 </p>
               </div>
-            </div>
-          )}
+            </section>
 
-          {/* TAB 3: CUSTOMISATION & CONTROLS */}
-          {activeTab === 'customise' && (
-            <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Section Divider: Customise */}
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-slate-800" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-[#0b0f19] px-3.5 py-1 rounded-full border border-slate-800 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 shadow-sm">
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Engine Controls & Customisation</span>
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION 3: CUSTOMISATION & CONTROLS */}
+            <section id="ppt-section-customise" className="space-y-6 scroll-mt-2">
               {/* Layout Engine */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
                 <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
@@ -473,12 +527,23 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   Click the <strong>Share</strong> button in the top toolbar to generate a compact, URL-safe Base64 slug of your exact layout and aesthetic configuration. Anyone opening the link will see your exact custom workspace setup.
                 </p>
               </div>
-            </div>
-          )}
+            </section>
 
-          {/* TAB 4: LINKS & RESOURCES */}
-          {activeTab === 'links' && (
-            <div className="space-y-6 animate-in fade-in duration-150">
+            {/* Section Divider: Links */}
+            <div className="relative py-2">
+              <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                <div className="w-full border-t border-slate-800" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-[#0b0f19] px-3.5 py-1 rounded-full border border-slate-800 text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-purple-400 flex items-center gap-1.5 shadow-sm">
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Theory Literature & Ecosystem</span>
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION 4: LINKS & RESOURCES */}
+            <section id="ppt-section-links" className="space-y-6 scroll-mt-2">
               <div className="bg-gradient-to-br from-purple-950/40 via-slate-900/60 to-slate-900/40 border border-purple-900/40 rounded-xl p-4 sm:p-5">
                 <h3 className="text-sm sm:text-base font-bold text-white mb-2 flex items-center gap-2">
                   <BookOpen className="w-5 h-5 text-purple-400" />
@@ -507,7 +572,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                       <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-red-400 transition" />
                     </div>
                     <p className="text-xs text-slate-300 leading-relaxed">
-                      The official compiled documentation for <strong>Prime Period Theory (PPT)</strong>. PPT is a descriptive framework treating pitch, rhythm, and timbre as unified expressions of periodic signals in time, organized through prime-ratio relationships (up to the 11-limit).
+                      The official compiled documentation for <strong>Prime Period Theory (PPT)</strong>. PPT is a descriptive framework treating pitch, rhythm, and timbre as unified expressions of periodic signals in time, organised through prime-ratio relationships (up to the 11-limit).
                     </p>
                     <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 text-[11px] space-y-1 text-slate-400">
                       <div className="text-red-400 font-semibold flex items-center gap-1">
@@ -629,9 +694,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                   <li>Clicking the <strong>Walkthrough & Guide</strong> button at the top of the Settings sidebar.</li>
                 </ul>
               </div>
-            </div>
-          )}
-        </div>
+            </section>
+          </div>
 
         {/* Footer with Persistent Checkbox & Close Action */}
         <div className="flex flex-col sm:flex-row items-center justify-between px-5 py-3.5 border-t border-slate-800 bg-[#080b13] shrink-0 gap-3">
