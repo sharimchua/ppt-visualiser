@@ -27,7 +27,7 @@ The `src/components` domain contains the React user interface layer, including t
 - **Outbound Link Destinations**:
   - Theory documentation: `https://ppt.midlifemuso.com` (and its reference library `https://ppt.midlifemuso.com/reference`).
   - Music coaching & pedagogy: `https://midlifemuso.com`.
-- **Responsive Geometry**: UI elements, drawer dropdowns, and header buttons must resize responsively without horizontal overflowing or boundary clipping on narrow viewports.
+- **Responsive Geometry**: UI elements, drawer dropdowns, header buttons, modal bookmark navigation tabs, and vector theory diagrams must resize responsively without horizontal overflowing or boundary clipping on narrow mobile viewports. Row containers adapt flexibly to columns on mobile portrait viewports (< 640px) to prevent viewport compression.
 
 ## Work Guidance
 

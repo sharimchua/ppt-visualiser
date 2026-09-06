@@ -388,16 +388,16 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         {/* Play/Pause Button */}
         <button
           onClick={() => (playbackState.isPlaying ? onPause() : onPlay())}
-          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition shadow-lg shadow-red-600/30 flex-shrink-0"
+          className="w-8 h-8 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition shadow-lg shadow-red-600/30 flex-shrink-0 touch-manipulation"
           title={playbackState.isPlaying ? 'Pause' : 'Play'}
         >
-          {playbackState.isPlaying ? <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" /> : <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current ml-0.5" />}
+          {playbackState.isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
         </button>
 
         {/* Stop Button */}
         <button
           onClick={onStop}
-          className="p-1 sm:p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition flex-shrink-0"
+          className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition flex-shrink-0 touch-manipulation"
           title="Stop & Rewind"
         >
           <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -408,7 +408,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
           <select
             value={DEMO_TRACKS.some(t => t.title === playbackState.trackName) ? DEMO_TRACKS.find(t => t.title === playbackState.trackName)?.id : ''}
             onChange={(e) => onSelectTrack(e.target.value)}
-            className="w-full bg-slate-800/80 hover:bg-slate-800 text-[11px] sm:text-xs text-slate-200 rounded-md px-2 py-1 sm:py-1.5 border border-slate-700 focus:outline-none truncate cursor-pointer"
+            className="w-full bg-slate-800/80 hover:bg-slate-800 text-[11px] sm:text-xs text-slate-200 rounded-md px-2 py-1.5 border border-slate-700 focus:outline-none truncate cursor-pointer touch-manipulation"
           >
             {Array.from(new Set(DEMO_TRACKS.map((t) => t.category))).map((category) => (
               <optgroup key={category} label={category} className="bg-slate-900 text-slate-400 font-semibold text-[11px]">
@@ -426,7 +426,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         <button
           onClick={() => fileInputRef.current?.click()}
           title="Upload standard MIDI file (.mid)"
-          className="p-1 sm:p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition flex-shrink-0"
+          className="p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 transition flex-shrink-0 touch-manipulation"
         >
           <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </button>
@@ -445,7 +445,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
               }
             }}
             title="Download demo track (.mid)"
-            className="hidden sm:block p-1 sm:p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition flex-shrink-0"
+            className="hidden sm:block p-1.5 rounded-md hover:bg-slate-800 text-slate-400 hover:text-purple-300 border border-slate-700/60 transition flex-shrink-0 touch-manipulation"
           >
             <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
@@ -464,7 +464,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         {/* Sound toggle */}
         <button
           onClick={() => onUpdateConfig({ soundEnabled: !config.soundEnabled })}
-          className={`p-1 sm:p-1.5 rounded-md border transition flex-shrink-0 ${
+          className={`p-1.5 rounded-md border transition flex-shrink-0 touch-manipulation ${
             config.soundEnabled
               ? 'bg-slate-800 border-slate-600 text-slate-200'
               : 'border-slate-700 text-slate-500 hover:text-slate-300'

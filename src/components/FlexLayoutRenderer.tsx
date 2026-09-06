@@ -59,12 +59,13 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
     );
   }
 
-  // Container node
+  // Container node: On mobile screens (< 640px portrait), row containers stack vertically as columns
+  // so cells are not compressed into unreadable side-by-side slivers.
   const isRow = node.direction === 'row';
   return (
     <div
       className={`relative w-full h-full flex min-w-0 min-h-0 ${
-        isRow ? 'flex-row' : 'flex-col'
+        isRow ? 'flex-col sm:flex-row' : 'flex-col'
       }`}
       style={{
         flexGrow: node.flex ?? 1,

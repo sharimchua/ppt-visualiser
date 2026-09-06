@@ -141,39 +141,43 @@ export class PianoTrianglesRenderer {
     const doSegment = doSegIndex !== -1 ? segments[doSegIndex] : segments[Math.floor(n / 2)];
     const doPoint = doSegment.doPoint ?? 2;
 
-    // Calculate layout geometry: triangle size, gap, and Do horizontal centering
-    const marginX = 24;
-    const marginY = 28;
-    const availableWidth = Math.max(80, width - marginX * 2);
-    const availableHeight = Math.max(60, height - marginY * 2);
+    // Calculate responsive margins and available layout geometry
+    const marginX = Math.max(8, Math.min(24, width * 0.04));
+    const marginY = Math.max(10, Math.min(28, height * 0.05));
+    const availableWidth = Math.max(60, width - marginX * 2);
+    const availableHeight = Math.max(40, height - marginY * 2);
 
-    // Initial estimation of triangle size
-    let triSize = Math.max(42, Math.min(170, Math.min(availableWidth / (n * 1.15), availableHeight * 0.72)));
-    let gap = Math.max(8, triSize * 0.18);
+    // Initial estimation of triangle size to fit available width
+    let triSize = Math.max(30, Math.min(170, Math.min((availableWidth - (n - 1) * 6) / n, availableHeight * 0.75)));
+    let gap = Math.max(4, Math.min(24, triSize * 0.16));
+    let totalChainWidth = n * triSize + (n - 1) * gap;
+
+    if (totalChainWidth > availableWidth) {
+      const fitScale = availableWidth / totalChainWidth;
+      triSize = Math.max(26, triSize * fitScale);
+      gap = Math.max(3, gap * fitScale);
+      totalChainWidth = n * triSize + (n - 1) * gap;
+    }
 
     // Locate Do vertex normalized in 100x100 space
     const doGeom = TRIANGLE_VERTEX_COORDINATES[doSegment.triangle];
     const doNormX = (doGeom.points[doPoint]?.x ?? 50) / 100;
+    const doXInChain = doSegIndex * (triSize + gap) + doNormX * triSize;
 
-    // Calculate Do offset in chain space
-    let doXInChain = doSegIndex * (triSize + gap) + doNormX * triSize;
-    let totalChainWidth = n * triSize + (n - 1) * gap;
+    // Horizontal placement with graceful soft-centering:
+    // When width permits, centre Do at width / 2; otherwise clamp within viewport margins
+    // so triangles are never crushed to keep an off-centre tonic at the exact canvas midpoint.
+    let chainStartX = width / 2 - doXInChain;
+    const minStartX = marginX;
+    const maxStartX = Math.max(minStartX, width - marginX - totalChainWidth);
 
-    // Prevent clipping when centering Do: check left and right extents
-    const leftExtent = doXInChain;
-    const rightExtent = totalChainWidth - doXInChain;
-    const maxHalfExtent = Math.max(leftExtent, rightExtent);
-
-    if (maxHalfExtent * 2 > availableWidth) {
-      const scaleFactor = availableWidth / (maxHalfExtent * 2);
-      triSize *= scaleFactor;
-      gap *= scaleFactor;
-      doXInChain = doSegIndex * (triSize + gap) + doNormX * triSize;
-      totalChainWidth = n * triSize + (n - 1) * gap;
+    if (chainStartX < minStartX) {
+      chainStartX = minStartX;
+    } else if (chainStartX > maxStartX) {
+      chainStartX = maxStartX;
     }
 
-    // Horizontal placement: align Do precisely with width / 2
-    const chainStartX = width / 2 - doXInChain;
+    const actualDoX = chainStartX + doXInChain;
     const chainCenterY = height / 2;
 
     // Build octave-agnostic active & decaying pitch-class maps
@@ -190,9 +194,9 @@ export class PianoTrianglesRenderer {
       decayPcMap.set(pc, Math.max(decayPcMap.get(pc) || 0, factor));
     }
 
-    // 1. Draw subtle Center Anchor guide line if enabled
+    // 1. Draw subtle Centre Anchor guide line at actual Do position if enabled
     if (config.showCenterAnchor) {
-      this.renderCenterAnchorGuide(ctx, width / 2, chainCenterY, triSize, availableHeight);
+      this.renderCenterAnchorGuide(ctx, actualDoX, chainCenterY, triSize, availableHeight);
     }
 
     // 2. Draw subtle chain link baseline connecting adjacent triangles
@@ -335,14 +339,14 @@ export class PianoTrianglesRenderer {
       const defaultColor = SOLFEGE_SPECS[defaultSyllable]?.colorHex ?? '#E13610';
       const vertexColor = scaleInfo?.color ?? defaultColor;
 
-      // Base radius calculation
-      let radius = size * 0.08;
+      // Base radius calculation with proportional scaling
+      let radius = Math.max(2.8, size * 0.08);
       if (isActive) {
-        radius = size * (0.11 + 0.03 * velocity);
+        radius = Math.max(4.5, size * (0.11 + 0.03 * velocity));
       } else if (isScaleTone) {
-        radius = size * (isDo ? 0.095 : 0.082);
+        radius = Math.max(3.5, size * (isDo ? 0.095 : 0.082));
       } else {
-        radius = size * 0.06; // Chromatic non-scale tones are smaller in resting state
+        radius = Math.max(2.2, size * 0.055); // Chromatic non-scale tones are smaller in resting state
       }
 
       ctx.save();
@@ -441,6 +445,7 @@ export class PianoTrianglesRenderer {
           centroidX,
           centroidY,
           radius,
+          size,
           pc,
           scaleInfo,
           isScaleTone,
@@ -465,6 +470,7 @@ export class PianoTrianglesRenderer {
     centroidX: number,
     centroidY: number,
     radius: number,
+    size: number,
     pc: number,
     scaleInfo: ScaleVertexInfo | undefined,
     isScaleTone: boolean,
@@ -473,6 +479,11 @@ export class PianoTrianglesRenderer {
     color: string,
     config: VisualiserConfig
   ): void {
+    // When triangles are compact (size < 48), suppress idle chromatic non-scale labels to prevent collision
+    if (size < 48 && !isScaleTone && !isActive) {
+      return;
+    }
+
     // Determine label text
     let labelText = '';
     const semitone = ((pc - config.tonic) % 12 + 12) % 12;
@@ -496,16 +507,21 @@ export class PianoTrianglesRenderer {
 
     if (!labelText) return;
 
-    // Compute outward label direction from triangle centroid
+    // Compute outward label direction from triangle centroid with proportional offset
     const dx = vx - centroidX;
     const dy = vy - centroidY;
     const dist = Math.hypot(dx, dy) || 1;
-    const offsetDist = radius + 11;
+    const offsetDist = radius + Math.max(5, Math.min(12, size * 0.14));
     const lx = vx + (dx / dist) * offsetDist;
     const ly = vy + (dy / dist) * offsetDist;
 
+    // Dynamic typography scaling based on triangle size
+    const fontSize = isDo
+      ? Math.max(8, Math.min(12, Math.round(size * 0.16)))
+      : Math.max(7, Math.min(11, Math.round(size * 0.14)));
+
     ctx.save();
-    ctx.font = isDo ? 'bold 11px system-ui, sans-serif' : '10px system-ui, sans-serif';
+    ctx.font = isDo ? `bold ${fontSize}px system-ui, sans-serif` : `${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 

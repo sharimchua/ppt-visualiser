@@ -35,7 +35,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="fixed inset-y-0 right-0 w-80 sm:w-96 bg-[#0b0e17]/95 backdrop-blur-xl border-l border-slate-800 shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
+    <aside className="fixed inset-y-0 right-0 w-full sm:w-96 max-w-full bg-[#0b0e17]/95 backdrop-blur-xl border-l border-slate-800 shadow-2xl z-50 flex flex-col overflow-hidden animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/80">
         <div className="flex items-center gap-2">

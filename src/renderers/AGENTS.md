@@ -21,6 +21,7 @@ The `src/renderers` domain contains all high-performance 2D Canvas and WebGL gra
   - In `pitch-clock-canvas.ts`, if `glowBloomEnabled` is false, `ctx.shadowBlur` must remain strictly 0 to eliminate software Gaussian blur rasterisation costs in 2D contexts.
   - If `sparksEnabled` is false, particle physics loops must be skipped entirely.
 - **High-DPI Awareness**: All canvases must scale by `window.devicePixelRatio` for razor-sharp rendering on Retina/HiDPI screens without visual blurring.
+- **Responsive Geometry & Soft-Centering**: When rendering in constrained viewports or mobile dimensions, canvas renderers must scale vertices and typography proportionally. In `piano-triangles-canvas.ts`, soft-centering prevents severe down-scaling of off-centre tonics, and idle chromatic labels are suppressed below 48px to eliminate collision.
 
 ## Work Guidance
 

@@ -14,7 +14,8 @@ const GlyphVector: React.FC<{
   rotation: number;
   colorHex: string;
   size?: number;
-}> = ({ glyphType, rotation, colorHex, size = 32 }) => {
+  className?: string;
+}> = ({ glyphType, rotation, colorHex, size, className }) => {
   let pathD = PATH_BASE;
   if (glyphType === 'sharp') pathD = PATH_SHARP;
   else if (glyphType === 'flat') pathD = PATH_FLAT;
@@ -29,7 +30,7 @@ const GlyphVector: React.FC<{
       viewBox="-120 -120 240 240"
       width={size}
       height={size}
-      className="shrink-0 transition-transform duration-200"
+      className={`shrink-0 transition-transform duration-200 ${className || ''}`}
       style={{
         transform: `rotate(${rotation}deg)`,
         overflow: 'visible',
@@ -55,7 +56,7 @@ const GlyphCell: React.FC<GlyphCellProps> = ({ syllable, isHovered, onHover, onL
     <div
       onMouseEnter={onHover}
       onMouseLeave={onLeave}
-      className={`relative p-2 rounded-lg border transition-all flex flex-col items-center gap-1 cursor-pointer select-none ${
+      className={`relative p-1 sm:p-2 rounded-md sm:rounded-lg border transition-all flex flex-col items-center gap-0.5 sm:gap-1 cursor-pointer select-none ${
         isHovered
           ? 'bg-slate-800 border-white shadow-[0_0_12px_rgba(255,255,255,0.25)] ring-1 ring-white/60 z-10'
           : 'bg-slate-950/70 border-slate-800/90 hover:border-slate-600'
@@ -65,17 +66,17 @@ const GlyphCell: React.FC<GlyphCellProps> = ({ syllable, isHovered, onHover, onL
         glyphType={spec.glyphType}
         rotation={spec.rotation}
         colorHex={spec.colorHex}
-        size={36}
+        className="w-6 h-6 sm:w-8 sm:h-8"
       />
-      <div className="flex items-center gap-1 mt-0.5">
-        <span className={`text-xs font-bold font-mono ${isFi ? 'text-slate-200' : 'text-white'}`}>
+      <div className="flex items-center gap-0.5 sm:gap-1 mt-0.5">
+        <span className={`text-[11px] sm:text-xs font-bold font-mono ${isFi ? 'text-slate-200' : 'text-white'}`}>
           {syllable}
         </span>
-        <span className="text-[10px] text-slate-400 font-mono">
+        <span className="text-[9px] sm:text-[10px] text-slate-400 font-mono">
           {offsetStr}
         </span>
       </div>
-      <span className="text-[9px] text-slate-500 font-mono">
+      <span className="text-[8px] sm:text-[9px] text-slate-500 font-mono">
         {spec.rotation}&deg;
       </span>
     </div>
@@ -155,23 +156,41 @@ export const UniformSolfegeDiagram: React.FC = () => {
           </span>
         </div>
 
-        {/* Matrix Grid */}
-        <div className="overflow-x-auto py-1.5 px-0.5">
-          <div className="min-w-[480px] space-y-2">
+        {/* Matrix Grid: Fully fluid responsive 5-column layout */}
+        <div className="w-full overflow-x-auto py-1.5 px-0.5">
+          <div className="w-full space-y-1.5 sm:space-y-2">
             {/* Header Columns */}
-            <div className="grid grid-cols-5 gap-2 text-[11px] font-mono text-slate-400 text-center px-1">
-              <div className="text-left font-bold text-slate-300">Glyph Type</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">0&deg; (0 st Anchor)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">90&deg; (+3 st CW)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">180&deg; (+6 / -5 st)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">270&deg; (-3 st CCW)</div>
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 text-[10px] sm:text-[11px] font-mono text-slate-400 text-center px-0.5 sm:px-1">
+              <div className="text-left font-bold text-slate-300">
+                <span className="sm:hidden">Type</span>
+                <span className="hidden sm:inline">Glyph Type</span>
+              </div>
+              <div className="bg-slate-900/60 py-1 px-0.5 rounded border border-slate-800/60">
+                <span className="sm:hidden">0&deg;</span>
+                <span className="hidden sm:inline">0&deg; (0 st Anchor)</span>
+              </div>
+              <div className="bg-slate-900/60 py-1 px-0.5 rounded border border-slate-800/60">
+                <span className="sm:hidden">+90&deg;</span>
+                <span className="hidden sm:inline">90&deg; (+3 st CW)</span>
+              </div>
+              <div className="bg-slate-900/60 py-1 px-0.5 rounded border border-slate-800/60">
+                <span className="sm:hidden">180&deg;</span>
+                <span className="hidden sm:inline">180&deg; (+6 / -5 st)</span>
+              </div>
+              <div className="bg-slate-900/60 py-1 px-0.5 rounded border border-slate-800/60">
+                <span className="sm:hidden">-90&deg;</span>
+                <span className="hidden sm:inline">270&deg; (-3 st CCW)</span>
+              </div>
             </div>
 
             {/* Row 1: Base */}
-            <div className="grid grid-cols-5 gap-2 items-center">
-              <div className="text-xs font-bold text-slate-200">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 items-center">
+              <div className="text-[11px] sm:text-xs font-bold text-slate-200">
                 <span>Base</span>
-                <span className="text-[10px] text-slate-500 block font-normal font-mono">0 st offset</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-500 block font-normal font-mono">
+                  <span className="sm:hidden">0 st</span>
+                  <span className="hidden sm:inline">0 st offset</span>
+                </span>
               </div>
               <GlyphCell
                 syllable="Do"
@@ -200,10 +219,13 @@ export const UniformSolfegeDiagram: React.FC = () => {
             </div>
 
             {/* Row 2: Sharp */}
-            <div className="grid grid-cols-5 gap-2 items-center">
-              <div className="text-xs font-bold text-amber-400">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 items-center">
+              <div className="text-[11px] sm:text-xs font-bold text-amber-400">
                 <span>Sharp</span>
-                <span className="text-[10px] text-amber-500/80 block font-normal font-mono">+1 st offset</span>
+                <span className="text-[9px] sm:text-[10px] text-amber-500/80 block font-normal font-mono">
+                  <span className="sm:hidden">+1 st</span>
+                  <span className="hidden sm:inline">+1 st offset</span>
+                </span>
               </div>
               <GlyphCell
                 syllable="Ra"
@@ -232,10 +254,13 @@ export const UniformSolfegeDiagram: React.FC = () => {
             </div>
 
             {/* Row 3: Flat */}
-            <div className="grid grid-cols-5 gap-2 items-center">
-              <div className="text-xs font-bold text-cyan-400">
+            <div className="grid grid-cols-5 gap-1 sm:gap-2 items-center">
+              <div className="text-[11px] sm:text-xs font-bold text-cyan-400">
                 <span>Flat</span>
-                <span className="text-[10px] text-cyan-500/80 block font-normal font-mono">-1 st offset</span>
+                <span className="text-[9px] sm:text-[10px] text-cyan-500/80 block font-normal font-mono">
+                  <span className="sm:hidden">-1 st</span>
+                  <span className="hidden sm:inline">-1 st offset</span>
+                </span>
               </div>
               <GlyphCell
                 syllable="Ti"

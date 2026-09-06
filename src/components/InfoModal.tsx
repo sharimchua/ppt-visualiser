@@ -124,79 +124,91 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
     >
       <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-[#0b0f19] border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden text-slate-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-[#080b13] shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center justify-between px-3 sm:px-5 py-3 sm:py-4 border-b border-slate-800 bg-[#080b13] shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <img
               src="/logo.svg"
               alt="PPT Logo"
-              className="w-8 h-8 object-contain rounded-md drop-shadow-[0_0_10px_rgba(225,54,16,0.4)] shrink-0"
+              className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded-md drop-shadow-[0_0_10px_rgba(225,54,16,0.4)] shrink-0"
             />
             <div className="min-w-0">
-              <h2 id="ppt-info-modal-title" className="text-base sm:text-lg font-bold text-white tracking-wide flex items-center gap-2 truncate">
+              <h2 id="ppt-info-modal-title" className="text-sm sm:text-lg font-bold text-white tracking-wide flex items-center gap-2 truncate">
                 <span>PPT Visualiser Primer & Guide</span>
                 <span className="text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-950/80 text-red-400 border border-red-800/60 hidden sm:inline-block">
                   Prime Period Theory
                 </span>
               </h2>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-[11px] sm:text-xs text-slate-400 truncate">
                 Multi-octave geometric music visualiser & interactive theoretical explorer
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0 ml-2"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0 ml-1.5 sm:ml-2"
             title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation Bookmarks Bar */}
-        <div className="flex border-b border-slate-800 bg-[#0e1424]/80 backdrop-blur px-3 sm:px-5 shrink-0 overflow-x-auto gap-1 sm:gap-2">
+        {/* Navigation Bookmarks Bar: Grid on mobile (no horizontal scroll), Flex on sm+ */}
+        <div className="grid grid-cols-4 sm:flex border-b border-slate-800 bg-[#0e1424]/80 backdrop-blur px-1 sm:px-5 shrink-0 overflow-x-auto gap-0.5 sm:gap-2">
           <button
             onClick={() => scrollToSection('overview')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm font-semibold border-b-2 transition min-w-0 ${
               activeTab === 'overview'
                 ? 'border-red-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
-            <Eye className="w-4 h-4 text-red-400" />
-            <span>Visualiser Overview</span>
+            <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-red-400 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Overview</span>
+              <span className="hidden sm:inline">Visualiser Overview</span>
+            </span>
           </button>
           <button
             onClick={() => scrollToSection('concepts')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm font-semibold border-b-2 transition min-w-0 ${
               activeTab === 'concepts'
                 ? 'border-amber-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
-            <Music className="w-4 h-4 text-amber-400" />
-            <span>PPT Musical Concepts</span>
+            <Music className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Concepts</span>
+              <span className="hidden sm:inline">PPT Musical Concepts</span>
+            </span>
           </button>
           <button
             onClick={() => scrollToSection('customise')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm font-semibold border-b-2 transition min-w-0 ${
               activeTab === 'customise'
                 ? 'border-cyan-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
-            <Sliders className="w-4 h-4 text-cyan-400" />
-            <span>Customisation & Controls</span>
+            <Sliders className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Controls</span>
+              <span className="hidden sm:inline">Customisation & Controls</span>
+            </span>
           </button>
           <button
             onClick={() => scrollToSection('links')}
-            className={`flex items-center gap-2 py-2.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+            className={`flex items-center justify-center sm:justify-start gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3 text-[11px] sm:text-sm font-semibold border-b-2 transition min-w-0 ${
               activeTab === 'links'
                 ? 'border-purple-500 text-white bg-slate-800/50'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-600'
             }`}
           >
-            <BookOpen className="w-4 h-4 text-purple-400" />
-            <span>Links & Resources</span>
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
+            <span className="truncate">
+              <span className="sm:hidden">Links</span>
+              <span className="hidden sm:inline">Links & Resources</span>
+            </span>
           </button>
         </div>
 
