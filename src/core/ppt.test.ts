@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { DEFAULT_CONFIG, loadSavedConfig, saveConfig, clearSavedConfig } from './config';
+import { DEFAULT_CONFIG, loadSavedConfig, saveConfig, clearSavedConfig, sanitizeConfig } from './config';
 import {
   SOLFEGE_SYLLABLES,
   SOLFEGE_SPECS,
@@ -1781,6 +1781,89 @@ test('Custom MIDI Tracks & LocalStorage Persistence: Store, load, playback state
   // 8. Clear all custom tracks
   clearAllCustomTracks();
   assert.strictEqual(loadSavedCustomTracks().length, 0, 'clearAllCustomTracks must empty storage');
+});
+
+test('Tonic Shift Kinetics: Configuration defaults, sanitisation, and Eco Mode toggle', () => {
+  // 1. Default config check
+  assert.strictEqual(DEFAULT_CONFIG.tonicShiftEffectsEnabled, true, 'tonicShiftEffectsEnabled must default to true');
+
+  // 2. Sanitisation
+  const sanitised = sanitizeConfig({} as any);
+  assert.strictEqual(sanitised.tonicShiftEffectsEnabled, true, 'Sanitised config must default to true if unspecified');
+
+  const sanitisedExplicitFalse = sanitizeConfig({ tonicShiftEffectsEnabled: false } as any);
+  assert.strictEqual(sanitisedExplicitFalse.tonicShiftEffectsEnabled, false, 'Explicit false must be preserved');
+});
+
+test('Tonic Shift Kinetics: Manual and automatic shift triggering, RenderCoordinator listeners, and timeline markers', () => {
+  const coordinator = new RenderCoordinator({
+    ...DEFAULT_CONFIG,
+    tonic: 2, // D
+    tonicShiftEffectsEnabled: true,
+  });
+
+  // 1. Listeners subscription
+  let shiftCount = 0;
+  let lastOldTonic = -1;
+  let lastNewTonic = -1;
+  let lastWasAuto = false;
+
+  const unsub = coordinator.subscribeTonicShift((oldT, newT, isAuto) => {
+    shiftCount++;
+    lastOldTonic = oldT;
+    lastNewTonic = newT;
+    lastWasAuto = isAuto;
+  });
+
+  // 2. Trigger manual shift via setConfig (D=2 -> G=7)
+  coordinator.setConfig({
+    ...coordinator.getConfig(),
+    tonic: 7,
+  });
+
+  assert.strictEqual(shiftCount, 1, 'Manual tonic change must trigger tonic shift listener');
+  assert.strictEqual(lastOldTonic, 2, 'Old tonic must be D (2)');
+  assert.strictEqual(lastNewTonic, 7, 'New tonic must be G (7)');
+  assert.strictEqual(lastWasAuto, false, 'Manual shift must not be marked as auto');
+  assert.strictEqual(coordinator.tonicShiftMarkers.length, 1, 'Tonic shift marker must be created');
+  assert.strictEqual(coordinator.tonicShiftMarkers[0].oldTonic, 2);
+  assert.strictEqual(coordinator.tonicShiftMarkers[0].newTonic, 7);
+  assert.strictEqual(coordinator.tonicShiftMarkers[0].isAuto, false);
+
+  // 3. Trigger manual shift directly via triggerTonicShift with isAuto=true (G=7 -> C=0)
+  coordinator.triggerTonicShift(7, 0, true);
+  assert.strictEqual(shiftCount, 2);
+  assert.strictEqual(lastOldTonic, 7);
+  assert.strictEqual(lastNewTonic, 0);
+  assert.strictEqual(lastWasAuto, true);
+  assert.strictEqual(coordinator.tonicShiftMarkers.length, 2);
+  assert.strictEqual(coordinator.tonicShiftMarkers[1].isAuto, true);
+
+  // 4. Session reset clears markers
+  coordinator.resetSession();
+  assert.strictEqual(coordinator.tonicShiftMarkers.length, 0, 'resetSession must clear timeline markers');
+
+  unsub();
+  coordinator.destroy();
+});
+
+test('Tonic Shift Kinetics: Zero-overhead bypass when tonicShiftEffectsEnabled is disabled', () => {
+  const coordinator = new RenderCoordinator({
+    ...DEFAULT_CONFIG,
+    tonic: 0,
+    tonicShiftEffectsEnabled: false,
+  });
+
+  assert.strictEqual(coordinator.cosmeticsEngine.hasActiveParticles(), false);
+
+  // Trigger shift with effects disabled
+  coordinator.triggerTonicShift(0, 5, false);
+
+  // Markers should not be spawned and cosmetic particles should not be active
+  assert.strictEqual(coordinator.tonicShiftMarkers.length, 0, 'No stream markers when effects disabled');
+  assert.strictEqual(coordinator.cosmeticsEngine.hasActiveParticles(), false, 'No cosmetic particles when effects disabled');
+
+  coordinator.destroy();
 });
 
 

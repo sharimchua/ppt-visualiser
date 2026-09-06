@@ -110,12 +110,33 @@ export function getScaleTetrachordChainTriangles(
   return segments;
 }
 
+interface TonicTriangleShiftAnimation {
+  oldTonic: number;
+  newTonic: number;
+  startTime: number;
+  durationMs: number;
+}
+
 /**
  * 60fps Canvas Renderer for the Piano Triangles Scale Signature Cell.
  * Displays 4/5 chained piano triangles with the vertex for Do centered,
  * pure geometric silhouettes, and octave-agnostic active tone highlighting.
  */
 export class PianoTrianglesRenderer {
+  private activeTonicShift: TonicTriangleShiftAnimation | null = null;
+
+  /**
+   * Triggers the kinetic Do anchor beam surge and vertex expansion ripple.
+   */
+  public triggerTonicShift(oldTonic: number, newTonic: number): void {
+    this.activeTonicShift = {
+      oldTonic,
+      newTonic,
+      startTime: performance.now(),
+      durationMs: 900,
+    };
+  }
+
   /**
    * Main render tick.
    */
@@ -218,6 +239,84 @@ export class PianoTrianglesRenderer {
         config
       );
     });
+
+    // 4. Kinetic tonic modulation surge & Do anchor pulse
+    if (config.tonicShiftEffectsEnabled !== false && this.activeTonicShift) {
+      const doNormY = (doGeom.points[doPoint]?.y ?? 50) / 100;
+      const actualDoY = (chainCenterY - triSize / 2) + doNormY * triSize;
+      this.renderTonicShiftKinetics(ctx, actualDoX, actualDoY, chainCenterY, triSize, availableHeight, config);
+    }
+  }
+
+  /**
+   * Renders the kinetic Do anchor beam surge and vertex ripple when tonic changes.
+   */
+  private renderTonicShiftKinetics(
+    ctx: CanvasRenderingContext2D,
+    doX: number,
+    doY: number,
+    chainCenterY: number,
+    triSize: number,
+    availH: number,
+    config: VisualiserConfig
+  ): void {
+    if (!this.activeTonicShift) return;
+    const elapsed = performance.now() - this.activeTonicShift.startTime;
+    if (elapsed >= this.activeTonicShift.durationMs) {
+      this.activeTonicShift = null;
+      return;
+    }
+
+    const t = elapsed / this.activeTonicShift.durationMs;
+    const surgeAlpha = Math.max(0, 1 - Math.pow(t, 1.4));
+
+    ctx.save();
+
+    // 1. Vertical Do Anchor Laser Beam Surge
+    const beamY1 = chainCenterY - availH / 2 + 6;
+    const beamY2 = chainCenterY + availH / 2 - 6;
+
+    ctx.beginPath();
+    ctx.moveTo(doX, beamY1);
+    ctx.lineTo(doX, beamY2);
+    ctx.strokeStyle = '#E13610';
+    ctx.lineWidth = 1.5 + (1 - t) * 3.5;
+    ctx.globalAlpha = surgeAlpha * 0.9;
+    ctx.shadowColor = '#E13610';
+    ctx.shadowBlur = 16 * (config.glowBloom ?? 0.8);
+    ctx.stroke();
+
+    // Inner white laser core
+    ctx.beginPath();
+    ctx.moveTo(doX, beamY1);
+    ctx.lineTo(doX, beamY2);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.0;
+    ctx.globalAlpha = surgeAlpha * 0.75;
+    ctx.stroke();
+
+    // 2. Expanding Do Vertex Harmonic Ring Ripple
+    const rippleR = 6 + t * 48;
+    ctx.beginPath();
+    ctx.arc(doX, doY, rippleR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#E13610';
+    ctx.lineWidth = Math.max(0.6, 2.4 * (1 - t));
+    ctx.globalAlpha = surgeAlpha * 0.8;
+    ctx.shadowColor = '#E13610';
+    ctx.shadowBlur = 14 * (config.glowBloom ?? 0.8);
+    ctx.stroke();
+
+    // 3. Do Anchor Diamond Pip Flash
+    const pipY = chainCenterY - triSize * 0.7;
+    ctx.beginPath();
+    ctx.arc(doX, pipY, 3 + surgeAlpha * 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.shadowColor = '#E13610';
+    ctx.shadowBlur = 16 * (config.glowBloom ?? 0.8);
+    ctx.globalAlpha = surgeAlpha;
+    ctx.fill();
+
+    ctx.restore();
   }
 
   /**

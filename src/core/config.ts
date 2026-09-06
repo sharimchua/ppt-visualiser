@@ -71,6 +71,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   particleOriginDistance: 0,
   glowBloomEnabled: true,
   glowBloom: 0.8,
+  tonicShiftEffectsEnabled: true,
   motionTrailsEnabled: true,
   motionTrails: 0.6,
   ghostingEnabled: true,
@@ -110,14 +111,25 @@ export function loadSavedConfig(): VisualiserConfig {
     if (!raw) return { ...DEFAULT_CONFIG };
 
     const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) {
-      return { ...DEFAULT_CONFIG };
-    }
+    return sanitizeConfig(parsed);
+  } catch (err) {
+    console.warn('[Config] Failed to load saved config from localStorage:', err);
+    return { ...DEFAULT_CONFIG };
+  }
+}
 
-    const merged = {
-      ...DEFAULT_CONFIG,
-      ...parsed,
-    };
+/**
+ * Sanitises and validates a configuration object against PPT specifications.
+ */
+export function sanitizeConfig(parsed: unknown): VisualiserConfig {
+  if (typeof parsed !== 'object' || parsed === null) {
+    return { ...DEFAULT_CONFIG };
+  }
+
+  const merged = {
+    ...DEFAULT_CONFIG,
+    ...(parsed as Partial<VisualiserConfig>),
+  };
 
     // Sanitize keyboard instrument range bounds
     merged.keyboardLowestMidi = typeof merged.keyboardLowestMidi === 'number'
@@ -189,6 +201,7 @@ export function loadSavedConfig(): VisualiserConfig {
     // Sanitize Note Sparks & Bloom
     merged.sparksEnabled = typeof merged.sparksEnabled === 'boolean' ? merged.sparksEnabled : ((merged.particleIntensity ?? 0) > 0);
     merged.glowBloomEnabled = typeof merged.glowBloomEnabled === 'boolean' ? merged.glowBloomEnabled : ((merged.glowBloom ?? 0) > 0);
+    merged.tonicShiftEffectsEnabled = typeof merged.tonicShiftEffectsEnabled === 'boolean' ? merged.tonicShiftEffectsEnabled : true;
     merged.motionTrailsEnabled = typeof merged.motionTrailsEnabled === 'boolean' ? merged.motionTrailsEnabled : ((merged.motionTrails ?? 0) > 0);
     merged.webglEnabled = typeof merged.webglEnabled === 'boolean' ? merged.webglEnabled : true;
 
@@ -238,11 +251,7 @@ export function loadSavedConfig(): VisualiserConfig {
     merged.focusModeEnabled = typeof merged.focusModeEnabled === 'boolean' ? merged.focusModeEnabled : true;
 
     return merged;
-  } catch (err) {
-    console.warn('[Config] Failed to load saved config from localStorage:', err);
-    return { ...DEFAULT_CONFIG };
   }
-}
 
 /**
  * Persists user configuration to browser localStorage.

@@ -1,6 +1,6 @@
-import { StreamItem, VisualiserConfig, PianoTriangleType, PianoTrianglePoint } from '../core/types';
+import { StreamItem, TonicShiftMarker, VisualiserConfig, PianoTriangleType, PianoTrianglePoint } from '../core/types';
 import { drawUniformSolfegeOnCanvas, drawPianoTriangleOnCanvas } from './glyph-renderer';
-import { TRI_PITCH_CLASSES } from '../core/ppt-constants';
+import { TRI_PITCH_CLASSES, PITCH_NAMES_DUAL } from '../core/ppt-constants';
 
 export class StreamRenderer {
   // Single-window rotation animation state
@@ -17,7 +17,8 @@ export class StreamRenderer {
     height: number,
     streamItems: StreamItem[],
     config: VisualiserConfig,
-    now: number
+    now: number,
+    tonicMarkers: TonicShiftMarker[] = []
   ) {
     if (width <= 10 || height <= 10) return;
 
@@ -42,10 +43,10 @@ export class StreamRenderer {
       if (config.fixedWindowSize === 1) {
         this.renderSingleWindowShowcase(ctx, x, y, width, height, filteredItems, config);
       } else {
-        this.renderFixedQueue(ctx, x, y, width, height, filteredItems, config);
+        this.renderFixedQueue(ctx, x, y, width, height, filteredItems, config, now, tonicMarkers);
       }
     } else {
-      this.renderContinuousStream(ctx, x, y, width, height, filteredItems, config, now);
+      this.renderContinuousStream(ctx, x, y, width, height, filteredItems, config, now, tonicMarkers);
     }
 
     ctx.restore();
@@ -201,12 +202,30 @@ export class StreamRenderer {
     width: number,
     height: number,
     items: StreamItem[],
-    config: VisualiserConfig
+    config: VisualiserConfig,
+    now: number,
+    tonicMarkers: TonicShiftMarker[] = []
   ) {
     const queueSize = Math.max(2, config.fixedWindowSize);
     const visibleItems = items.slice(-queueSize);
     const isVertical = config.orientation === 'vertical';
     const direction = config.direction || (isVertical ? 'ttb' : 'rtl');
+
+    // Kinetic wash across fixed conveyor if a recent tonic shift occurred
+    const nowSec = now / 1000;
+    const recentMarker = (config.tonicShiftEffectsEnabled !== false)
+      ? tonicMarkers.find(m => nowSec - m.timestamp >= 0 && nowSec - m.timestamp < 1.4)
+      : null;
+
+    if (recentMarker) {
+      const pulseT = (nowSec - recentMarker.timestamp) / 1.4;
+      const pulseAlpha = Math.max(0, 1 - pulseT) * 0.28;
+      ctx.save();
+      ctx.fillStyle = '#E13610';
+      ctx.globalAlpha = pulseAlpha;
+      ctx.fillRect(x, y, width, height);
+      ctx.restore();
+    }
 
     if (isVertical) {
       // Vertical conveyor
@@ -295,7 +314,8 @@ export class StreamRenderer {
     height: number,
     items: StreamItem[],
     config: VisualiserConfig,
-    now: number
+    now: number,
+    tonicMarkers: TonicShiftMarker[] = []
   ) {
     const speed = config.scrollSpeed; // px per second
     const nowSec = now / 1000;
@@ -316,6 +336,7 @@ export class StreamRenderer {
       ctx.lineTo(x + width, playheadY);
       ctx.stroke();
 
+      // Render notes
       for (const item of items) {
         const elapsed = nowSec - item.timestamp;
         const itemY = isTTB
@@ -339,6 +360,21 @@ export class StreamRenderer {
 
         this.renderItemCard(ctx, cx, itemY, itemSize, item, config, false);
       }
+
+      // Render kinetic tonic modulation barriers along timeline
+      if (config.tonicShiftEffectsEnabled !== false && tonicMarkers.length > 0) {
+        for (const marker of tonicMarkers) {
+          const elapsed = nowSec - marker.timestamp;
+          if (elapsed < 0) continue;
+          const markerY = isTTB
+            ? playheadY + elapsed * speed
+            : playheadY - elapsed * speed;
+
+          if (markerY >= y - 12 && markerY <= y + height + 12) {
+            this.renderStreamTonicBarrier(ctx, x, markerY, width, 0, marker, config, true);
+          }
+        }
+      }
     } else {
       // Horizontal
       const itemSize = Math.min(60, height * 0.55);
@@ -353,6 +389,7 @@ export class StreamRenderer {
       ctx.lineTo(playheadX, y + height);
       ctx.stroke();
 
+      // Render notes
       for (const item of items) {
         const elapsed = nowSec - item.timestamp;
         const itemX = isLTR
@@ -376,7 +413,86 @@ export class StreamRenderer {
 
         this.renderItemCard(ctx, itemX, cy, itemSize, item, config, false);
       }
+
+      // Render kinetic tonic modulation barriers along timeline
+      if (config.tonicShiftEffectsEnabled !== false && tonicMarkers.length > 0) {
+        for (const marker of tonicMarkers) {
+          const elapsed = nowSec - marker.timestamp;
+          if (elapsed < 0) continue;
+          const markerX = isLTR
+            ? playheadX + elapsed * speed
+            : playheadX - elapsed * speed;
+
+          if (markerX >= x - 12 && markerX <= x + width + 12) {
+            this.renderStreamTonicBarrier(ctx, markerX, y, 0, height, marker, config, false);
+          }
+        }
+      }
     }
+  }
+
+  /**
+   * Renders a kinetic modulation laser barrier stamped into the note stream timeline.
+   */
+  private renderStreamTonicBarrier(
+    ctx: CanvasRenderingContext2D,
+    bx: number,
+    by: number,
+    bw: number,
+    bh: number,
+    marker: TonicShiftMarker,
+    config: VisualiserConfig,
+    isVertical: boolean
+  ): void {
+    const oldPitch = PITCH_NAMES_DUAL[marker.oldTonic] ?? 'C';
+    const newPitch = PITCH_NAMES_DUAL[marker.newTonic] ?? 'C';
+    const label = marker.isAuto ? `AUTO: ${newPitch}` : `${oldPitch} ➔ ${newPitch}`;
+
+    ctx.save();
+
+    // Laser barrier outer glow
+    ctx.strokeStyle = '#E13610';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#E13610';
+    ctx.shadowBlur = 10 * (config.glowBloom ?? 0.8);
+
+    ctx.beginPath();
+    if (isVertical) {
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + bw, by);
+    } else {
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx, by + bh);
+    }
+    ctx.stroke();
+
+    // Laser barrier bright inner wire
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+
+    // Center pill badge
+    const badgeW = marker.isAuto ? 72 : 92;
+    const badgeH = 18;
+    const badgeX = isVertical ? bx + bw / 2 - badgeW / 2 : bx - badgeW / 2;
+    const badgeY = isVertical ? by - badgeH / 2 : by + bh / 2 - badgeH / 2;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.beginPath();
+    ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 9);
+    ctx.fill();
+
+    ctx.strokeStyle = marker.isAuto ? '#10B981' : '#E13610';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.font = 'bold 9px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(label, badgeX + badgeW / 2, badgeY + badgeH / 2);
+
+    ctx.restore();
   }
 
   private renderItemCard(

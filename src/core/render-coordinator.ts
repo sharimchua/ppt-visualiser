@@ -1,6 +1,7 @@
 import {
   ActiveNote,
   StreamItem,
+  TonicShiftMarker,
   VisualiserConfig,
   VisualiserModuleType,
 } from './types';
@@ -49,12 +50,14 @@ export interface ScaleFitInfo {
 export type ActiveNotesListener = (notes: Map<number, ActiveNote>) => void;
 export type ScaleFitListener = (info: ScaleFitInfo) => void;
 export type AutoTonicShiftHandler = (newTonic: number) => void;
+export type TonicShiftListener = (oldTonic: number, newTonic: number, isAuto: boolean) => void;
 
 export class RenderCoordinator {
   // Live musical & animation state (bypassing React)
   public readonly activeNotes: Map<number, ActiveNote> = new Map();
   public readonly decayingNotes: Map<number, { note: ActiveNote; decayProgress: number }> = new Map();
   public streamItems: StreamItem[] = [];
+  public tonicShiftMarkers: TonicShiftMarker[] = [];
 
   // Dedicated Renderers & Engines
   public readonly cosmeticsEngine: CosmeticsEngine;
@@ -86,7 +89,9 @@ export class RenderCoordinator {
   // Listeners & Callbacks
   private readonly activeNotesListeners: Set<ActiveNotesListener> = new Set();
   private readonly scaleFitListeners: Set<ScaleFitListener> = new Set();
+  private readonly tonicShiftListeners: Set<TonicShiftListener> = new Set();
   public onAutoTonicShift?: AutoTonicShiftHandler;
+  private lastShiftWasAuto: boolean = false;
 
   // Animation Frame Loop
   private animId: number | null = null;
@@ -191,6 +196,7 @@ export class RenderCoordinator {
     if (this.unsubMidiOff) this.unsubMidiOff();
     this.activeNotesListeners.clear();
     this.scaleFitListeners.clear();
+    this.tonicShiftListeners.clear();
     this.cellCanvases.clear();
     if (this.webglPipeline) {
       this.webglPipeline.destroy();
@@ -212,6 +218,8 @@ export class RenderCoordinator {
       config.masterVolume !== this.config.masterVolume ||
       config.synthWaveform !== this.config.synthWaveform;
     const focusChanged = config.focusModeEnabled !== this.config.focusModeEnabled;
+    const tonicChanged = config.tonic !== this.config.tonic;
+    const oldTonic = this.config.tonic;
 
     this.config = config;
 
@@ -234,6 +242,11 @@ export class RenderCoordinator {
     if (themeChanged) {
       this.renderBackground();
     }
+
+    if (tonicChanged) {
+      this.triggerTonicShift(oldTonic, config.tonic, this.lastShiftWasAuto);
+      this.lastShiftWasAuto = false;
+    }
   }
 
   public getConfig(): VisualiserConfig {
@@ -244,6 +257,7 @@ export class RenderCoordinator {
     this.activeNotes.clear();
     this.decayingNotes.clear();
     this.streamItems = [];
+    this.tonicShiftMarkers = [];
     this.pitchClockRenderer.resetRevealsAndActivity();
     this.scaleTracker.reset();
     for (const listener of this.activeNotesListeners) {
@@ -264,6 +278,70 @@ export class RenderCoordinator {
     return () => {
       this.scaleFitListeners.delete(listener);
     };
+  }
+
+  public subscribeTonicShift(listener: TonicShiftListener): () => void {
+    this.tonicShiftListeners.add(listener);
+    return () => {
+      this.tonicShiftListeners.delete(listener);
+    };
+  }
+
+  public triggerTonicShift(oldTonic: number, newTonic: number, isAuto: boolean = false) {
+    if (oldTonic === newTonic) return;
+
+    if (this.config.tonicShiftEffectsEnabled !== false) {
+      // Find orbital clock center and radius on the effects canvas (if available)
+      let orbitalCellCanvas: HTMLCanvasElement | null = null;
+      for (const cell of this.cellCanvases.values()) {
+        if (cell.module === 'orbital') {
+          orbitalCellCanvas = cell.canvas;
+          break;
+        }
+      }
+
+      const targetCanvas = this.effectsCanvas || this.overlayCanvas || this.postProcessingCanvas;
+      let clockCx = (typeof window !== 'undefined' ? window.innerWidth : 1920) / 2;
+      let clockCy = (typeof window !== 'undefined' ? window.innerHeight : 1080) / 2;
+      let clockRadius = Math.min(clockCx, clockCy) * 0.45;
+
+      if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
+        const cellRect = orbitalCellCanvas.getBoundingClientRect();
+        const targetRect = targetCanvas.getBoundingClientRect();
+        clockCx = (cellRect.left - targetRect.left) + cellRect.width / 2;
+        clockCy = (cellRect.top - targetRect.top) + cellRect.height / 2;
+        clockRadius = Math.min(cellRect.width, cellRect.height) * 0.45;
+      }
+
+      // 1. Cosmetics Engine shockwaves, orbital particles, and HUD banner
+      this.cosmeticsEngine.spawnTonicShift(clockCx, clockCy, oldTonic, newTonic, isAuto, clockRadius);
+
+      // 2. Pitch Clock compass sweep arc and Do zenith beacon
+      this.pitchClockRenderer.triggerTonicShift(oldTonic, newTonic);
+
+      // 3. Piano Triangles Do anchor beam surge and vertex ripple
+      this.pianoTrianglesRenderer.triggerTonicShift(oldTonic, newTonic);
+
+      // 4. Note stream timeline modulation marker
+      const nowSec = performance.now() / 1000;
+      this.tonicShiftMarkers.push({
+        id: `tonic-${performance.now()}`,
+        oldTonic,
+        newTonic,
+        timestamp: nowSec,
+        isAuto,
+      });
+
+      // Keep maximum 40 recent timeline markers
+      if (this.tonicShiftMarkers.length > 40) {
+        this.tonicShiftMarkers = this.tonicShiftMarkers.slice(-40);
+      }
+    }
+
+    // Notify tonic shift listeners (e.g. Virtual Keyboard)
+    for (const listener of this.tonicShiftListeners) {
+      listener(oldTonic, newTonic, isAuto);
+    }
   }
 
   public registerPostProcessingCanvas(canvas: HTMLCanvasElement) {
@@ -560,6 +638,7 @@ export class RenderCoordinator {
       alignRes.newTonic !== undefined &&
       alignRes.newTonic !== this.config.tonic
     ) {
+      this.lastShiftWasAuto = true;
       if (this.onAutoTonicShift) {
         this.onAutoTonicShift(alignRes.newTonic);
       }
@@ -624,7 +703,8 @@ export class RenderCoordinator {
           height,
           this.streamItems,
           effectiveConfig,
-          time
+          time,
+          this.tonicShiftMarkers
         );
       }
 
@@ -656,7 +736,7 @@ export class RenderCoordinator {
         // A. Kinetic sparks & shockwaves (only if active)
         if (hasKinetics) {
           const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
-          this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow);
+          this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow, width, height);
         }
 
         // B. If WebGL is not active/supported or disabled, render 2D post-processing fallback directly on this context

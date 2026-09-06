@@ -28,7 +28,19 @@ interface RadialArcTrail {
   durationMs: number;
 }
 
+interface TonicClockShiftAnimation {
+  oldTonic: number;
+  newTonic: number;
+  startTime: number;
+  durationMs: number;
+  fromAngle: number;
+  toAngle: number;
+  deltaAngle: number;
+}
+
 export class PitchClockRenderer {
+  // Kinetic tonic shift animation state
+  private activeTonicShift: TonicClockShiftAnimation | null = null;
   // Set of tone keys ("${r}_${s}") that have been played in this session
   private discoveredTones: Set<string> = new Set();
   // Dynamic per-tone activity score [0..1] for organic window decay
@@ -56,6 +68,29 @@ export class PitchClockRenderer {
   private toneCoordinates: Map<string, { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number }> = new Map();
 
   /**
+   * Triggers the kinetic compass modulation sweep arc and Do zenith beacon pulse.
+   */
+  public triggerTonicShift(oldTonic: number, newTonic: number): void {
+    const semitoneOfNew = ((newTonic - oldTonic) % 12 + 12) % 12;
+    const fromAngle = getClockAngleRad(semitoneOfNew);
+    const toAngle = getClockAngleRad(0); // 12 o'clock Do
+
+    let delta = toAngle - fromAngle;
+    while (delta > Math.PI) delta -= 2 * Math.PI;
+    while (delta <= -Math.PI) delta += 2 * Math.PI;
+
+    this.activeTonicShift = {
+      oldTonic,
+      newTonic,
+      startTime: performance.now(),
+      durationMs: 1100,
+      fromAngle,
+      toAngle,
+      deltaAngle: delta,
+    };
+  }
+
+  /**
    * Look up exact on-screen rendered center coordinates and radius for a MIDI note.
    */
   public getToneCoordinates(midi: number, tonic: number, lowestMidi: number = 21): { x: number; y: number; radius: number; angle: number; semitone: number; registerIndex: number } | null {
@@ -79,6 +114,7 @@ export class PitchClockRenderer {
     this.lastNotePerRegister = [null, null, null, null, null, null, null, null];
     this.processedNoteStarts.clear();
     this.radialTrails = [];
+    this.activeTonicShift = null;
   }
 
   public render(
@@ -255,6 +291,140 @@ export class PitchClockRenderer {
       effectiveConfig,
       now
     );
+
+    // 6. Draw Kinetic Tonic Shift (Compass Sweep Arc, Do Zenith Beacon, and Octave Seam Flash)
+    if (effectiveConfig.tonicShiftEffectsEnabled !== false && this.activeTonicShift) {
+      this.drawTonicShiftKinetics(ctx, cx, cy, this.currentRadii, activeRegisters, now, effectiveConfig);
+    }
+  }
+
+  /**
+   * Renders the kinetic compass modulation sweep arc and Do zenith beacon pulse when the tonic changes.
+   */
+  private drawTonicShiftKinetics(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    ringRadii: number[],
+    activeRegisters: Set<number>,
+    now: number,
+    config: VisualiserConfig
+  ): void {
+    if (!this.activeTonicShift) return;
+    const elapsed = now - this.activeTonicShift.startTime;
+    if (elapsed >= this.activeTonicShift.durationMs) {
+      this.activeTonicShift = null;
+      return;
+    }
+
+    const t = elapsed / this.activeTonicShift.durationMs;
+    const { fromAngle, deltaAngle } = this.activeTonicShift;
+
+    // Find outermost active ring radius
+    const maxActiveR = Math.max(80, ...Array.from(activeRegisters).map(r => ringRadii[r] || 0));
+    const sweepRadius = maxActiveR * 1.05;
+
+    ctx.save();
+
+    // 1. Compass Modulation Sweep Arc along the perimeter
+    if (t < 0.9) {
+      const headEased = 1 - Math.pow(1 - t, 2.5);
+      const tailT = Math.max(0, (t - 0.2) / 0.8);
+      const tailEased = tailT * tailT;
+
+      const headAngle = fromAngle + deltaAngle * headEased;
+      const tailAngle = fromAngle + deltaAngle * tailEased;
+      const counterclockwise = deltaAngle < 0;
+
+      const alpha = Math.max(0, 1 - Math.pow(t, 1.2));
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, sweepRadius, tailAngle, headAngle, counterclockwise);
+
+      const hx = cx + sweepRadius * Math.cos(headAngle);
+      const hy = cy + sweepRadius * Math.sin(headAngle);
+      const tx = cx + sweepRadius * Math.cos(tailAngle);
+      const ty = cy + sweepRadius * Math.sin(tailAngle);
+
+      const grad = ctx.createLinearGradient(tx, ty, hx, hy);
+      grad.addColorStop(0, 'rgba(56, 189, 248, 0.1)'); // Cyan tail
+      grad.addColorStop(0.7, '#F5D432'); // Gold mid
+      grad.addColorStop(1, '#E13610'); // Do Red head
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 4.0;
+      ctx.lineCap = 'round';
+      ctx.globalAlpha = alpha;
+      ctx.shadowColor = '#E13610';
+      ctx.shadowBlur = 14 * config.glowBloom;
+      ctx.stroke();
+
+      // Leading comet spark
+      ctx.beginPath();
+      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#FFFFFF';
+      ctx.shadowBlur = 16 * config.glowBloom;
+      ctx.fill();
+    }
+
+    // 2. 12 o'clock Do Zenith Beacon Pulse
+    const beaconT = Math.max(0, (t - 0.25) / 0.75);
+    if (beaconT > 0 && beaconT < 1) {
+      const beaconAlpha = Math.sin(beaconT * Math.PI);
+      const doAngle = getClockAngleRad(0); // 12 o'clock Do (-PI / 2)
+      const doX = cx + sweepRadius * Math.cos(doAngle);
+      const doY = cy + sweepRadius * Math.sin(doAngle);
+
+      // A. Expanding harmonic ripple rings from 12 o'clock Do
+      const rippleR = 8 + beaconT * 55;
+      ctx.beginPath();
+      ctx.arc(doX, doY, rippleR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#E13610';
+      ctx.lineWidth = Math.max(0.8, 2.5 * (1 - beaconT));
+      ctx.globalAlpha = beaconAlpha * 0.75;
+      ctx.shadowColor = '#E13610';
+      ctx.shadowBlur = 12 * config.glowBloom;
+      ctx.stroke();
+
+      // B. Radiant crosshair beacon spikes
+      const spikeLen = 14 + beaconT * 22;
+      ctx.beginPath();
+      ctx.moveTo(doX, doY - spikeLen);
+      ctx.lineTo(doX, doY + spikeLen);
+      ctx.moveTo(doX - spikeLen, doY);
+      ctx.lineTo(doX + spikeLen, doY);
+      ctx.strokeStyle = 'rgba(255, 255, 255, ' + (beaconAlpha * 0.85) + ')';
+      ctx.lineWidth = 1.8;
+      ctx.shadowColor = '#FFFFFF';
+      ctx.shadowBlur = 10 * config.glowBloom;
+      ctx.stroke();
+
+      // C. Luminous Do core glint
+      ctx.beginPath();
+      ctx.arc(doX, doY, 3.5 + beaconAlpha * 2, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = '#E13610';
+      ctx.shadowBlur = 16 * config.glowBloom;
+      ctx.fill();
+    }
+
+    // 3. Octave Seam Glint (between 7 and 6 o'clock)
+    if (t > 0.1 && t < 0.6) {
+      const seamAlpha = Math.sin(((t - 0.1) / 0.5) * Math.PI) * 0.5;
+      const seamAngle = getClockAngleRad(6.5);
+      const minActiveR = Math.min(...Array.from(activeRegisters).map(r => ringRadii[r] || 40));
+      ctx.beginPath();
+      ctx.moveTo(cx + minActiveR * Math.cos(seamAngle), cy + minActiveR * Math.sin(seamAngle));
+      ctx.lineTo(cx + sweepRadius * Math.cos(seamAngle), cy + sweepRadius * Math.sin(seamAngle));
+      ctx.strokeStyle = `rgba(225, 54, 16, ${seamAlpha})`;
+      ctx.lineWidth = 2.0;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
   }
 
   /**

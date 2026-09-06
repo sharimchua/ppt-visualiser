@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { PITCH_CLASS_TO_PIANO_TRIANGLE, SOLFEGE_SYLLABLES, SOLFEGE_SPECS } from '../core/ppt-constants';
 import { ActiveNote, VisualiserConfig, PianoTriangleType, PianoTrianglePoint } from '../core/types';
 import { createPianoTriangleSvg } from '../renderers/glyph-renderer';
@@ -63,6 +63,18 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   onNoteOn,
   onNoteOff,
 }) => {
+  const [flashingTonic, setFlashingTonic] = useState<number | null>(null);
+
+  // Trigger kinetic flash on all matching keys when tonic changes
+  useEffect(() => {
+    if (config.tonicShiftEffectsEnabled === false) return;
+    setFlashingTonic(config.tonic);
+    const timer = window.setTimeout(() => {
+      setFlashingTonic(null);
+    }, 850);
+    return () => window.clearTimeout(timer);
+  }, [config.tonic, config.tonicShiftEffectsEnabled]);
+
   // Keyboard listener for QWERTY playing
   useEffect(() => {
     const activeKeys = new Set<string>();
@@ -182,11 +194,13 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     e.preventDefault();
                     onNoteOff(key.midi);
                   }}
-                  className={`relative flex-1 h-full border-r border-slate-300/80 last:border-r-0 transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-2 select-none ${
+                  className={`relative flex-1 h-full border-r border-slate-300/80 last:border-r-0 transition-all duration-300 cursor-pointer flex flex-col justify-end items-center pb-2 select-none ${
                     isFirst ? 'rounded-bl-md' : ''
                   } ${isLast ? 'rounded-br-md' : ''} ${
                     key.isActive
                       ? 'border-b-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.7)] translate-y-[2px]'
+                      : key.pc === flashingTonic
+                      ? 'ring-2 ring-inset ring-[#E13610] shadow-[0_0_16px_rgba(225,54,16,0.65)] bg-gradient-to-b from-rose-50 via-white to-slate-200 border-b-4 border-red-500'
                       : 'bg-gradient-to-b from-white via-slate-50 to-slate-200 hover:from-white hover:to-slate-100 border-b-4 border-slate-400/90 shadow-[inset_0_-1px_2px_rgba(0,0,0,0.1)]'
                   }`}
                   style={{
@@ -299,9 +313,11 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
                     e.stopPropagation();
                     onNoteOff(key.midi);
                   }}
-                  className={`absolute pointer-events-auto h-[63%] rounded-b-[4px] transition-all duration-75 cursor-pointer flex flex-col justify-end items-center pb-1.5 z-20 -translate-x-1/2 select-none ${
+                  className={`absolute pointer-events-auto h-[63%] rounded-b-[4px] transition-all duration-300 cursor-pointer flex flex-col justify-end items-center pb-1.5 z-20 -translate-x-1/2 select-none ${
                     key.isActive
                       ? 'border-b-2 border-white shadow-[0_0_18px_rgba(255,255,255,0.85)] translate-y-[2px]'
+                      : key.pc === flashingTonic
+                      ? 'ring-2 ring-[#E13610] shadow-[0_0_18px_rgba(225,54,16,0.85)] bg-gradient-to-b from-neutral-700 to-red-950 border-x border-b border-red-600'
                       : 'bg-gradient-to-b from-neutral-800 via-neutral-900 to-black hover:from-neutral-700 hover:to-neutral-900 border-x border-b border-black/90 shadow-[0_4px_6px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)]'
                   }`}
                   style={{

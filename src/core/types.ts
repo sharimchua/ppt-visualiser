@@ -52,6 +52,14 @@ export interface StreamItem {
   rotation: GlyphRotation;
 }
 
+export interface TonicShiftMarker {
+  id: string;
+  oldTonic: number;
+  newTonic: number;
+  timestamp: number; // in seconds
+  isAuto: boolean;
+}
+
 export type StreamMode = 'fixed' | 'continuous';
 export type StreamOrientation = 'horizontal' | 'vertical';
 export type StreamDirection = 'rtl' | 'ltr' | 'ttb' | 'btt';
@@ -166,6 +174,7 @@ export interface AestheticsConfig {
   particleOriginDistance: number; // 0..60px offset from tone circle edge
   glowBloomEnabled?: boolean;
   glowBloom: number; // 0..1
+  tonicShiftEffectsEnabled?: boolean;
   motionTrailsEnabled?: boolean;
   motionTrails: number; // 0..0.8
   ghostingEnabled?: boolean;

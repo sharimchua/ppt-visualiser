@@ -1013,6 +1013,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     sparksEnabled: true,
                     glowBloomEnabled: true,
                     motionTrailsEnabled: true,
+                    tonicShiftEffectsEnabled: true,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-purple-500/50 bg-purple-600/20 hover:bg-purple-600/30 text-[10px] text-purple-300 font-medium transition text-center"
@@ -1031,6 +1032,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     sparksEnabled: true,
                     glowBloomEnabled: true,
                     motionTrailsEnabled: true,
+                    tonicShiftEffectsEnabled: true,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 font-medium transition text-center"
@@ -1049,6 +1051,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     sparksEnabled: false,
                     glowBloomEnabled: false,
                     motionTrailsEnabled: false,
+                    tonicShiftEffectsEnabled: false,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-emerald-500/50 bg-emerald-600/20 hover:bg-emerald-600/30 text-[10px] text-emerald-300 font-medium transition text-center"
@@ -1644,6 +1647,33 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 />
               </div>
             )}
+          </div>
+
+          {/* 9. Tonic Shift Kinetics */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Tonic Shift Kinetics</span>
+                <span className="text-[10px] text-slate-400 block">Shockwaves, modulation sweeps & stream markers</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.tonicShiftEffectsEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.tonicShiftEffectsEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ tonicShiftEffectsEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-400 leading-relaxed border-t border-slate-800/60 pt-2">
+              Triggers a luminous compass sweep arc and Do zenith beacon on the pitch clock, a vertical laser surge on piano triangles, a timeline modulation barrier in the note stream, and an HUD badge whenever tonic is changed.
+            </p>
           </div>
         </section>
 

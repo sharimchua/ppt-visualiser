@@ -1,5 +1,5 @@
 import { ActiveNote, BackgroundTheme, VisualiserConfig } from '../core/types';
-import { getClockAngleRad, resolveMidiToRegisterAndSemitone } from '../core/ppt-constants';
+import { getClockAngleRad, resolveMidiToRegisterAndSemitone, PITCH_NAMES_DUAL } from '../core/ppt-constants';
 
 export interface KineticParticle {
   x: number;
@@ -36,7 +36,16 @@ export interface PhosphorGhost {
   vx: number;
 }
 
+export interface TonicShiftHUDNotification {
+  oldTonic: number;
+  newTonic: number;
+  isAuto: boolean;
+  startTime: number;
+  durationMs: number;
+}
+
 export class CosmeticsEngine {
+  private tonicShiftHUD: TonicShiftHUDNotification | null = null;
   private static readonly GRAIN_PATTERNS_COUNT = 6;
   private static readonly GRAIN_PATTERN_SIZE = 160;
 
@@ -189,6 +198,84 @@ export class CosmeticsEngine {
   }
 
   /**
+   * Spawns kinetic tonic modulation shockwave wavefronts, directional orbital particles,
+   * and sets up transient HUD banner notification.
+   */
+  public spawnTonicShift(
+    cx: number,
+    cy: number,
+    oldTonic: number,
+    newTonic: number,
+    isAuto: boolean,
+    clockRadius: number = 180
+  ) {
+    const delta = ((newTonic - oldTonic + 6) % 12) - 6;
+    const spinDir = delta >= 0 ? 1 : -1;
+
+    // 1. Primary Do-red resonant shockwave ring
+    this.shockwaves.push({
+      x: cx,
+      y: cy,
+      currentRadius: Math.max(12, clockRadius * 0.15),
+      maxRadius: Math.max(120, clockRadius * 1.55),
+      color: '#E13610',
+      alpha: 0.95,
+      decayRate: 0.015,
+      lineWidth: 3.5,
+    });
+
+    // 2. Secondary Harmonic Wavefront in bright cyan resonance
+    this.shockwaves.push({
+      x: cx,
+      y: cy,
+      currentRadius: 6,
+      maxRadius: Math.max(90, clockRadius * 1.25),
+      color: '#38BDF8',
+      alpha: 0.8,
+      decayRate: 0.022,
+      lineWidth: 2.0,
+    });
+
+    // 3. Spawns kinetic orbital particles with angular momentum
+    const particleCount = 28;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const speed = Math.random() * 3.5 + 1.8;
+      const tanAngle = angle + (spinDir * Math.PI) / 2;
+      const vx = Math.cos(angle) * (speed * 0.6) + Math.cos(tanAngle) * (speed * 0.8);
+      const vy = Math.sin(angle) * (speed * 0.6) + Math.sin(tanAngle) * (speed * 0.8);
+      const life = Math.random() * 35 + 35;
+
+      this.particles.push({
+        x: cx + Math.cos(angle) * (clockRadius * 0.2),
+        y: cy + Math.sin(angle) * (clockRadius * 0.2),
+        vx,
+        vy,
+        gravity: 0,
+        radius: Math.random() * 2.2 + 1.2,
+        color: i % 2 === 0 ? '#E13610' : '#F5D432',
+        alpha: 0.95,
+        decay: 1.0 / life,
+        life: 0,
+        maxLife: life,
+      });
+    }
+
+    // 4. Set HUD notification
+    this.tonicShiftHUD = {
+      oldTonic,
+      newTonic,
+      isAuto,
+      startTime: performance.now(),
+      durationMs: 2000,
+    };
+  }
+
+  public hasActiveTonicHUD(): boolean {
+    return this.tonicShiftHUD !== null && (performance.now() - this.tonicShiftHUD.startTime < this.tonicShiftHUD.durationMs);
+  }
+
+  /**
    * Updates all active particles and shockwaves
    */
   public update() {
@@ -242,7 +329,7 @@ export class CosmeticsEngine {
    * Checks if there are any active particles, shockwaves, or ghosts being simulated
    */
   public hasActiveParticles(): boolean {
-    return this.particles.length > 0 || this.shockwaves.length > 0 || this.ghosts.length > 0;
+    return this.particles.length > 0 || this.shockwaves.length > 0 || this.ghosts.length > 0 || this.hasActiveTonicHUD();
   }
 
   /**
@@ -332,7 +419,12 @@ export class CosmeticsEngine {
   /**
    * Renders particles and shockwaves on top of canvas elements
    */
-  public renderEffects(ctx: CanvasRenderingContext2D, glowBloom: number = 0.8) {
+  public renderEffects(
+    ctx: CanvasRenderingContext2D,
+    glowBloom: number = 0.8,
+    vpWidth: number = 0,
+    vpHeight: number = 0
+  ) {
     ctx.save();
 
     // Render shockwaves
@@ -367,6 +459,99 @@ export class CosmeticsEngine {
       ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
       ctx.fill();
     }
+
+    // 3. Transient Kinetic Tonic HUD Banner
+    if (this.tonicShiftHUD) {
+      const elapsed = performance.now() - this.tonicShiftHUD.startTime;
+      if (elapsed >= this.tonicShiftHUD.durationMs) {
+        this.tonicShiftHUD = null;
+      } else {
+        const progress = elapsed / this.tonicShiftHUD.durationMs;
+        let alpha = 1.0;
+        if (progress < 0.12) {
+          alpha = progress / 0.12;
+        } else if (progress > 0.65) {
+          alpha = 1.0 - (progress - 0.65) / 0.35;
+        }
+        alpha = Math.max(0, Math.min(1, alpha));
+
+        if (alpha > 0.02 && vpWidth > 0 && vpHeight > 0) {
+          this.renderTonicHUDCard(ctx, vpWidth / 2, Math.max(40, vpHeight * 0.06), this.tonicShiftHUD, alpha, glowBloom);
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * Renders a sleek cybernetic canvas HUD pill badge indicating tonic shift.
+   */
+  private renderTonicHUDCard(
+    ctx: CanvasRenderingContext2D,
+    cx: number,
+    cy: number,
+    hud: TonicShiftHUDNotification,
+    alpha: number,
+    glowBloom: number
+  ) {
+    const oldPitch = PITCH_NAMES_DUAL[hud.oldTonic] ?? 'C';
+    const newPitch = PITCH_NAMES_DUAL[hud.newTonic] ?? 'C';
+    const badgeText = hud.isAuto ? 'AUTO-TONIC DETECTED' : 'TONIC RE-ALIGNED';
+    const transitionText = `${oldPitch} ➔ ${newPitch}`;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    const cardW = 230;
+    const cardH = 36;
+    const rx = cx - cardW / 2;
+    const ry = cy - cardH / 2;
+
+    // Glowing shadow
+    if (glowBloom > 0.1) {
+      ctx.shadowColor = hud.isAuto ? '#10B981' : '#E13610';
+      ctx.shadowBlur = 14 * glowBloom;
+    }
+
+    // Pill container background
+    ctx.fillStyle = 'rgba(11, 15, 25, 0.90)';
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, cardW, cardH, 18);
+    ctx.fill();
+
+    // Outer subtle border
+    ctx.strokeStyle = hud.isAuto ? 'rgba(16, 185, 129, 0.65)' : 'rgba(225, 54, 16, 0.65)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Status indicator beacon dot
+    const dotX = rx + 16;
+    const dotY = cy;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = hud.isAuto ? '#10B981' : '#E13610';
+    ctx.fill();
+
+    // Beacon ping ring
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 7.0, 0, Math.PI * 2);
+    ctx.strokeStyle = hud.isAuto ? 'rgba(16, 185, 129, 0.45)' : 'rgba(225, 54, 16, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Tag text: AUTO-TONIC or TONIC RE-ALIGNED
+    ctx.font = 'bold 9px "Inter", -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = hud.isAuto ? '#34D399' : '#FCA5A5';
+    ctx.fillText(badgeText, rx + 28, cy);
+
+    // Transition text: C ➔ D
+    ctx.font = 'bold 13px "JetBrains Mono", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#F8FAFC';
+    ctx.fillText(transitionText, rx + cardW - 14, cy);
 
     ctx.restore();
   }
