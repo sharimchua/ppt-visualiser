@@ -179,7 +179,7 @@ export class StreamRenderer {
         latestItem.colorHex,
         undefined,
         isFi ? 3.5 : 2.5,
-        config.glyphContrastMode === 'high'
+        false
       );
     }
 
@@ -451,7 +451,7 @@ export class StreamRenderer {
         isFi ? '#141414' : item.colorHex,
         undefined,
         isFi ? 3.0 : 2.0,
-        config.glyphContrastMode === 'high'
+        false
       );
     }
 

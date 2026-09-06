@@ -354,7 +354,7 @@ test('Clock Node Label Priorities: 8 Priority Slots & Outermost Sizing', () => {
   assert.strictEqual(DEFAULT_CONFIG.clockLabelPriorities.length, 8);
   assert.deepStrictEqual(
     DEFAULT_CONFIG.clockLabelPriorities,
-    ['glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs']
+    ['pitches', 'triPitches', 'syllables', 'glyphs', 'triangles', 'intervals', 'none', 'none']
   );
 
   // Outermost ring clearance calculation test:

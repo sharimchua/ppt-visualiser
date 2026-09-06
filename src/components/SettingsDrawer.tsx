@@ -543,38 +543,6 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             )}
           </div>
 
-          {/* Glyph Contrast & Fi Styling */}
-          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
-            <label className="block font-medium text-slate-300">Glyph Contrast & Legibility</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => onUpdateConfig({ glyphContrastMode: 'high' })}
-                className={`py-1.5 px-2 rounded border text-center transition ${
-                  config.glyphContrastMode === 'high'
-                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
-                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                High-Contrast Luminous
-              </button>
-              <button
-                onClick={() => onUpdateConfig({ glyphContrastMode: 'solfege' })}
-                className={`py-1.5 px-2 rounded border text-center transition ${
-                  config.glyphContrastMode === 'solfege'
-                    ? 'bg-red-600/30 border-red-500 text-white font-medium'
-                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Canonical Solfège
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-500 italic">
-              {config.glyphContrastMode === 'high'
-                ? 'High-contrast mode adds brilliant white outlines to all solfège glyphs and renders Fi with luminous platinum styling for supreme legibility.'
-                : 'Canonical Solfège mode uses traditional darker engravings and subtle boundary styling.'}
-            </p>
-          </div>
-
           {/* Clock Node Label Priority Slots */}
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <div className="flex justify-between items-center">
@@ -590,22 +558,23 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Presets:</span>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
-                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('glyphs') })}
-                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                  onClick={() =>
+                    onUpdateConfig({
+                      clockLabelPriorities: [
+                        'pitches',
+                        'triPitches',
+                        'syllables',
+                        'glyphs',
+                        'triangles',
+                        'intervals',
+                        'none',
+                        'none',
+                      ],
+                    })
+                  }
+                  className="py-1 px-1.5 rounded border border-red-500/50 bg-red-600/20 hover:bg-red-600/30 text-[10px] text-red-300 transition text-center font-medium"
                 >
-                  All Uniform Solfège
-                </button>
-                <button
-                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('triangles') })}
-                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
-                >
-                  All Piano Triangles
-                </button>
-                <button
-                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('syllables') })}
-                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
-                >
-                  All Solfège Names
+                  Default Hierarchy
                 </button>
                 <button
                   onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('pitches') })}
@@ -620,23 +589,22 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   All Tri Pitch (△X)
                 </button>
                 <button
-                  onClick={() =>
-                    onUpdateConfig({
-                      clockLabelPriorities: [
-                        'triangles',
-                        'triangles',
-                        'glyphs',
-                        'glyphs',
-                        'syllables',
-                        'syllables',
-                        'pitches',
-                        'none',
-                      ],
-                    })
-                  }
-                  className="py-1 px-1.5 rounded border border-red-500/50 bg-red-600/20 hover:bg-red-600/30 text-[10px] text-red-300 transition text-center font-medium"
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('syllables') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
                 >
-                  Graduated Scale
+                  All Solfège Names
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('glyphs') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Uniform Solfège
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ clockLabelPriorities: Array(8).fill('triangles') })}
+                  className="py-1 px-1.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 transition text-center"
+                >
+                  All Piano Triangles
                 </button>
               </div>
             </div>
@@ -649,7 +617,8 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               </div>
               <div className="space-y-1.5 bg-slate-950/40 p-2 rounded-lg border border-slate-800/80">
                 {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
-                  const currentVal = config.clockLabelPriorities?.[idx] ?? 'glyphs';
+                  const defaultSlots: ClockLabelType[] = ['pitches', 'triPitches', 'syllables', 'glyphs', 'triangles', 'intervals', 'none', 'none'];
+                  const currentVal = config.clockLabelPriorities?.[idx] ?? defaultSlots[idx];
                   const slotLabel =
                     idx === 0
                       ? 'Slot 1 (Outermost)'
@@ -667,17 +636,17 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                       <select
                         value={currentVal}
                         onChange={(e) => {
-                          const updated = [...(config.clockLabelPriorities || Array(8).fill('glyphs'))];
+                          const updated = [...(config.clockLabelPriorities || defaultSlots)];
                           updated[idx] = e.target.value as ClockLabelType;
                           onUpdateConfig({ clockLabelPriorities: updated });
                         }}
                         className="bg-slate-950 text-[11px] text-slate-200 rounded px-2 py-1 border border-slate-700/80 focus:outline-none focus:border-red-500 cursor-pointer flex-1 min-w-0"
                       >
-                        <option value="glyphs">Uniform Solfège</option>
-                        <option value="triangles">Piano Triangles</option>
-                        <option value="syllables">Solfège Names</option>
                         <option value="pitches">Pitch Names</option>
                         <option value="triPitches">Tri Pitch Class (△X)</option>
+                        <option value="syllables">Solfège Names</option>
+                        <option value="glyphs">Uniform Solfège</option>
+                        <option value="triangles">Piano Triangles</option>
                         <option value="intervals">Intervals</option>
                         <option value="none">None (Dot)</option>
                       </select>

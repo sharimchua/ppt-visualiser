@@ -941,29 +941,19 @@ export class PitchClockRenderer {
         } else {
           // Inactive idle state
           if (isFi) {
-            if (config.glyphContrastMode === 'high') {
-              ctx.fillStyle = '#0f172a';
-              ctx.fill();
-
-              ctx.strokeStyle = '#f8fafc'; // Crisp platinum white rim
-              ctx.lineWidth = 2.4;
-              ctx.stroke();
-            } else {
-              ctx.fillStyle = '#141414';
-              ctx.fill();
-
-              ctx.strokeStyle = '#64748b';
-              ctx.lineWidth = 1.4;
-              ctx.stroke();
-            }
-          } else {
-            // Solfege degree
-            const isHigh = config.glyphContrastMode === 'high';
-            ctx.fillStyle = hexToRgba(solfegeColor, isHigh ? 0.30 : 0.20);
+            ctx.fillStyle = '#141414';
             ctx.fill();
 
-            ctx.strokeStyle = isHigh ? '#ffffff' : hexToRgba(solfegeColor, 0.95);
-            ctx.lineWidth = s === 0 ? 2.8 : (isHigh ? 1.8 : 1.5); // Emphasize Do
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+          } else {
+            // Solfege degree
+            ctx.fillStyle = hexToRgba(solfegeColor, 0.20);
+            ctx.fill();
+
+            ctx.strokeStyle = hexToRgba(solfegeColor, 0.95);
+            ctx.lineWidth = s === 0 ? 2.8 : 1.5; // Emphasise Do
             ctx.stroke();
           }
         }
@@ -1005,7 +995,7 @@ export class PitchClockRenderer {
     isDecaying: boolean,
     isFi: boolean,
     labelType: string,
-    config: VisualiserConfig,
+    _config: VisualiserConfig,
     nodeAlpha: number = 1.0
   ) {
     ctx.save();
@@ -1058,7 +1048,7 @@ export class PitchClockRenderer {
         isLit ? '#ffffff' : (isFi ? '#141414' : solfegeColor),
         undefined,
         isFi ? 3.0 : 2.0,
-        config.glyphContrastMode === 'high'
+        false
       );
       ctx.restore();
       return;
@@ -1077,10 +1067,9 @@ export class PitchClockRenderer {
     }
 
     if (labelText && nodeR >= 8) {
-      const isHigh = config.glyphContrastMode === 'high';
       const textColor = isLit
         ? (isFi ? '#0f172a' : '#ffffff')
-        : (isFi ? (isHigh ? '#f8fafc' : '#94a3b8') : '#f8fafc');
+        : (isFi ? '#94a3b8' : '#f8fafc');
 
       ctx.fillStyle = textColor;
       const fontSize = Math.max(8, Math.min(22, Math.round(nodeR * 0.78)));

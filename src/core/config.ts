@@ -24,12 +24,12 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   startOctave: 1, // 1..8 (lowest / outermost ring)
   endOctave: 8, // 1..8 (highest / innermost ring)
   showOctaveNumbers: true, // Display clean octave numbers (1..8) on rings
-  clockLabelPriorities: ['glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs', 'glyphs'],
+  clockLabelPriorities: ['pitches', 'triPitches', 'syllables', 'glyphs', 'triangles', 'intervals', 'none', 'none'],
   toneRevealMode: 'played', // Only show tones that have been played!
   registerWeightMode: 'organic', // Organic window of what is being played
   inactiveRegisterDisplay: 'hidden', // Unused registers omitted to give maximum room to active octaves
   organicWindowDurationSec: 12, // 12 second organic decay window
-  glyphContrastMode: 'high', // High-contrast crisp glyphs with luminous outlines and platinum Fi
+  glyphContrastMode: 'solfege', // Canonical Solfège mode with sleek contours
   showUniformSolfege: true,
   showPianoTriangles: false,
   showSyllables: true,
@@ -137,15 +137,25 @@ export function loadSavedConfig(): VisualiserConfig {
     merged.endOctave = endOctave;
     merged.showOctaveNumbers = typeof merged.showOctaveNumbers === 'boolean' ? merged.showOctaveNumbers : true;
 
-    // Sanitize 8 clock label priority slots
+    // Sanitise 8 clock label priority slots
     const validLabels = new Set(['glyphs', 'triangles', 'syllables', 'pitches', 'triPitches', 'intervals', 'none']);
+    const defaultPriorities = ['pitches', 'triPitches', 'syllables', 'glyphs', 'triangles', 'intervals', 'none', 'none'];
     const rawPriorities = Array.isArray(merged.clockLabelPriorities) ? merged.clockLabelPriorities : [];
+    // If the saved configuration is using the legacy default (all 'glyphs'), upgrade to the new default order
+    const isLegacyAllGlyphs = rawPriorities.length === 8 && rawPriorities.every((v: unknown) => v === 'glyphs');
     const sanitizedPriorities = [];
     for (let i = 0; i < 8; i++) {
-      const val = rawPriorities[i];
-      sanitizedPriorities.push(validLabels.has(val) ? val : 'glyphs');
+      if (isLegacyAllGlyphs) {
+        sanitizedPriorities.push(defaultPriorities[i]);
+      } else {
+        const val = rawPriorities[i];
+        sanitizedPriorities.push(validLabels.has(val) ? val : defaultPriorities[i]);
+      }
     }
     merged.clockLabelPriorities = sanitizedPriorities as any;
+
+    // Normalise glyph contrast mode to canonical solfege
+    merged.glyphContrastMode = 'solfege';
 
     // Sanitize stream presentation format & direction
     const validPresentation = new Set(['glyphs', 'pianoTriangles', 'syllables', 'pitchNames', 'triPitches']);

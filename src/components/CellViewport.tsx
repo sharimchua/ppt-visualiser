@@ -6,6 +6,7 @@ import {
   StreamDirection,
   VisualiserModuleType,
   LayoutFlexDirection,
+  ClockLabelType,
 } from '../core/types';
 import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
 import {
@@ -598,62 +599,42 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 Orbital Pitch Clock Settings
               </label>
 
-              {/* Glyph Contrast & Legibility */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-400 block font-medium">Glyph Contrast & Legibility:</label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    onClick={() =>
-                      onUpdateCell({
-                        ...cell,
-                        configOverrides: {
-                          ...(cell.configOverrides || {}),
-                          glyphContrastMode: 'high',
-                        },
-                      })
-                    }
-                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
-                      effectiveConfig.glyphContrastMode === 'high'
-                        ? 'bg-purple-600/30 border-purple-500 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    High-Contrast Luminous
-                  </button>
-                  <button
-                    onClick={() =>
-                      onUpdateCell({
-                        ...cell,
-                        configOverrides: {
-                          ...(cell.configOverrides || {}),
-                          glyphContrastMode: 'solfege',
-                        },
-                      })
-                    }
-                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
-                      effectiveConfig.glyphContrastMode === 'solfege'
-                        ? 'bg-purple-600/30 border-purple-500 text-white'
-                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    Canonical Solfège
-                  </button>
-                </div>
-              </div>
-
               {/* Clock Node Label Priority Presets */}
               <div className="space-y-1">
                 <div className="flex justify-between items-center">
                   <label className="text-[10px] text-slate-400 block font-medium">Priority Slots Preset:</label>
                   <span className="text-[9px] text-slate-500 font-mono">8 Orbit Slots</span>
                 </div>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          clockLabelPriorities: [
+                            'pitches',
+                            'triPitches',
+                            'syllables',
+                            'glyphs',
+                            'triangles',
+                            'intervals',
+                            'none',
+                            'none',
+                          ],
+                        },
+                      })
+                    }
+                    className="py-1 px-1 rounded border border-purple-500/50 bg-purple-600/20 hover:bg-purple-600/30 text-[10px] text-purple-200 text-center font-medium transition"
+                  >
+                    Default
+                  </button>
                   {[
-                    { id: 'glyphs' as const, label: 'Glyphs' },
-                    { id: 'triangles' as const, label: 'Triangles' },
-                    { id: 'syllables' as const, label: 'Solfège' },
                     { id: 'pitches' as const, label: 'Pitches' },
                     { id: 'triPitches' as const, label: 'Tri-Pitch' },
+                    { id: 'syllables' as const, label: 'Solfège' },
+                    { id: 'glyphs' as const, label: 'Glyphs' },
+                    { id: 'triangles' as const, label: 'Triangles' },
                   ].map((preset) => (
                     <button
                       key={preset.id}
@@ -683,14 +664,15 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 <label className="text-[10px] text-slate-400 block font-medium">Slot Priority Overrides (Slot 1 = Outermost):</label>
                 <div className="grid grid-cols-4 sm:grid-cols-8 gap-1">
                   {[0, 1, 2, 3, 4, 5, 6, 7].map((idx) => {
-                    const currentVal = effectiveConfig.clockLabelPriorities?.[idx] ?? 'glyphs';
+                    const defaultSlots: ClockLabelType[] = ['pitches', 'triPitches', 'syllables', 'glyphs', 'triangles', 'intervals', 'none', 'none'];
+                    const currentVal = effectiveConfig.clockLabelPriorities?.[idx] ?? defaultSlots[idx];
                     return (
                       <div key={idx} className="flex flex-col items-center">
                         <span className="text-[8px] text-slate-500 font-mono mb-0.5">#{idx + 1}</span>
                         <select
                           value={currentVal}
                           onChange={(e) => {
-                            const updated = [...(effectiveConfig.clockLabelPriorities || Array(8).fill('glyphs'))];
+                            const updated = [...(effectiveConfig.clockLabelPriorities || defaultSlots)];
                             updated[idx] = e.target.value as any;
                             onUpdateCell({
                               ...cell,
@@ -702,12 +684,12 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                           }}
                           className="w-full bg-slate-900 border border-slate-800 text-[9px] text-slate-300 rounded px-0.5 py-0.5 text-center font-mono cursor-pointer"
                         >
-                          <option value="glyphs">Glyphs</option>
-                          <option value="triangles">Triangles</option>
-                          <option value="syllables">Solfège</option>
                           <option value="pitches">Pitches</option>
                           <option value="triPitches">Tri-Pitch</option>
-                          <option value="intervals">Degrees</option>
+                          <option value="syllables">Solfège</option>
+                          <option value="glyphs">Glyphs</option>
+                          <option value="triangles">Triangles</option>
+                          <option value="intervals">Intervals</option>
                           <option value="none">None</option>
                         </select>
                       </div>

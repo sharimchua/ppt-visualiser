@@ -27,7 +27,7 @@ function getPath2D(type: GlyphType): Path2D {
 
 /**
  * Draws a Uniform Solfège glyph on a 2D Canvas context at (cx, cy) with size and rotation.
- * Features high-contrast outlining and special platinum/silver styling for Fi (Obsidian Tritone).
+ * Renders canonical Solfège colouring with sleek dark contouring and obsidian boundary styling for Fi (Tritone).
  */
 export function drawUniformSolfegeOnCanvas(
   ctx: CanvasRenderingContext2D,
@@ -39,7 +39,7 @@ export function drawUniformSolfegeOnCanvas(
   colorHex: string,
   strokeColor?: string,
   strokeWidth: number = 3,
-  isHighContrast: boolean = true
+  isHighContrast: boolean = false
 ) {
   ctx.save();
   ctx.translate(cx, cy);
