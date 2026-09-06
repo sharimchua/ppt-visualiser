@@ -18,6 +18,7 @@ import { PitchClockDiagram } from './PitchClockDiagram';
 import { UniformSolfegeDiagram } from './UniformSolfegeDiagram';
 import { PianoTrianglesDiagram } from './PianoTrianglesDiagram';
 import { ConcentricOrbitsDiagram } from './ConcentricOrbitsDiagram';
+import { TriPitchClassDiagram } from './TriPitchClassDiagram';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -213,7 +214,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 What is the PPT Visualiser?
               </h3>
               <p className="text-slate-300">
-                The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualiser built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and tetrachordal triangles</strong>.
+                The <strong>PPT Visualiser</strong> is an advanced, real-time musical visualiser built around <strong>Prime Period Theory (PPT)</strong>. Rather than depicting music as a conventional flat timeline or linear piano roll, PPT represents musical pitches through <strong>rotational geometry, polar pitch clocks, and geometric piano triangles</strong>.
               </p>
               <p className="text-slate-400 mt-2 text-xs">
                 Whether listening to built-in classical and modern demo tracks, playing via a connected USB MIDI keyboard, or uploading your own MIDI files, the visualiser translates harmonic structure into dynamic light, phosphorescent trails, and geometric resonance.
@@ -243,7 +244,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                     Piano Triangles
                   </div>
                   <p className="text-xs text-slate-300">
-                    Deconstructs the 12 keys of the piano into 4 geometric tetrachords (Down, Left, Up, Right). Illuminates active notes and harmonic clusters directly across physical keyboard geometry.
+                    Deconstructs the 12 keys of the piano into 4 geometric 3-note triangles (Down, Left, Up, Right). Illuminates active notes and harmonic clusters directly across physical keyboard geometry.
                   </p>
                 </div>
 
@@ -371,19 +372,39 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Traditional music notation relies on historical accidentals (♯, ♭, ♮) that introduce visual asymmetry. Uniform Solfège replaces them with <strong>three elemental geometric glyphs</strong> that rotate in 90&deg; orthogonal quadrants. Each 90&deg; rotation corresponds to advancing by a minor third (+3 semitones):
+                  Traditional music notation relies on historical accidentals (♯, ♭, ♮) that introduce visual asymmetry. Uniform Solfège replaces them with <strong>three elemental geometric glyphs</strong> that rotate in 90&deg; orthogonal quadrants around <strong>Do as centre (0 st)</strong>. Each 90&deg; rotation corresponds to a distance of 3 semitones (&plusmn;3 st):
                 </p>
 
                 {/* Rich Vector Solfège Diagram Component */}
                 <UniformSolfegeDiagram />
               </div>
 
-              {/* Concept 3: Piano Triangles */}
+              {/* Concept 3: Tri Pitch-Class Notation */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Compass className="w-5 h-5 text-cyan-400 shrink-0" />
+                    <span>3. Tri Pitch-Class Notation (Absolute Pitch Alternative)</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
+                    Default 12TET Polar Naming
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  While Uniform Solfège provides an intuitive <em>relative</em> notation for movable Do, Prime Period Theory uses <strong>Tri Pitch-Class Notation</strong> as its default <em>absolute</em> pitch naming system. Instead of ambiguous enharmonic accidentals (e.g. C♯ vs D♭), each of the five chromatic non-natural notes is uniquely named after its <strong>tritone partner (6 semitones away)</strong> across the pitch circle:
+                </p>
+
+                {/* Rich Vector Tri Pitch-Class Diagram Component */}
+                <TriPitchClassDiagram />
+              </div>
+
+              {/* Concept 4: Piano Triangles */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
-                    <span>3. Piano Triangles (Tetrachord Topography)</span>
+                    <span>4. Piano Triangles (Keyboard Topography)</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 self-start sm:self-auto">
                     Down &bull; Left &bull; Up &bull; Right
@@ -391,19 +412,23 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  The piano keyboard is physically asymmetrical: an irregular 2-pack (C♯, D♯) and 3-pack (F♯, G♯, A♯) of raised black keys separated by two natural semitone chasms (E–F and B–C). <strong>Piano Triangles</strong> bridge this irregularity by partitioning all 12 chromatic keys into four balanced 3-note geometric units ($4 \times 3 = 12$):
+                  The piano keyboard is physically asymmetrical: an irregular 2-pack (C♯, D♯) and 3-pack (F♯, G♯, A♯) of raised black keys separated by two natural semitone chasms (E–F and B–C). <strong>Piano Triangles</strong> bridge this irregularity by partitioning all 12 chromatic keys into four balanced 3-note geometric units (4 &times; 3 = 12 keys):
                 </p>
+
+                <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 text-[11.5px] text-slate-400 leading-relaxed">
+                  <strong className="text-indigo-300">Triangles vs Tetrachords:</strong> Each Piano Triangle contains exactly <strong>3 notes</strong> (a trichord). While PPT uses triangles in <em>Scale Signatures</em> to link two 4-note scale tetrachords bridged by the central tonic Do, individual Piano Triangles operate as fundamental 3-key geometric units.
+                </div>
 
                 {/* Rich Vector Piano Triangles Diagram Component */}
                 <PianoTrianglesDiagram />
               </div>
 
-              {/* Concept 4: Concentric Orbits & Nearest-Address */}
+              {/* Concept 5: Concentric Orbits & Nearest-Address */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Eye className="w-5 h-5 text-cyan-400 shrink-0" />
-                    <span>4. Concentric Orbits & Octave Wrapping</span>
+                    <span>5. Concentric Orbits & Octave Wrapping</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
                     Octave Seam at 6 to 7 o&apos;clock
@@ -418,11 +443,11 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose }) => {
                 <ConcentricOrbitsDiagram />
               </div>
 
-              {/* Concept 5: Auto-Alignment */}
+              {/* Concept 6: Auto-Alignment */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
                 <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                   <Compass className="w-5 h-5 text-red-400 shrink-0" />
-                  <span>5. Auto-Alignment of Do (Diatonic Key Tracking)</span>
+                  <span>6. Auto-Alignment of Do (Diatonic Key Tracking)</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300">
                   When <strong>Auto-Alignment</strong> is enabled in the settings or header toolbar, the engine continuously monitors incoming notes over an organic time decay window. It calculates diatonic correlation scores against all 12 candidate tonics and automatically rotates Do to match the musical key of the song in real time.

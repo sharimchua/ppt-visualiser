@@ -7,7 +7,7 @@ The `src/renderers` domain contains all high-performance 2D Canvas and WebGL gra
 ## Ownership
 
 - `src/renderers/pitch-clock-canvas.ts` — 8-octave concentric polar clock renderer, node layout, chord rays, convex hull polygons, and ring labels.
-- `src/renderers/piano-triangles-canvas.ts` — Tetrachord keyboard topography renderer (Scale Signature mode and 4-triangle matrix).
+- `src/renderers/piano-triangles-canvas.ts` — Piano keyboard topography renderer (Scale Signature tetrachord mode and 4-triangle matrix).
 - `src/renderers/stream-canvas.ts` — High-velocity directional note ribbon renderer (horizontal LTR/RTL, vertical TTB/BTT).
 - `src/renderers/cosmetics.ts` — Canvas 2D effects engine (kinetic note sparks physics, analogue light bleed, halation, and optical lens flare starbursts).
 - `src/renderers/webgl-post-processing.ts` — GPU WebGL fragment shader pipeline (CRT scanlines, chromatic phosphor ghosts, bloom, and 24fps procedural film grain).

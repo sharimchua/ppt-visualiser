@@ -49,6 +49,7 @@ const GlyphVector: React.FC<{
 const GlyphCell: React.FC<GlyphCellProps> = ({ syllable, isHovered, onHover, onLeave }) => {
   const spec = SOLFEGE_SPECS[syllable];
   const isFi = spec.colorHex.toLowerCase() === '#141414';
+  const offsetStr = spec.nearestAddress > 0 ? `+${spec.nearestAddress}` : `${spec.nearestAddress}`;
 
   return (
     <div
@@ -71,7 +72,7 @@ const GlyphCell: React.FC<GlyphCellProps> = ({ syllable, isHovered, onHover, onL
           {syllable}
         </span>
         <span className="text-[10px] text-slate-400 font-mono">
-          +{spec.semitone}
+          {offsetStr}
         </span>
       </div>
       <span className="text-[9px] text-slate-500 font-mono">
@@ -100,7 +101,7 @@ export const UniformSolfegeDiagram: React.FC = () => {
             <span className="text-[11px] text-red-400 font-medium">Neutral / Diamond Cross</span>
           </div>
           <p className="text-[11px] text-slate-400 leading-normal">
-            Reflectively symmetric across both axes. Represents foundational minor-third anchors: <strong>Do (0&deg;)</strong>, <strong>Me (90&deg;)</strong>, <strong>Fi (180&deg;)</strong>, <strong>La (270&deg;)</strong>.
+            Reflectively symmetric across both axes. Represents foundational minor-third anchors around Do (0 st): <strong>Do (0&deg;, 0 st)</strong>, <strong>Me (90&deg;, +3 st)</strong>, <strong>Fi (180&deg;, +6 st)</strong>, <strong>La (270&deg;, -3 st)</strong>.
           </p>
         </div>
 
@@ -116,7 +117,7 @@ export const UniformSolfegeDiagram: React.FC = () => {
             <span className="text-[11px] text-amber-300 font-medium">Clockwise Outward Peak</span>
           </div>
           <p className="text-[11px] text-slate-400 leading-normal">
-            Asymmetric outward apex pointing clockwise in the direction of ascending pitch (+1 semitone tilt): <strong>Ra (0&deg;)</strong>, <strong>Mi (90&deg;)</strong>, <strong>So (180&deg;)</strong>, <strong>Te (270&deg;)</strong>.
+            Asymmetric outward apex pointing clockwise in the direction of ascending pitch (+1 semitone tilt): <strong>Ra (0&deg;, +1 st)</strong>, <strong>Mi (90&deg;, +4 st)</strong>, <strong>So (180&deg;, -5 st)</strong>, <strong>Te (270&deg;, -2 st)</strong>.
           </p>
         </div>
 
@@ -132,7 +133,7 @@ export const UniformSolfegeDiagram: React.FC = () => {
             <span className="text-[11px] text-cyan-300 font-medium">Counter-Clockwise Inward Dip</span>
           </div>
           <p className="text-[11px] text-slate-400 leading-normal">
-            Concave notch receding counter-clockwise against pitch progression (-1 semitone dip): <strong>Ti (0&deg;)</strong>, <strong>Re (90&deg;)</strong>, <strong>Fa (180&deg;)</strong>, <strong>Le (270&deg;)</strong>.
+            Concave notch receding counter-clockwise against pitch progression (-1 semitone dip): <strong>Ti (0&deg;, -1 st)</strong>, <strong>Re (90&deg;, +2 st)</strong>, <strong>Fa (180&deg;, +5 st)</strong>, <strong>Le (270&deg;, -4 st)</strong>.
           </p>
         </div>
       </div>
@@ -146,11 +147,11 @@ export const UniformSolfegeDiagram: React.FC = () => {
               <span className="text-[11px] font-normal text-amber-400 font-mono">(3 Glyphs &times; 4 Quadrants = 12 Tones)</span>
             </h4>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Every 90&deg; rotation advances exactly 3 semitones (a minor third) around the pitch circle.
+              Every 90&deg; clockwise rotation advances +3 semitones around the circle. Do is the centre (0 st), La is -3 st, and So is the lowest bound at -5 st.
             </p>
           </div>
           <span className="text-[10.5px] font-mono px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-800 self-start sm:self-auto">
-            90&deg; = +3 Semitones
+            90&deg; = &plusmn;3 Semitones
           </span>
         </div>
 
@@ -160,10 +161,10 @@ export const UniformSolfegeDiagram: React.FC = () => {
             {/* Header Columns */}
             <div className="grid grid-cols-5 gap-2 text-[11px] font-mono text-slate-400 text-center px-1">
               <div className="text-left font-bold text-slate-300">Glyph Type</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">0&deg; (Quad 0)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">90&deg; (Quad 1)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">180&deg; (Quad 2)</div>
-              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">270&deg; (Quad 3)</div>
+              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">0&deg; (0 st Anchor)</div>
+              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">90&deg; (+3 st CW)</div>
+              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">180&deg; (+6 / -5 st)</div>
+              <div className="bg-slate-900/60 py-1 rounded border border-slate-800/60">270&deg; (-3 st CCW)</div>
             </div>
 
             {/* Row 1: Base */}
@@ -269,16 +270,17 @@ export const UniformSolfegeDiagram: React.FC = () => {
           {activeSyllable ? (
             (() => {
               const spec = SOLFEGE_SPECS[activeSyllable];
+              const offsetStr = spec.nearestAddress > 0 ? `+${spec.nearestAddress}` : `${spec.nearestAddress}`;
               return (
                 <div className="w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded bg-slate-900/90 border border-slate-700/80 text-slate-300 font-mono text-[11px] animate-in fade-in duration-100">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: spec.colorHex }} />
                     <span className="font-bold text-white text-xs">{activeSyllable}</span>
-                    <span className="text-slate-400">+{spec.semitone} st</span>
+                    <span className="text-amber-400 font-semibold">{offsetStr} st</span>
                   </div>
                   <div className="flex items-center gap-3 text-slate-400 text-[10.5px]">
                     <span>Rotation: <strong className="text-amber-300">{spec.rotation}&deg;</strong></span>
-                    <span className="hidden sm:inline">Nearest: <strong className="text-cyan-300">{spec.nearestAddress >= 0 ? `+${spec.nearestAddress}` : spec.nearestAddress}</strong></span>
+                    <span className="hidden sm:inline">Centre Do Offset: <strong className="text-cyan-300">{offsetStr} st</strong></span>
                     <span className="capitalize text-slate-300">{spec.glyphType}</span>
                   </div>
                 </div>
@@ -286,7 +288,7 @@ export const UniformSolfegeDiagram: React.FC = () => {
             })()
           ) : (
             <div className="text-[11px] text-slate-400 font-mono text-center truncate">
-              Hover over any solf&egrave;ge syllable to inspect its rotation, semitone offset, and nearest address
+              Hover any syllable to inspect its rotation and centred offset from Do (0 st, lowest So at -5 st)
             </div>
           )}
         </div>

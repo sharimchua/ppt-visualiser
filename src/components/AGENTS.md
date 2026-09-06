@@ -16,8 +16,9 @@ The `src/components` domain contains the React user interface layer, including t
 - `src/components/InfoModal.tsx` — Comprehensive introduction and theory guide modal dialogue featuring continuous single-piece scrolling, interactive top bookmark navigation, and rich vector diagrams for PPT concepts.
 - `src/components/PitchClockDiagram.tsx` — Interactive SVG polar pitch clock diagram rendering 12 radial pitch classes, movable Do zenith, and Fi nadir.
 - `src/components/UniformSolfegeDiagram.tsx` — Visual vector diagram explaining the 3 root glyphs and the 4-fold 90° symmetry matrix.
-- `src/components/PianoTrianglesDiagram.tsx` — Vector diagram presenting the 4 tetrachordal triangles and 2-octave keyboard with drawn geometric overlays.
+- `src/components/PianoTrianglesDiagram.tsx` — Vector diagram presenting the 4 geometric piano triangles and 2-octave keyboard with drawn vector overlays.
 - `src/components/ConcentricOrbitsDiagram.tsx` — Vector diagram displaying 8 concentric octave registers and the 6-to-7 o'clock radial octave seam.
+- `src/components/TriPitchClassDiagram.tsx` — Interactive vector diagram presenting PPT Tri Pitch-Class Notation as the default 12TET absolute alternative to sharps and flats.
 
 ## Local Contracts
 

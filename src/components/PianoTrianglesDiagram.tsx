@@ -259,7 +259,7 @@ export const PianoTrianglesDiagram: React.FC = () => {
                       {detail.title}
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">
-                      Tetrachord
+                      3-Note Triangle
                     </span>
                   </div>
                   <span className="text-[11px] text-slate-300 font-medium block">
@@ -295,7 +295,7 @@ export const PianoTrianglesDiagram: React.FC = () => {
           <div>
             <h4 className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
               <span>Two-Octave Keyboard Geometric Overlay</span>
-              <span className="text-[11px] font-normal text-amber-400 font-mono">(C3 to C5 &bull; 8 Tetrachord Triangles)</span>
+              <span className="text-[11px] font-normal text-amber-400 font-mono">(C3 to C5 &bull; 8 Geometric Triangles)</span>
             </h4>
             <p className="text-[11px] text-slate-400">
               Notice how all 4 geometric triangles tile continuously across physical piano keys without gaps:
