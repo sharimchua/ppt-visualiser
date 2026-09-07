@@ -867,6 +867,94 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 />
               </div>
 
+              {/* Voice Leading Harmonic Undulation Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Voice Leading Undulation</span>
+                  <span className="text-[9px] text-slate-500 block">Harmonic wave undulation &amp; travelling counterpoint pulses</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.voiceLeadingUndulation !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        voiceLeadingUndulation: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Note Entrance Animation Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Note Entrance Pop &amp; Flash</span>
+                  <span className="text-[9px] text-slate-500 block">Elastic scale pop &amp; radiant flash at origin line</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.noteEntranceAnimation !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        noteEntranceAnimation: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Origin Spark Spray Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Origin Spark Spray</span>
+                  <span className="text-[9px] text-slate-500 block">Directional eastward sparks shooting from playhead</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.staffSparksEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        staffSparksEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Termination Dissipation Absorption Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Termination Dissipation</span>
+                  <span className="text-[9px] text-slate-500 block">Horizontal squish &amp; cyan dissipation ripple at boundary</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.staffAbsorptionEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        staffAbsorptionEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
               {/* Pitch Register Filter */}
               <div className="space-y-1 pt-1">
                 <label className="text-[10px] text-slate-400 block font-medium">Pitch Register Filter:</label>
@@ -1141,6 +1229,50 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 >
                   {effectiveConfig.showCenterAnchor ? 'Active' : 'Hidden'}
                 </button>
+              </div>
+
+              {/* Vertex Spark Bursts Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Vertex Spark Bursts</span>
+                  <span className="text-[9px] text-slate-500 block">Particle bursts &amp; expanding shockwave rings on active vertices</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.triangleSparksEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        triangleSparksEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Vertex Optical Lens Flares Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Vertex Lens Flares</span>
+                  <span className="text-[9px] text-slate-500 block">Anamorphic streaks &amp; diffraction rays on active vertices</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.triangleLensFlaresEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        triangleLensFlaresEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
               </div>
             </div>
           )}

@@ -152,12 +152,18 @@ export interface StaffStreamModuleConfig {
   showVoiceLeadingLines: boolean; // default: true
   staffFilterRegister: 'all' | 'bass' | 'mid' | 'treble';
   staffMinVelocity: number; // 0..1
+  noteEntranceAnimation?: boolean; // default: true (elastic scale pop & radiant flash)
+  staffSparksEnabled?: boolean; // default: true (directional sparks at origin line)
+  staffAbsorptionEnabled?: boolean; // default: true (dissipation ripple at termination line)
+  voiceLeadingUndulation?: boolean; // default: true (harmonic wave undulation on SATB lines)
 }
 
 export interface PianoTrianglesModuleConfig {
   showVertexLabels: boolean;
   vertexLabelType: 'syllables' | 'pitches' | 'triPitches' | 'intervals' | 'none';
   showCenterAnchor: boolean;
+  triangleSparksEnabled?: boolean; // default: true (kinetic spark bursts on active vertices)
+  triangleLensFlaresEnabled?: boolean; // default: true (optical lens flares on active vertices)
 }
 
 export interface OvertonesModuleConfig {

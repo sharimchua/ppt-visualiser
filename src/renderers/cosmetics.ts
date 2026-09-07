@@ -182,6 +182,93 @@ export class CosmeticsEngine {
   }
 
   /**
+   * Spawns a directional burst of sparks constrained to a directional fan cone.
+   * Ideal for directional barriers (e.g. shooting rightward +X from the Staff Stream origin line).
+   */
+  public spawnDirectionalSparks(
+    x: number,
+    y: number,
+    color: string,
+    velocity: number = 0.8,
+    baseAngle: number = 0, // 0 = East (+X)
+    spreadAngle: number = Math.PI * 0.65, // ~117 degree forward cone
+    count: number = 14,
+    speedMultiplier: number = 1.0,
+    sizeMultiplier: number = 1.0,
+    gravityMultiplier: number = 1.0
+  ): void {
+    const totalCount = Math.max(2, Math.round(count * (0.6 + velocity * 0.8)));
+
+    for (let i = 0; i < totalCount; i++) {
+      // Fan cone around baseAngle
+      const angle = baseAngle + (Math.random() - 0.5) * spreadAngle;
+      const speed = (Math.random() * 4.2 + 1.8) * speedMultiplier * (0.7 + velocity * 0.7);
+      const life = Math.random() * 30 + 20; // 20-50 frames (~0.3-0.8s)
+      const radius = (Math.random() * 2.2 + 0.8) * sizeMultiplier;
+
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: (Math.random() - 0.5) * 0.08 * gravityMultiplier, // subtle vertical drift
+        radius,
+        color,
+        alpha: 1.0,
+        decay: 1.0 / life,
+        life: 0,
+        maxLife: life,
+      });
+    }
+  }
+
+  /**
+   * Spawns an absorption dissipation ripple at the termination boundary line.
+   * Creates an imploding/collapsing ripple in luminous cyan and Solfège colour,
+   * with micro-droplet mist dissipating westward.
+   */
+  public spawnAbsorptionEffect(
+    x: number,
+    y: number,
+    color: string,
+    height: number = 24
+  ): void {
+    // 1. Vertical cyan shockwave along boundary
+    this.shockwaves.push({
+      x,
+      y,
+      currentRadius: 4,
+      maxRadius: Math.max(16, height * 0.8),
+      color: '#38BDF8', // Cyan optical complement
+      alpha: 0.9,
+      decayRate: 0.045,
+      lineWidth: 2.2,
+    });
+
+    // 2. Solfège harmonic dissipation particles spraying leftward (-X)
+    const particleCount = 8;
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.PI + (Math.random() - 0.5) * (Math.PI * 0.6); // Westward fan
+      const speed = Math.random() * 2.5 + 0.8;
+      const life = Math.random() * 20 + 15;
+
+      this.particles.push({
+        x,
+        y: y + (Math.random() - 0.5) * (height * 0.6),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: 0,
+        radius: Math.random() * 1.8 + 0.6,
+        color: i % 2 === 0 ? color : '#38BDF8',
+        alpha: 0.85,
+        decay: 1.0 / life,
+        life: 0,
+        maxLife: life,
+      });
+    }
+  }
+
+  /**
    * Spawns an expanding kinetic shockwave ring
    */
   public spawnShockwave(cx: number, cy: number, color: string, maxRadius: number = 75) {

@@ -554,7 +554,7 @@ export class RenderCoordinator {
     }
 
     const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
-    if (sparksOn) {
+    if (sparksOn && (orbitalCellCanvas || this.cellCanvases.size === 0)) {
       this.cosmeticsEngine.spawnNoteSparks(
         sparkX,
         sparkY,
@@ -567,9 +567,78 @@ export class RenderCoordinator {
         this.config.particleOriginDistance,
         radialAngle
       );
+      if (this.config.pulseShockwaves) {
+        this.cosmeticsEngine.spawnShockwave(sparkX, sparkY, spec.colorHex, 65 + velocity * 30);
+      }
     }
-    if (this.config.pulseShockwaves) {
-      this.cosmeticsEngine.spawnShockwave(sparkX, sparkY, spec.colorHex, 65 + velocity * 30);
+
+    // Additional cell-specific note sparks
+    if (targetCanvas && typeof window !== 'undefined' && sparksOn) {
+      const overlayRect = targetCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+
+      for (const cell of this.cellCanvases.values()) {
+        const effConfig = cell.configOverrides
+          ? { ...this.config, ...cell.configOverrides }
+          : this.config;
+
+        if (cell.module === 'staff-stream' && effConfig.staffSparksEnabled !== false) {
+          const cellRect = cell.canvas.getBoundingClientRect();
+          const cellLeft = cellRect.left - overlayRect.left;
+          const cellTop = cellRect.top - overlayRect.top;
+          const w = cell.canvas.width / dpr;
+          const h = cell.canvas.height / dpr;
+
+          const playhead = this.staffStreamRenderer.getPlayheadCoordinatesForMidi(
+            midi,
+            cellLeft,
+            cellTop,
+            w,
+            h,
+            effConfig
+          );
+
+          // Spray east (+X): angle 0, cone spread Math.PI * 0.65
+          this.cosmeticsEngine.spawnDirectionalSparks(
+            playhead.x,
+            playhead.y,
+            spec.colorHex,
+            velocity,
+            0,
+            Math.PI * 0.65,
+            Math.round(18 * this.config.particleIntensity),
+            this.config.particleSize,
+            this.config.particleVolume,
+            this.config.particleGravity
+          );
+        } else if (cell.module === 'triangles' && effConfig.triangleSparksEnabled !== false) {
+          const cellRect = cell.canvas.getBoundingClientRect();
+          const cellLeft = cellRect.left - overlayRect.left;
+          const cellTop = cellRect.top - overlayRect.top;
+          const coord = this.pianoTrianglesRenderer.getVertexCoordinatesForPc(pc);
+
+          if (coord) {
+            this.cosmeticsEngine.spawnNoteSparks(
+              cellLeft + coord.x,
+              cellTop + coord.y,
+              spec.colorHex,
+              velocity,
+              Math.round(16 * this.config.particleIntensity),
+              this.config.particleSize,
+              this.config.particleVolume,
+              this.config.particleGravity
+            );
+            if (this.config.pulseShockwaves) {
+              this.cosmeticsEngine.spawnShockwave(
+                cellLeft + coord.x,
+                cellTop + coord.y,
+                spec.colorHex,
+                45 + velocity * 25
+              );
+            }
+          }
+        }
+      }
     }
 
     // Add to Note Stream with mode-aware buffer
@@ -870,68 +939,96 @@ export class RenderCoordinator {
       hasOrbitalCell = true;
     }
 
-    // 1. Active notes
-    for (const note of this.activeNotes.values()) {
-      const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
-      let lx: number;
-      let ly: number;
-      if (coords) {
-        lx = offsetLeft + coords.x;
-        ly = offsetTop + coords.y;
-      } else if (hasOrbitalCell) {
-        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
-        const angle = getClockAngleRad(res.semitone);
-        const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
-        lx = clockCx + radius * Math.cos(angle);
-        ly = clockCy + radius * Math.sin(angle);
-      } else {
-        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
-        const angle = getClockAngleRad(res.semitone);
-        const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
-        const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
-        const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
-        lx = vpW / 2 + radius * Math.cos(angle);
-        ly = vpH / 2 + radius * Math.sin(angle);
+    // 1. Orbital active notes
+    if (hasOrbitalCell || this.cellCanvases.size === 0) {
+      for (const note of this.activeNotes.values()) {
+        const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
+        let lx: number;
+        let ly: number;
+        if (coords) {
+          lx = offsetLeft + coords.x;
+          ly = offsetTop + coords.y;
+        } else if (hasOrbitalCell) {
+          const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+          const angle = getClockAngleRad(res.semitone);
+          const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
+          lx = clockCx + radius * Math.cos(angle);
+          ly = clockCy + radius * Math.sin(angle);
+        } else {
+          const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+          const angle = getClockAngleRad(res.semitone);
+          const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
+          const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+          const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
+          lx = vpW / 2 + radius * Math.cos(angle);
+          ly = vpH / 2 + radius * Math.sin(angle);
+        }
+        lights.push({
+          x: lx,
+          y: ly,
+          velocity: note.velocity,
+          colorHex: note.colorHex,
+        });
       }
-      lights.push({
-        x: lx,
-        y: ly,
-        velocity: note.velocity,
-        colorHex: note.colorHex,
-      });
+
+      // 2. Orbital decaying notes
+      for (const { note, decayProgress } of this.decayingNotes.values()) {
+        const vel = note.velocity * (1 - decayProgress);
+        if (vel <= 0.04) continue;
+        const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
+        let lx: number;
+        let ly: number;
+        if (coords) {
+          lx = offsetLeft + coords.x;
+          ly = offsetTop + coords.y;
+        } else if (hasOrbitalCell) {
+          const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+          const angle = getClockAngleRad(res.semitone);
+          const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
+          lx = clockCx + radius * Math.cos(angle);
+          ly = clockCy + radius * Math.sin(angle);
+        } else {
+          const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
+          const angle = getClockAngleRad(res.semitone);
+          const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
+          const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+          const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
+          lx = vpW / 2 + radius * Math.cos(angle);
+          ly = vpH / 2 + radius * Math.sin(angle);
+        }
+        lights.push({
+          x: lx,
+          y: ly,
+          velocity: vel,
+          colorHex: note.colorHex,
+        });
+      }
     }
 
-    // 2. Decaying notes
-    for (const { note, decayProgress } of this.decayingNotes.values()) {
-      const vel = note.velocity * (1 - decayProgress);
-      if (vel <= 0.04) continue;
-      const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
-      let lx: number;
-      let ly: number;
-      if (coords) {
-        lx = offsetLeft + coords.x;
-        ly = offsetTop + coords.y;
-      } else if (hasOrbitalCell) {
-        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
-        const angle = getClockAngleRad(res.semitone);
-        const radius = maxClockRadius * (0.85 - res.registerIndex * 0.08);
-        lx = clockCx + radius * Math.cos(angle);
-        ly = clockCy + radius * Math.sin(angle);
-      } else {
-        const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
-        const angle = getClockAngleRad(res.semitone);
-        const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
-        const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
-        const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
-        lx = vpW / 2 + radius * Math.cos(angle);
-        ly = vpH / 2 + radius * Math.sin(angle);
+    // 3. Piano Triangles active vertices
+    if (targetCanvas && typeof window !== 'undefined') {
+      const targetRect = targetCanvas.getBoundingClientRect();
+      for (const cell of this.cellCanvases.values()) {
+        if (cell.module === 'triangles') {
+          const effConfig = cell.configOverrides
+            ? { ...this.config, ...cell.configOverrides }
+            : this.config;
+          if (effConfig.triangleLensFlaresEnabled !== false) {
+            const cellRect = cell.canvas.getBoundingClientRect();
+            const cellLeft = cellRect.left - targetRect.left;
+            const cellTop = cellRect.top - targetRect.top;
+            const vertices = this.pianoTrianglesRenderer.getActiveVertexCoordinates();
+            for (const v of vertices) {
+              lights.push({
+                x: cellLeft + v.x,
+                y: cellTop + v.y,
+                velocity: v.velocity,
+                colorHex: v.colorHex,
+              });
+            }
+          }
+        }
       }
-      lights.push({
-        x: lx,
-        y: ly,
-        velocity: vel,
-        colorHex: note.colorHex,
-      });
     }
 
     if (lights.length > 8) {

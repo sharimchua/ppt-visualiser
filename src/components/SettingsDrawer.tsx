@@ -1138,6 +1138,70 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
               </label>
             </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="text-slate-300 font-medium block">Voice Leading Undulation</span>
+                <span className="text-[10px] text-slate-400 block">Harmonic wave undulation &amp; travelling counterpoint pulses</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.voiceLeadingUndulation !== false}
+                  onChange={(e) => onUpdateConfig({ voiceLeadingUndulation: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="text-slate-300 font-medium block">Note Entrance Pop &amp; Flash</span>
+                <span className="text-[10px] text-slate-400 block">Elastic scale pop &amp; radiant flash at origin line</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.noteEntranceAnimation !== false}
+                  onChange={(e) => onUpdateConfig({ noteEntranceAnimation: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="text-slate-300 font-medium block">Origin Spark Spray</span>
+                <span className="text-[10px] text-slate-400 block">Directional eastward sparks shooting from playhead</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.staffSparksEnabled !== false}
+                  onChange={(e) => onUpdateConfig({ staffSparksEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="text-slate-300 font-medium block">Termination Dissipation</span>
+                <span className="text-[10px] text-slate-400 block">Horizontal squish &amp; cyan ripple at boundary</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.staffAbsorptionEnabled !== false}
+                  onChange={(e) => onUpdateConfig({ staffAbsorptionEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
           </div>
         </section>
 
@@ -1613,6 +1677,23 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     ))}
                   </div>
                 </div>
+
+                {/* Piano Triangles Lens Flares Toggle */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                  <div>
+                    <span className="text-[11px] text-slate-300 block font-medium">Piano Triangles Lens Flares</span>
+                    <span className="text-[9px] text-slate-400 block">Diffraction flares on active keyboard triangle vertices</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={config.triangleLensFlaresEnabled !== false}
+                      onChange={(e) => onUpdateConfig({ triangleLensFlaresEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
               </div>
             )}
           </div>
@@ -1731,6 +1812,23 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     onChange={(e) => onUpdateConfig({ particleOriginDistance: parseInt(e.target.value, 10) })}
                     className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
                   />
+                </div>
+
+                {/* Piano Triangles Sparks Toggle */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                  <div>
+                    <span className="text-[11px] text-slate-300 block font-medium">Piano Triangles Vertex Sparks</span>
+                    <span className="text-[9px] text-slate-400 block">Spark bursts &amp; shockwaves on active triangle vertices</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={config.triangleSparksEnabled !== false}
+                      onChange={(e) => onUpdateConfig({ triangleSparksEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
                 </div>
               </div>
             )}

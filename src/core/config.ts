@@ -66,11 +66,17 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   showVoiceLeadingLines: true,
   staffFilterRegister: 'all',
   staffMinVelocity: 0.05,
+  noteEntranceAnimation: true,
+  staffSparksEnabled: true,
+  staffAbsorptionEnabled: true,
+  voiceLeadingUndulation: true,
 
   // Piano Triangles (Scale Signature)
   showVertexLabels: true,
   vertexLabelType: 'syllables',
   showCenterAnchor: true,
+  triangleSparksEnabled: true,
+  triangleLensFlaresEnabled: true,
 
   // Overtones Waveform
   showDissonanceCurve: true,
@@ -259,6 +265,19 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
       typeof merged.staffMinVelocity === 'number'
         ? Math.max(0, Math.min(1, merged.staffMinVelocity))
         : 0.05;
+    merged.noteEntranceAnimation =
+      typeof merged.noteEntranceAnimation === 'boolean' ? merged.noteEntranceAnimation : true;
+    merged.staffSparksEnabled =
+      typeof merged.staffSparksEnabled === 'boolean' ? merged.staffSparksEnabled : true;
+    merged.staffAbsorptionEnabled =
+      typeof merged.staffAbsorptionEnabled === 'boolean' ? merged.staffAbsorptionEnabled : true;
+    merged.voiceLeadingUndulation =
+      typeof merged.voiceLeadingUndulation === 'boolean' ? merged.voiceLeadingUndulation : true;
+
+    merged.triangleSparksEnabled =
+      typeof merged.triangleSparksEnabled === 'boolean' ? merged.triangleSparksEnabled : true;
+    merged.triangleLensFlaresEnabled =
+      typeof merged.triangleLensFlaresEnabled === 'boolean' ? merged.triangleLensFlaresEnabled : true;
 
     // Sanitize film grain & artifact settings
     merged.filmGrainEnabled = typeof merged.filmGrainEnabled === 'boolean' ? merged.filmGrainEnabled : (merged.filmGrainIntensity > 0);

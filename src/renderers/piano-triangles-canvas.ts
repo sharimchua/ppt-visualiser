@@ -117,6 +117,14 @@ interface TonicTriangleShiftAnimation {
   durationMs: number;
 }
 
+export interface ActiveTriangleVertex {
+  x: number;
+  y: number;
+  pc: number;
+  velocity: number;
+  colorHex: string;
+}
+
 /**
  * 60fps Canvas Renderer for the Piano Triangles Scale Signature Cell.
  * Displays 4/5 chained piano triangles with the vertex for Do centered,
@@ -124,6 +132,22 @@ interface TonicTriangleShiftAnimation {
  */
 export class PianoTrianglesRenderer {
   private activeTonicShift: TonicTriangleShiftAnimation | null = null;
+  private activeVertices: ActiveTriangleVertex[] = [];
+  private vertexPositionsByPc = new Map<number, { x: number; y: number; colorHex: string }>();
+
+  /**
+   * Retrieves all currently active piano triangle vertex coordinates in canvas space.
+   */
+  public getActiveVertexCoordinates(): ActiveTriangleVertex[] {
+    return this.activeVertices;
+  }
+
+  /**
+   * Retrieves the current canvas coordinate and colour for a given pitch class.
+   */
+  public getVertexCoordinatesForPc(pc: number): { x: number; y: number; colorHex: string } | undefined {
+    return this.vertexPositionsByPc.get(((pc % 12) + 12) % 12);
+  }
 
   /**
    * Triggers the kinetic Do anchor beam surge and vertex expansion ripple.
@@ -150,6 +174,9 @@ export class PianoTrianglesRenderer {
     _timeMs: number
   ): void {
     if (width <= 0 || height <= 0) return;
+
+    this.activeVertices = [];
+    this.vertexPositionsByPc.clear();
 
     // Resolve scale intervals based on active mode
     const intervals = getEffectiveModeIntervals(config.autoTonicMode, config.autoTonicCustomDegrees);
@@ -236,7 +263,8 @@ export class PianoTrianglesRenderer {
         triSize,
         activePcMap,
         decayPcMap,
-        config
+        config,
+        _timeMs
       );
     });
 
@@ -383,7 +411,8 @@ export class PianoTrianglesRenderer {
     size: number,
     activePcMap: Map<number, number>,
     decayPcMap: Map<number, number>,
-    config: VisualiserConfig
+    config: VisualiserConfig,
+    timeMs: number
   ): void {
     const geom = TRIANGLE_VERTEX_COORDINATES[seg.triangle];
     const scale = size / 100;
@@ -438,6 +467,21 @@ export class PianoTrianglesRenderer {
       const defaultColor = SOLFEGE_SPECS[defaultSyllable]?.colorHex ?? '#E13610';
       const vertexColor = scaleInfo?.color ?? defaultColor;
 
+      // Record canvas-space coordinates for lens flares and particle effects
+      const absX = x + vx;
+      const absY = y + vy;
+      this.vertexPositionsByPc.set(pc, { x: absX, y: absY, colorHex: vertexColor });
+
+      if (isActive) {
+        this.activeVertices.push({
+          x: absX,
+          y: absY,
+          pc,
+          velocity,
+          colorHex: vertexColor,
+        });
+      }
+
       // Base radius calculation with proportional scaling
       let radius = Math.max(2.8, size * 0.08);
       if (isActive) {
@@ -473,6 +517,26 @@ export class PianoTrianglesRenderer {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2.0;
         ctx.stroke();
+
+        // Luminous specular core pip
+        ctx.beginPath();
+        ctx.arc(vx, vy, Math.max(1.8, radius * 0.38), 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = 0.95;
+        ctx.fill();
+
+        // Expanding harmonic shockwave ring
+        if (config.triangleSparksEnabled !== false) {
+          const shockwavePhase = ((timeMs * 0.003 + pc * 0.4) % 1.0 + 1.0) % 1.0;
+          const shockwaveRadius = radius + shockwavePhase * 14;
+          const shockwaveAlpha = Math.max(0, 1 - shockwavePhase) * 0.65;
+          ctx.beginPath();
+          ctx.arc(vx, vy, shockwaveRadius, 0, Math.PI * 2);
+          ctx.strokeStyle = vertexColor;
+          ctx.lineWidth = Math.max(0.8, 1.8 * (1 - shockwavePhase));
+          ctx.globalAlpha = shockwaveAlpha;
+          ctx.stroke();
+        }
       } else if (isDecaying) {
         // --- DECAYING VERTEX: Smooth Alpha Fade ---
         ctx.shadowColor = vertexColor;

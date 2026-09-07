@@ -3059,5 +3059,107 @@ test('Staff Stream: Renders discrete noteheads without offset duration ribbons',
   });
 });
 
+test('Staff Stream and Piano Triangles Visual Effects Configuration Defaults and Sanitisation', () => {
+  // Verify defaults
+  assert.strictEqual(DEFAULT_CONFIG.noteEntranceAnimation, true);
+  assert.strictEqual(DEFAULT_CONFIG.staffSparksEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.staffAbsorptionEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.voiceLeadingUndulation, true);
+  assert.strictEqual(DEFAULT_CONFIG.triangleSparksEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.triangleLensFlaresEnabled, true);
+
+  // Verify sanitisation preserves boolean overrides
+  const sanitized = sanitizeConfig({
+    noteEntranceAnimation: false,
+    staffSparksEnabled: false,
+    staffAbsorptionEnabled: false,
+    voiceLeadingUndulation: false,
+    triangleSparksEnabled: false,
+    triangleLensFlaresEnabled: false,
+  });
+  assert.strictEqual(sanitized.noteEntranceAnimation, false);
+  assert.strictEqual(sanitized.staffSparksEnabled, false);
+  assert.strictEqual(sanitized.staffAbsorptionEnabled, false);
+  assert.strictEqual(sanitized.voiceLeadingUndulation, false);
+  assert.strictEqual(sanitized.triangleSparksEnabled, false);
+  assert.strictEqual(sanitized.triangleLensFlaresEnabled, false);
+});
+
+test('CosmeticsEngine: Directional Sparks and Absorption Effect', () => {
+  const cosmetics = new CosmeticsEngine();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    arc: () => {},
+    closePath: () => {},
+    rect: () => {},
+    fillRect: () => {},
+    clearRect: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  assert.doesNotThrow(() => {
+    // Eastward directional sparks
+    cosmetics.spawnDirectionalSparks(100, 200, '#E13610', 0.8, 0, Math.PI * 0.65, 15, 1.2, 1.0, 0.15);
+    // Boundary absorption ripple
+    cosmetics.spawnAbsorptionEffect(20, 200, '#38BDF8', 300);
+    // Update and render
+    cosmetics.update();
+    cosmetics.renderEffects(mockCtx, 0.8, 800, 600);
+  });
+});
+
+test('PianoTrianglesRenderer: Active Vertex Coordinate Tracking and Query', () => {
+  const ptRenderer = new PianoTrianglesRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    arc: () => {},
+    closePath: () => {},
+    translate: () => {},
+    setLineDash: () => {},
+    measureText: () => ({ width: 10 }),
+    fillText: () => {},
+  } as unknown as CanvasRenderingContext2D;
+
+  const activeNotes = new Map<number, ActiveNote>([
+    [60, { midi: 60, velocity: 0.9, startTime: 1000 } as ActiveNote], // C4 (pc 0)
+    [64, { midi: 64, velocity: 0.7, startTime: 1000 } as ActiveNote], // E4 (pc 4)
+  ]);
+  const decayingNotes = new Map();
+
+  ptRenderer.render(mockCtx, 800, 400, activeNotes, decayingNotes, DEFAULT_CONFIG, 1200);
+
+  const activeVertices = ptRenderer.getActiveVertexCoordinates();
+  assert.ok(activeVertices.length >= 2, `Expected at least 2 active vertices, got ${activeVertices.length}`);
+  const pcs = activeVertices.map(v => v.pc);
+  assert.ok(pcs.includes(0), 'Active vertices must include pitch class 0 (C)');
+  assert.ok(pcs.includes(4), 'Active vertices must include pitch class 4 (E)');
+
+  // Verify pitch class coordinate query
+  const coordC = ptRenderer.getVertexCoordinatesForPc(0);
+  assert.ok(coordC !== undefined, 'getVertexCoordinatesForPc(0) must return valid coordinates');
+  assert.ok(typeof coordC.x === 'number' && typeof coordC.y === 'number');
+  assert.ok(typeof coordC.colorHex === 'string');
+});
+
+test('StaffStreamRenderer: getPlayheadCoordinatesForMidi', () => {
+  const staffRenderer = new StaffStreamRenderer();
+  const coord = staffRenderer.getPlayheadCoordinatesForMidi(60, 100, 50, 600, 300, DEFAULT_CONFIG);
+  assert.strictEqual(coord.x, 100 + 600 - 24, 'Playhead X must align with the origin line');
+  assert.ok(typeof coord.y === 'number' && coord.y > 50 && coord.y < 350, 'Playhead Y must sit within cell bounds');
+});
+
 
 

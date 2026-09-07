@@ -224,6 +224,26 @@ export class StaffStreamRenderer {
     };
   }
 
+  /**
+   * Computes the playhead strike coordinates (x, y) for a given MIDI pitch
+   * within a specific cell's bounding box and configuration.
+   */
+  public getPlayheadCoordinatesForMidi(
+    midi: number,
+    cellX: number,
+    cellY: number,
+    cellWidth: number,
+    cellHeight: number,
+    config: VisualiserConfig
+  ): { x: number; y: number } {
+    const isGrand = (config.staffSize || 'grand') === 'grand';
+    const geom = this.computeStaffGeometry(cellY, cellHeight, isGrand);
+    const staffNote = midiToDiatonicStaffNote(midi);
+    const noteY = this.stepToY(staffNote.diatonicStep, geom, isGrand);
+    const playheadX = cellX + cellWidth - 24;
+    return { x: playheadX, y: noteY };
+  }
+
   public reset(): void {
     this.activeSingleClef = 'treble';
     this.targetSingleClef = 'treble';
@@ -912,7 +932,7 @@ export class StaffStreamRenderer {
         const pairs = computeSatbVoiceLeading(onsetNodes[i], onsetNodes[i + 1]);
         allPairs.push(...pairs);
       }
-      this.drawSatbVoiceLeadingLines(ctx, allPairs);
+      this.drawSatbVoiceLeadingLines(ctx, allPairs, now, config.voiceLeadingUndulation !== false);
     }
   }
 
@@ -1001,21 +1021,67 @@ export class StaffStreamRenderer {
         // Draw ledger lines
         this.drawLedgerLines(ctx, noteX, note.diatonicStep, geom, isGrand, noteSize);
 
+        // 1. Note Entrance Animation (at Playhead origin line)
+        let entranceScale = 1.0;
+        if (config.noteEntranceAnimation !== false && elapsed >= 0 && elapsed < 0.35) {
+          const p = elapsed / 0.35;
+          entranceScale = 1.0 + Math.sin((1 - p) * Math.PI * 0.5) * 0.42;
+          const flashAlpha = Math.max(0, 1 - p);
+          if (flashAlpha > 0.05) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(noteX, noteY, noteSize * (1.1 + flashAlpha * 0.75), 0, Math.PI * 2);
+            ctx.strokeStyle = item.colorHex;
+            ctx.globalAlpha = flashAlpha * 0.8;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
+            ctx.restore();
+          }
+        }
+
+        // 2. Termination Boundary Absorption Effect
+        let squishX = 1.0;
+        const distToTerm = noteX - terminationX;
+        if (config.staffAbsorptionEnabled !== false && distToTerm >= -12 && distToTerm <= 28) {
+          squishX = Math.max(0.12, Math.min(1.0, (distToTerm + 12) / 40));
+          const absorbNorm = 1.0 - Math.max(0, distToTerm) / 28;
+          if (absorbNorm > 0.05) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.ellipse(terminationX, noteY, 3 + absorbNorm * 9, noteSize * (0.6 + absorbNorm * 0.6), 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#38bdf8';
+            ctx.globalAlpha = absorbNorm * 0.75;
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+
         // Render PPT Notehead: in continuous mode, no accidentals are rendered
         const semitoneFromTonic = ((item.pitchClass - config.tonic) % 12 + 12) % 12;
         const isBlackKey = isBlackPianoKey(item.pitchClass);
+
+        if (squishX < 0.98) {
+          ctx.save();
+          ctx.translate(noteX, noteY);
+          ctx.scale(squishX, 1.0);
+          ctx.translate(-noteX, -noteY);
+        }
 
         renderPptNoteOnCanvas(
           ctx,
           semitoneFromTonic,
           noteX,
           noteY,
-          noteSize,
+          noteSize * entranceScale,
           0,     // accidental = 0 (suppressed in continuous mode)
           false, // showAccidental = false (suppressed in continuous mode)
           false,
           isBlackKey
         );
+
+        if (squishX < 0.98) {
+          ctx.restore();
+        }
       }
 
       if (currentNodes.length > 0) {
@@ -1030,7 +1096,7 @@ export class StaffStreamRenderer {
         const pairs = computeSatbVoiceLeading(onsetNodes[i], onsetNodes[i + 1]);
         allPairs.push(...pairs);
       }
-      this.drawSatbVoiceLeadingLines(ctx, allPairs);
+      this.drawSatbVoiceLeadingLines(ctx, allPairs, now, config.voiceLeadingUndulation !== false);
     }
 
     // Timeline tonic modulation barriers
@@ -1126,15 +1192,26 @@ export class StaffStreamRenderer {
    * Draws 1-to-1 SATB voice leading lines between consecutive chord onsets
    * with a gradient from origin Solfège colour to destination Solfège colour.
    */
+  /**
+   * Draws 1-to-1 SATB voice leading lines between consecutive chord onsets
+   * with a gradient from origin Solfège colour to destination Solfège colour,
+   * organic harmonic undulation, dual-layer glow, and travelling counterpoint energy pulses.
+   */
   private drawSatbVoiceLeadingLines(
     ctx: CanvasRenderingContext2D,
-    pairs: VoiceLeadingPair[]
+    pairs: VoiceLeadingPair[],
+    now: number,
+    enableUndulation: boolean
   ): void {
+    if (pairs.length === 0) return;
+
     ctx.save();
-    ctx.lineWidth = 2.0;
     ctx.lineCap = 'round';
 
-    for (const pair of pairs) {
+    const nowSec = now / 1000;
+
+    for (let pairIdx = 0; pairIdx < pairs.length; pairIdx++) {
+      const pair = pairs[pairIdx];
       const p1 = pair.from;
       const p2 = pair.to;
 
@@ -1143,15 +1220,95 @@ export class StaffStreamRenderer {
       grad.addColorStop(0, p1.item.colorHex);
       grad.addColorStop(1, p2.item.colorHex);
 
-      ctx.strokeStyle = grad;
-      ctx.globalAlpha = 0.65;
-
-      // Smooth horizontal S-curve connecting the two notes across time/slots
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
       const midX = (p1.x + p2.x) / 2;
-      ctx.bezierCurveTo(midX, p1.y, midX, p2.y, p2.x, p2.y);
+
+      if (!enableUndulation) {
+        // Clean static Bézier curve fallback
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.bezierCurveTo(midX, p1.y, midX, p2.y, p2.x, p2.y);
+
+        // Soft glow pass
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 3.5;
+        ctx.globalAlpha = 0.28;
+        ctx.stroke();
+
+        // Crisp core pass
+        ctx.lineWidth = 1.8;
+        ctx.globalAlpha = 0.75;
+        ctx.stroke();
+        continue;
+      }
+
+      // Harmonic standing wave undulation
+      // Envelope sin(pi * t) strictly forces offset to 0 at t=0 and t=1
+      const steps = 24;
+      const waveSeed = (p1.item.pitchClass * 7 + p2.item.pitchClass * 13 + pairIdx * 5) % 100;
+      const pathPoints: Array<{ x: number; y: number }> = [];
+
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const oneMinusT = 1 - t;
+
+        // Base horizontal S-curve Bézier evaluation
+        const bx =
+          oneMinusT * oneMinusT * oneMinusT * p1.x +
+          3 * oneMinusT * oneMinusT * t * midX +
+          3 * oneMinusT * t * t * midX +
+          t * t * t * p2.x;
+
+        const by =
+          oneMinusT * oneMinusT * oneMinusT * p1.y +
+          3 * oneMinusT * oneMinusT * t * p1.y +
+          3 * oneMinusT * t * t * p2.y +
+          t * t * t * p2.y;
+
+        // Standing harmonic wave undulation
+        const env = Math.sin(Math.PI * t);
+        const wave1 = Math.sin(t * Math.PI * 2 + nowSec * 4.2 + waveSeed) * 4.5;
+        const wave2 = Math.sin(t * Math.PI * 4 - nowSec * 5.8 + waveSeed * 0.5) * 2.0;
+        const undulationY = env * (wave1 + wave2);
+
+        pathPoints.push({ x: bx, y: by + undulationY });
+      }
+
+      // 1. Ambient outer glow pass
+      ctx.beginPath();
+      ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+      for (let i = 1; i < pathPoints.length; i++) {
+        ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+      }
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 4.2;
+      ctx.globalAlpha = 0.32;
       ctx.stroke();
+
+      // 2. Focused core pass
+      ctx.lineWidth = 1.8;
+      ctx.globalAlpha = 0.85;
+      ctx.stroke();
+
+      // 3. Travelling counterpoint energy pulse bead
+      const pulseSpeed = 1.25;
+      const pulseT = ((nowSec * pulseSpeed + waveSeed * 0.08) % 1.0 + 1.0) % 1.0;
+      const sampleIdx = Math.min(Math.floor(pulseT * steps), steps - 1);
+      const frac = pulseT * steps - sampleIdx;
+      const ptA = pathPoints[sampleIdx];
+      const ptB = pathPoints[sampleIdx + 1] ?? ptA;
+      const pulseX = ptA.x + (ptB.x - ptA.x) * frac;
+      const pulseY = ptA.y + (ptB.y - ptA.y) * frac;
+
+      // Pulse bead glow
+      ctx.save();
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowColor = p2.item.colorHex;
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(pulseX, pulseY, 2.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
 
     ctx.restore();
