@@ -1,6 +1,6 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano } from 'lucide-react';
-import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle } from '../core/types';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano, Music } from 'lucide-react';
+import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle, StaffClef } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES, PIANO_RANGE_PRESETS } from '../core/ppt-constants';
 import { PRESET_LAYOUTS } from '../core/layout-models';
@@ -966,6 +966,177 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   {opt.label}
                 </button>
               ))}
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION: STAFF STREAM NOTATION */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Music className="w-4 h-4 text-amber-400" />
+            <span>Staff Stream Notation</span>
+          </div>
+
+          {/* Staff Size */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Staff Size</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onUpdateConfig({ staffSize: 'grand' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  (config.staffSize || 'grand') === 'grand'
+                    ? 'bg-amber-600/30 border-amber-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Grand Staff (10 Lines)
+              </button>
+              <button
+                onClick={() => onUpdateConfig({ staffSize: 'single' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.staffSize === 'single'
+                    ? 'bg-amber-600/30 border-amber-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Single Staff (5 Lines)
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500 italic">
+              {config.staffSize === 'single'
+                ? 'Single 5-line staff with dynamic clef adaptation (Treble, Bass, and optional C-clefs).'
+                : 'Adjacent Treble and Bass staves with Middle C shared as the 1st ledger line between them.'}
+            </p>
+          </div>
+
+          {/* Staff Stream Mode */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <label className="block font-medium text-slate-300">Conveyor Mode</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => onUpdateConfig({ staffStreamMode: 'continuous' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  (config.staffStreamMode || 'continuous') === 'continuous'
+                    ? 'bg-amber-600/30 border-amber-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Continuous Scroll
+              </button>
+              <button
+                onClick={() => onUpdateConfig({ staffStreamMode: 'fixed' })}
+                className={`py-1.5 px-2 rounded border text-center transition ${
+                  config.staffStreamMode === 'fixed'
+                    ? 'bg-amber-600/30 border-amber-500 text-white font-medium'
+                    : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Fixed Queue
+              </button>
+            </div>
+          </div>
+
+          {/* Fixed Queue Window Length */}
+          {config.staffStreamMode === 'fixed' && (
+            <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
+              <div className="flex justify-between items-center text-slate-300">
+                <span className="font-medium">Fixed Queue Length:</span>
+                <span className="font-mono text-amber-400 font-bold">
+                  {config.staffFixedWindowSize ?? 8} notes
+                </span>
+              </div>
+              <input
+                type="range"
+                min={2}
+                max={24}
+                step={1}
+                value={config.staffFixedWindowSize ?? 8}
+                onChange={(e) => onUpdateConfig({ staffFixedWindowSize: parseInt(e.target.value, 10) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-amber-500"
+              />
+              <p className="text-[10px] text-slate-500 italic">
+                Controls the number of discrete notes shown on the staff queue simultaneously.
+              </p>
+            </div>
+          )}
+
+          {/* Clef Selection */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-2">
+            <div className="flex justify-between items-center text-[11px] text-slate-300">
+              <span className="font-medium">Clef Selection:</span>
+              <span className="font-mono text-amber-400 capitalize">{config.staffClef || 'dynamic'}</span>
+            </div>
+            <select
+              value={config.staffClef || 'dynamic'}
+              onChange={(e) => onUpdateConfig({ staffClef: e.target.value as StaffClef })}
+              className="w-full bg-slate-800/80 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-amber-500 focus:outline-none cursor-pointer"
+            >
+              <option value="dynamic">Dynamic (Prioritises Staff Lines)</option>
+              <option value="treble">Treble (G-clef)</option>
+              <option value="treble_8va">Treble 8va (Octave Up)</option>
+              <option value="treble_8vb">Treble 8vb (Octave Down)</option>
+              <option value="bass">Bass (F-clef)</option>
+              <option value="bass_8va">Bass 8va (Octave Up)</option>
+              <option value="bass_8vb">Bass 8vb (Octave Down)</option>
+              {config.staffSize === 'single' && config.includeCClefs && (
+                <>
+                  <option value="alto">Alto (C-clef Line 3)</option>
+                  <option value="tenor">Tenor (C-clef Line 4)</option>
+                </>
+              )}
+            </select>
+
+            {config.staffSize === 'single' && (
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                <div>
+                  <span className="text-slate-300 font-medium block">Enable C-Clefs</span>
+                  <span className="text-[10px] text-slate-400 block">Include Alto &amp; Tenor in dynamic evaluation</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.includeCClefs || false}
+                    onChange={(e) => onUpdateConfig({ includeCClefs: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Key Signature & Voice Leading Lines */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-slate-300 font-medium block">Key Signature</span>
+                <span className="text-[10px] text-slate-400 block">Display sharps/flats after clef</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.showKeySignature || false}
+                  onChange={(e) => onUpdateConfig({ showKeySignature: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="text-slate-300 font-medium block">Voice Leading Lines</span>
+                <span className="text-[10px] text-slate-400 block">Chromatic Solfège gradient trails between onsets</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.showVoiceLeadingLines !== false}
+                  onChange={(e) => onUpdateConfig({ showVoiceLeadingLines: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-600"></div>
+              </label>
             </div>
           </div>
         </section>

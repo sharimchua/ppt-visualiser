@@ -55,6 +55,18 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   streamFilterRegister: 'all',
   streamMinVelocity: 0.05,
 
+  // Staff Stream
+  staffStreamMode: 'continuous',
+  staffFixedWindowSize: 8,
+  staffSize: 'grand',
+  staffClef: 'dynamic',
+  includeCClefs: false,
+  staffScrollSpeed: 160,
+  showKeySignature: false,
+  showVoiceLeadingLines: true,
+  staffFilterRegister: 'all',
+  staffMinVelocity: 0.05,
+
   // Piano Triangles (Scale Signature)
   showVertexLabels: true,
   vertexLabelType: 'syllables',
@@ -205,6 +217,48 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     if (!validDirections.has(merged.direction)) {
       merged.direction = merged.orientation === 'vertical' ? 'ttb' : 'rtl';
     }
+
+    // Sanitize fixed window sizes (default: 8, range: 2..32)
+    merged.fixedWindowSize =
+      typeof merged.fixedWindowSize === 'number'
+        ? Math.max(2, Math.min(32, Math.round(merged.fixedWindowSize)))
+        : 8;
+
+    // Sanitize Staff Stream
+    merged.staffStreamMode = merged.staffStreamMode === 'fixed' ? 'fixed' : 'continuous';
+    merged.staffFixedWindowSize =
+      typeof merged.staffFixedWindowSize === 'number'
+        ? Math.max(2, Math.min(32, Math.round(merged.staffFixedWindowSize)))
+        : 8;
+    merged.staffSize = merged.staffSize === 'single' ? 'single' : 'grand';
+    const validClefs = new Set([
+      'dynamic',
+      'treble',
+      'treble_8va',
+      'treble_8vb',
+      'bass',
+      'bass_8va',
+      'bass_8vb',
+      'alto',
+      'tenor',
+    ]);
+    if (!validClefs.has(merged.staffClef)) merged.staffClef = 'dynamic';
+    merged.includeCClefs = typeof merged.includeCClefs === 'boolean' ? merged.includeCClefs : false;
+    merged.staffScrollSpeed =
+      typeof merged.staffScrollSpeed === 'number'
+        ? Math.max(40, Math.min(600, merged.staffScrollSpeed))
+        : 160;
+    merged.showKeySignature =
+      typeof merged.showKeySignature === 'boolean' ? merged.showKeySignature : false;
+    merged.showVoiceLeadingLines =
+      typeof merged.showVoiceLeadingLines === 'boolean' ? merged.showVoiceLeadingLines : true;
+    merged.staffFilterRegister = ['all', 'bass', 'mid', 'treble'].includes(merged.staffFilterRegister)
+      ? merged.staffFilterRegister
+      : 'all';
+    merged.staffMinVelocity =
+      typeof merged.staffMinVelocity === 'number'
+        ? Math.max(0, Math.min(1, merged.staffMinVelocity))
+        : 0.05;
 
     // Sanitize film grain & artifact settings
     merged.filmGrainEnabled = typeof merged.filmGrainEnabled === 'boolean' ? merged.filmGrainEnabled : (merged.filmGrainIntensity > 0);

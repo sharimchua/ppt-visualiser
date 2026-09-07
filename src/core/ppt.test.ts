@@ -13,7 +13,13 @@ import {
   TRI_PITCH_CLASSES_SHORT,
   getTriPitchClass,
   PIANO_RANGE_PRESETS,
+  PPT_NOTEHEAD_SPECS,
+  getPptNoteheadSpec,
+  midiToDiatonicStaffNote,
+  TONIC_TO_KEY_SIGNATURE,
+  isBlackPianoKey,
 } from './ppt-constants';
+import { renderPptNoteOnCanvas } from '../renderers/notehead-renderer';
 import { DEMO_TRACKS } from './demo-tracks';
 import { encodeNotesToMidi } from './midi-encoder';
 import { midiPlayerInstance } from './midi-file-player';
@@ -71,6 +77,18 @@ import {
 } from '../renderers/overtones-canvas';
 import { RenderCoordinator } from './render-coordinator';
 import { WebGLPostProcessingPipeline } from '../renderers/webgl-post-processing';
+import { SMUFL_GLYPH_PATHS } from '../renderers/smufl-glyphs';
+import {
+  clusterItemsIntoOnsets,
+  computeSatbVoiceLeading,
+  VoiceLeadingNode,
+  TREBLE_KEY_SIG_SHARPS,
+  TREBLE_KEY_SIG_FLATS,
+  BASS_KEY_SIG_SHARPS,
+  BASS_KEY_SIG_FLATS,
+  StaffStreamRenderer,
+} from '../renderers/staff-stream-canvas';
+import { StreamItem } from './types';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -2417,3 +2435,624 @@ test('Virtual Keyboard: 2-Octave QWERTY octave shifter offsets', () => {
   assert.strictEqual(baseMax + 24, 108);
   assert.ok(baseMax + 24 <= 108, 'Highest playable note with shift +3 touches C8');
 });
+
+test('PPT Noteheads: Taxonomy of 12 chromatic degrees matches shapes and Solfège colours', () => {
+  // Check exact 12 degree specs
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[0].shape, 'circle');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[0].colorHex, '#E13610'); // Do
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[0].semitone, 0);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[1].shape, 'diamond');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[1].colorHex, '#F98016'); // Ra/Di
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[1].semitone, 1);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[2].shape, 'square');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[2].colorHex, '#F98016'); // Re
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[2].semitone, 2);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[3].shape, 'triangle-down');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[3].colorHex, '#F5D432'); // Me/Ri
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[3].semitone, 3);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[4].shape, 'triangle-up');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[4].colorHex, '#F5D432'); // Mi
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[4].semitone, 4);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[5].shape, 'semicircle-left');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[5].colorHex, '#43A440'); // Fa
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[5].semitone, 5);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[6].shape, 'cross');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[6].colorHex, '#141414'); // Fi (Tritone)
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[6].semitone, 6);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[7].shape, 'semicircle-right');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[7].colorHex, '#0032A4'); // So
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[7].semitone, 7);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[8].shape, 'triangle-down');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[8].colorHex, '#5300A4'); // Le/Si
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[8].semitone, 8);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[9].shape, 'triangle-up');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[9].colorHex, '#5300A4'); // La/Li
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[9].semitone, 9);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[10].shape, 'diamond');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[10].colorHex, '#F158A4'); // Te/Li
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[10].semitone, 10);
+
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[11].shape, 'square');
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[11].colorHex, '#F158A4'); // Ti
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[11].semitone, 11);
+
+  // Modulo wrap testing for getPptNoteheadSpec
+  const wrapDo = getPptNoteheadSpec(12);
+  assert.strictEqual(wrapDo.shape, 'circle');
+  assert.strictEqual(wrapDo.semitone, 0);
+
+  const wrapNegative = getPptNoteheadSpec(-1);
+  assert.strictEqual(wrapNegative.shape, 'square');
+  assert.strictEqual(wrapNegative.semitone, 11);
+});
+
+test('Diatonic Staff Mapping: Middle C, natural notes, and accidentals', () => {
+  // Middle C (MIDI 60) -> step 0, accidental 0 (natural)
+  const c4 = midiToDiatonicStaffNote(60, false);
+  assert.strictEqual(c4.diatonicStep, 0);
+  assert.strictEqual(c4.accidental, 0);
+  assert.strictEqual(c4.letterName, 'C');
+
+  // D4 (MIDI 62) -> step 1
+  const d4 = midiToDiatonicStaffNote(62, false);
+  assert.strictEqual(d4.diatonicStep, 1);
+  assert.strictEqual(d4.accidental, 0);
+  assert.strictEqual(d4.letterName, 'D');
+
+  // E4 (MIDI 64) -> step 2
+  const e4 = midiToDiatonicStaffNote(64, false);
+  assert.strictEqual(e4.diatonicStep, 2);
+  assert.strictEqual(e4.accidental, 0);
+
+  // F4 (MIDI 65) -> step 3
+  const f4 = midiToDiatonicStaffNote(65, false);
+  assert.strictEqual(f4.diatonicStep, 3);
+  assert.strictEqual(f4.accidental, 0);
+
+  // G4 (MIDI 67) -> step 4
+  const g4 = midiToDiatonicStaffNote(67, false);
+  assert.strictEqual(g4.diatonicStep, 4);
+  assert.strictEqual(g4.accidental, 0);
+
+  // A4 (MIDI 69) -> step 5
+  const a4 = midiToDiatonicStaffNote(69, false);
+  assert.strictEqual(a4.diatonicStep, 5);
+  assert.strictEqual(a4.accidental, 0);
+
+  // B4 (MIDI 71) -> step 6
+  const b4 = midiToDiatonicStaffNote(71, false);
+  assert.strictEqual(b4.diatonicStep, 6);
+  assert.strictEqual(b4.accidental, 0);
+
+  // C5 (MIDI 72) -> step 7
+  const c5 = midiToDiatonicStaffNote(72, false);
+  assert.strictEqual(c5.diatonicStep, 7);
+  assert.strictEqual(c5.accidental, 0);
+
+  // C3 (MIDI 48) -> step -7
+  const c3 = midiToDiatonicStaffNote(48, false);
+  assert.strictEqual(c3.diatonicStep, -7);
+  assert.strictEqual(c3.accidental, 0);
+
+  // C#4 (MIDI 61) with sharp preference -> step 0 (C), accidental 1 (sharp)
+  const cSharp4 = midiToDiatonicStaffNote(61, false);
+  assert.strictEqual(cSharp4.diatonicStep, 0);
+  assert.strictEqual(cSharp4.accidental, 1);
+
+  // Eb4 (MIDI 63) with flat preference -> step 2 (E), accidental -1 (flat)
+  const eFlat4 = midiToDiatonicStaffNote(63, true);
+  assert.strictEqual(eFlat4.diatonicStep, 2);
+  assert.strictEqual(eFlat4.accidental, -1);
+
+  // F#4 (MIDI 66) with sharp preference -> step 3 (F), accidental 1 (sharp)
+  const fSharp4 = midiToDiatonicStaffNote(66, false);
+  assert.strictEqual(fSharp4.diatonicStep, 3);
+  assert.strictEqual(fSharp4.accidental, 1);
+});
+
+test('Key Signatures: Canonical accidentals for all 12 tonics', () => {
+  assert.deepStrictEqual(TONIC_TO_KEY_SIGNATURE[0], { sharpsFlats: 0, accidentals: [] });
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[7].sharpsFlats, 1); // G major (F#)
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[2].sharpsFlats, 2); // D major (F#, C#)
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[9].sharpsFlats, 3); // A major (F#, C#, G#)
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[4].sharpsFlats, 4); // E major
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[11].sharpsFlats, 5); // B major
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[6].sharpsFlats, 6); // F# major
+
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[5].sharpsFlats, -1); // F major (Bb)
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[10].sharpsFlats, -2); // Bb major (Bb, Eb)
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[3].sharpsFlats, -3); // Eb major
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[8].sharpsFlats, -4); // Ab major
+  assert.strictEqual(TONIC_TO_KEY_SIGNATURE[1].sharpsFlats, -5); // Db major
+});
+
+test('Configuration & Sanitisation: Fixed window size and staffStream configuration', () => {
+  // Default fixed queue lengths must be 8
+  assert.strictEqual(DEFAULT_CONFIG.fixedWindowSize, 8);
+  assert.strictEqual(DEFAULT_CONFIG.staffFixedWindowSize, 8);
+
+  // Clamping test: below 2 clamps to 2
+  const clampedLow = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    fixedWindowSize: 1,
+    staffFixedWindowSize: 1,
+  });
+  assert.strictEqual(clampedLow.fixedWindowSize, 2);
+  assert.strictEqual(clampedLow.staffFixedWindowSize, 2);
+
+  // Clamping test: above 32 clamps to 32
+  const clampedHigh = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    fixedWindowSize: 50,
+    staffFixedWindowSize: 50,
+  });
+  assert.strictEqual(clampedHigh.fixedWindowSize, 32);
+  assert.strictEqual(clampedHigh.staffFixedWindowSize, 32);
+
+  // Valid range preserved
+  const valid = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    fixedWindowSize: 16,
+    staffFixedWindowSize: 16,
+  });
+  assert.strictEqual(valid.fixedWindowSize, 16);
+  assert.strictEqual(valid.staffFixedWindowSize, 16);
+
+  // Staff stream configuration defaults
+  assert.strictEqual(DEFAULT_CONFIG.staffSize, 'grand');
+  assert.strictEqual(DEFAULT_CONFIG.staffClef, 'dynamic');
+  assert.strictEqual(DEFAULT_CONFIG.staffStreamMode, 'continuous');
+  assert.strictEqual(DEFAULT_CONFIG.includeCClefs, false);
+  assert.strictEqual(DEFAULT_CONFIG.showKeySignature, false);
+  assert.strictEqual(DEFAULT_CONFIG.showVoiceLeadingLines, true);
+
+  // Sanitisation of invalid values
+  const sanitizedStaff = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    staffSize: 'invalid' as any,
+    staffClef: 'invalid' as any,
+    staffStreamMode: 'invalid' as any,
+    includeCClefs: 'yes' as any,
+    showKeySignature: 'not-bool' as any,
+    showVoiceLeadingLines: 'not-bool' as any,
+  });
+  assert.strictEqual(sanitizedStaff.staffSize, 'grand');
+  assert.strictEqual(sanitizedStaff.staffClef, 'dynamic');
+  assert.strictEqual(sanitizedStaff.staffStreamMode, 'continuous');
+  assert.strictEqual(sanitizedStaff.includeCClefs, false);
+  assert.strictEqual(sanitizedStaff.showKeySignature, false);
+  assert.strictEqual(sanitizedStaff.showVoiceLeadingLines, true);
+});
+
+test('Layout Models: Split and add cell with staff-stream module', () => {
+  const root = {
+    id: 'root-test',
+    type: 'container' as const,
+    direction: 'row' as const,
+    gap: 8,
+    children: [
+      { id: 'cell-1', type: 'cell' as const, module: 'orbital' as const, flex: 1 },
+    ],
+  };
+
+  const splitResult = splitCellInTree(root, 'cell-1', 'row', 'staff-stream');
+  assert.strictEqual(splitResult.type, 'container');
+  assert.strictEqual(splitResult.children[1].type, 'cell');
+  assert.strictEqual((splitResult.children[1] as any).module, 'staff-stream');
+  assert.strictEqual((splitResult.children[1] as any).title, 'Staff Stream');
+
+  const addedResult = addCellToTree(root, 'row', 'staff-stream');
+  const cells = getAllCellNodes(addedResult);
+  assert.ok(cells.some((c) => c.module === 'staff-stream' && c.title === 'Staff Stream'));
+});
+
+test('SMuFL Glyphs: Vector path definitions for clefs and accidentals', () => {
+  assert.ok(SMUFL_GLYPH_PATHS.gClef.startsWith('M 541 598'));
+  assert.ok(SMUFL_GLYPH_PATHS.fClef.startsWith('M 363 377'));
+  assert.ok(SMUFL_GLYPH_PATHS.cClef.startsWith('M 331 694'));
+  assert.ok(SMUFL_GLYPH_PATHS.accidentalSharp.startsWith('M 341 170'));
+  assert.ok(SMUFL_GLYPH_PATHS.accidentalFlat.startsWith('M 17 -245'));
+  assert.ok(SMUFL_GLYPH_PATHS.accidentalNatural.startsWith('M 203 261'));
+});
+
+test('Staff Stream: Chord onset clustering for polyphonic chords', () => {
+  const createMockItem = (id: string, midi: number, timestamp: number): StreamItem => ({
+    id,
+    midi,
+    pitchClass: midi % 12,
+    octave: Math.floor(midi / 12) - 1,
+    velocity: 0.8,
+    timestamp,
+    colorHex: '#38bdf8',
+    solfege: 'Do',
+    pitchName: 'C',
+    interval: 'P1',
+    pianoTriangle: { triangle: 'D', point: 1 },
+    glyphType: 'base',
+    rotation: 0,
+  });
+
+  // 3 notes in a C major chord played simultaneously (within 20ms)
+  // followed 500ms later by a 4th note (melody note)
+  const items: StreamItem[] = [
+    createMockItem('n3', 67, 1.015), // G4
+    createMockItem('n1', 60, 1.000), // C4
+    createMockItem('n2', 64, 1.008), // E4
+    createMockItem('n4', 72, 1.500), // C5
+  ];
+
+  const onsets = clusterItemsIntoOnsets(items);
+  assert.strictEqual(onsets.length, 2, 'Should cluster into 2 distinct onsets');
+  assert.strictEqual(onsets[0].items.length, 3, 'First onset should contain 3 chord notes');
+  // Notes within onset must be sorted ascending by MIDI pitch: C4 (60), E4 (64), G4 (67)
+  assert.strictEqual(onsets[0].items[0].midi, 60);
+  assert.strictEqual(onsets[0].items[1].midi, 64);
+  assert.strictEqual(onsets[0].items[2].midi, 67);
+
+  // Second onset is monophonic
+  assert.strictEqual(onsets[1].items.length, 1);
+  assert.strictEqual(onsets[1].items[0].midi, 72);
+});
+
+test('Staff Stream: Deduplication of identical MIDI notes within same chord onset', () => {
+  const createMockItem = (id: string, midi: number, timestamp: number): StreamItem => ({
+    id,
+    midi,
+    pitchClass: midi % 12,
+    octave: Math.floor(midi / 12) - 1,
+    velocity: 0.8,
+    timestamp,
+    colorHex: '#E13610',
+    solfege: 'Do',
+    pitchName: 'C',
+    interval: 'P1',
+    pianoTriangle: { triangle: 'D', point: 1 },
+    glyphType: 'base',
+    rotation: 0,
+  });
+
+  // Simulated Cmaj7 2nd inversion with duplicate C5 triggers (e.g. from Web MIDI / driver duplicate messages)
+  const items: StreamItem[] = [
+    createMockItem('g4', 67, 1.000), // G4
+    createMockItem('b4', 71, 1.005), // B4
+    createMockItem('c5_1', 72, 1.010), // C5 first trigger
+    createMockItem('c5_2', 72, 1.012), // C5 duplicate trigger
+    createMockItem('e5', 76, 1.015), // E5
+  ];
+
+  const onsets = clusterItemsIntoOnsets(items);
+  assert.strictEqual(onsets.length, 1, 'Should cluster into 1 onset');
+  assert.strictEqual(onsets[0].items.length, 4, 'Duplicate C5 note must be deduplicated into 4 unique pitches');
+  assert.deepStrictEqual(onsets[0].items.map((it) => it.midi), [67, 71, 72, 76]);
+});
+
+test('Staff Stream: 1-to-1 SATB Voice Leading logic', () => {
+  const createNode = (midi: number, x: number, y: number): VoiceLeadingNode => ({
+    x,
+    y,
+    diatonicStep: midi,
+    item: {
+      id: `m_${midi}`,
+      midi,
+      pitchClass: midi % 12,
+      octave: Math.floor(midi / 12) - 1,
+      velocity: 0.8,
+      timestamp: 1.0,
+      colorHex: '#E13610',
+      solfege: 'Do',
+      pitchName: 'C',
+      interval: 'P1',
+      pianoTriangle: { triangle: 'D', point: 1 },
+      glyphType: 'base',
+      rotation: 0,
+    },
+  });
+
+  // Onset 1: C major SATB chord: C3(48), G3(55), E4(64), C5(72)
+  const chord1: VoiceLeadingNode[] = [
+    createNode(48, 100, 300), // Bass: C3
+    createNode(55, 100, 260), // Tenor: G3
+    createNode(64, 100, 210), // Alto: E4
+    createNode(72, 100, 160), // Soprano: C5
+  ];
+
+  // Onset 2: G major SATB chord: G2(43), G3(55), D4(62), B4(71)
+  const chord2: VoiceLeadingNode[] = [
+    createNode(43, 200, 330), // Bass: G2
+    createNode(55, 200, 260), // Tenor: G3
+    createNode(62, 200, 220), // Alto: D4
+    createNode(71, 200, 165), // Soprano: B4
+  ];
+
+  const pairs = computeSatbVoiceLeading(chord1, chord2);
+  assert.strictEqual(pairs.length, 4, '4-voice to 4-voice transition should yield 4 1-to-1 voice leading pairs');
+
+  // Soprano must connect to Soprano: C5(72) -> B4(71)
+  const sopranoPair = pairs.find((p) => p.from.item.midi === 72);
+  assert.ok(sopranoPair, 'Soprano voice must exist');
+  assert.strictEqual(sopranoPair.to.item.midi, 71, 'Soprano C5 must connect to Soprano B4');
+
+  // Bass must connect to Bass: C3(48) -> G2(43)
+  const bassPair = pairs.find((p) => p.from.item.midi === 48);
+  assert.ok(bassPair, 'Bass voice must exist');
+  assert.strictEqual(bassPair.to.item.midi, 43, 'Bass C3 must connect to Bass G2');
+
+  // Tenor held note: G3(55) -> G3(55)
+  const tenorPair = pairs.find((p) => p.from.item.midi === 55);
+  assert.ok(tenorPair, 'Tenor voice must exist');
+  assert.strictEqual(tenorPair.to.item.midi, 55, 'Tenor G3 connects to common tone G3');
+
+  // Alto: E4(64) -> D4(62)
+  const altoPair = pairs.find((p) => p.from.item.midi === 64);
+  assert.ok(altoPair, 'Alto voice must exist');
+  assert.strictEqual(altoPair.to.item.midi, 62, 'Alto E4 connects to D4');
+
+  // Voice expansion test: 3-note chord to 4-note chord
+  const triad: VoiceLeadingNode[] = [
+    createNode(48, 100, 300), // Bass
+    createNode(64, 100, 210), // Inner
+    createNode(72, 100, 160), // Soprano
+  ];
+  const expansionPairs = computeSatbVoiceLeading(triad, chord2);
+  assert.strictEqual(expansionPairs.length, 3, 'Each voice from origin chord connects 1-to-1 to destination chord');
+  // Outer voices still strictly preserved
+  assert.strictEqual(expansionPairs.find((p) => p.from.item.midi === 72)?.to.item.midi, 71);
+  assert.strictEqual(expansionPairs.find((p) => p.from.item.midi === 48)?.to.item.midi, 43);
+});
+
+test('Staff Stream: Traditional Key Signature step positions', () => {
+  // Treble sharps order: F5(4.0), C5(2.5), G5(4.5), D5(3.0), A4(1.5), E5(3.5), B4(2.0)
+  assert.deepStrictEqual(TREBLE_KEY_SIG_SHARPS, [4.0, 2.5, 4.5, 3.0, 1.5, 3.5, 2.0]);
+  // Treble flats order: Bb4(2.0), Eb5(3.5), Ab4(1.5), Db5(3.0), Gb4(1.0), Cb5(2.5), Fb4(0.5)
+  assert.deepStrictEqual(TREBLE_KEY_SIG_FLATS, [2.0, 3.5, 1.5, 3.0, 1.0, 2.5, 0.5]);
+
+  // Bass sharps order: F4(3.0), C4(1.5), G4(3.5), D4(2.0), A3(0.5), E4(2.5), B3(1.0)
+  assert.deepStrictEqual(BASS_KEY_SIG_SHARPS, [3.0, 1.5, 3.5, 2.0, 0.5, 2.5, 1.0]);
+  // Bass flats order: Bb3(1.0), Eb4(2.5), Ab3(0.5), Db4(2.0), Gb3(0.0), Cb4(1.5), Fb3(-0.5)
+  assert.deepStrictEqual(BASS_KEY_SIG_FLATS, [1.0, 2.5, 0.5, 2.0, 0.0, 1.5, -0.5]);
+});
+
+test('Piano Keyboard Mapping: isBlackPianoKey identifies physical black and white keys', () => {
+  // White keys: C(0), D(2), E(4), F(5), G(7), A(9), B(11)
+  const whiteKeys = [0, 2, 4, 5, 7, 9, 11];
+  for (const pc of whiteKeys) {
+    assert.strictEqual(isBlackPianoKey(pc), false, `Pitch class ${pc} must be a white key`);
+    assert.strictEqual(isBlackPianoKey(pc + 60), false, `MIDI ${pc + 60} must be a white key`);
+  }
+
+  // Black keys: C#(1), D#(3), F#(6), G#(8), A#(10)
+  const blackKeys = [1, 3, 6, 8, 10];
+  for (const pc of blackKeys) {
+    assert.strictEqual(isBlackPianoKey(pc), true, `Pitch class ${pc} must be a black key`);
+    assert.strictEqual(isBlackPianoKey(pc + 60), true, `MIDI ${pc + 60} must be a black key`);
+  }
+});
+
+test('PPT Noteheads: Outline colour indicates physical piano key (white or black)', () => {
+  let capturedStrokeStyle = '';
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: () => {},
+    rect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    fill: () => {},
+    stroke: () => {},
+    set strokeStyle(val: string) {
+      capturedStrokeStyle = val;
+    },
+    get strokeStyle() {
+      return capturedStrokeStyle;
+    },
+    lineWidth: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  // 1. White piano key notehead -> White outline (#ffffff)
+  renderPptNoteOnCanvas(mockCtx, 0, 100, 100, 20, 0, false, false, false);
+  assert.strictEqual(capturedStrokeStyle, '#ffffff', 'White piano key must have white outline');
+
+  // 2. Black piano key notehead -> Black outline (#090d16)
+  renderPptNoteOnCanvas(mockCtx, 1, 100, 100, 20, 0, false, false, true);
+  assert.strictEqual(capturedStrokeStyle, '#090d16', 'Black piano key must have black outline');
+});
+
+test('Staff Stream: Mode-specific accidentals, key signatures, and timing alignment', () => {
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: () => {},
+    rect: () => {},
+    roundRect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    strokeRect: () => {},
+    fillRect: () => {},
+    clip: () => {},
+    fill: () => {},
+    stroke: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    set strokeStyle(_val: string) {},
+    set fillStyle(_val: string) {},
+    lineWidth: 1,
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  const renderer = new StaffStreamRenderer();
+
+  const createItem = (midi: number, timestamp: number): StreamItem => ({
+    id: `item_${midi}`,
+    midi,
+    pitchClass: midi % 12,
+    octave: Math.floor(midi / 12) - 1,
+    velocity: 0.8,
+    timestamp,
+    duration: 0.5,
+    colorHex: '#E13610',
+    solfege: 'Do',
+    pitchName: 'C',
+    interval: 'P1',
+    pianoTriangle: { triangle: 'D', point: 1 },
+    glyphType: 'base',
+    rotation: 0,
+  });
+
+  // Simultaneous C4 (60) and C#4 (61) - a second
+  const items = [
+    createItem(60, 1.0),
+    createItem(61, 1.0),
+  ];
+
+  // 1. Continuous mode: must render without error, clipping and termination line present
+  assert.doesNotThrow(() => {
+    renderer.render(
+      mockCtx,
+      0,
+      0,
+      800,
+      400,
+      items,
+      { ...DEFAULT_CONFIG, staffStreamMode: 'continuous', showKeySignature: true },
+      2000
+    );
+  }, 'Continuous mode should render without errors');
+
+  // 2. Fixed queue mode: must render without error
+  assert.doesNotThrow(() => {
+    renderer.render(
+      mockCtx,
+      0,
+      0,
+      800,
+      400,
+      items,
+      { ...DEFAULT_CONFIG, staffStreamMode: 'fixed', showKeySignature: true },
+      2000
+    );
+  }, 'Fixed queue mode should render without errors');
+});
+
+test('RenderCoordinator: isContinuousStreamingActive detects continuous modes across cell overrides', () => {
+  // 1. Default config: both streamMode and staffStreamMode are continuous
+  const coordinator = new RenderCoordinator(DEFAULT_CONFIG);
+  assert.strictEqual(coordinator.isContinuousStreamingActive(), true);
+
+  // 2. Both set to fixed: should return false
+  const fixedConfig = { ...DEFAULT_CONFIG, streamMode: 'fixed' as const, staffStreamMode: 'fixed' as const };
+  const fixedCoordinator = new RenderCoordinator(fixedConfig);
+  assert.strictEqual(fixedCoordinator.isContinuousStreamingActive(), false);
+
+  // 3. streamMode fixed, but staffStreamMode continuous: should return true
+  const staffContinuousConfig = { ...DEFAULT_CONFIG, streamMode: 'fixed' as const, staffStreamMode: 'continuous' as const };
+  const staffContinuousCoordinator = new RenderCoordinator(staffContinuousConfig);
+  assert.strictEqual(staffContinuousCoordinator.isContinuousStreamingActive(), true);
+
+  // 4. Global fixed, but registered cell has continuous override: should return true
+  const mockCanvas = { getContext: () => ({}) } as unknown as HTMLCanvasElement;
+  fixedCoordinator.registerCellCanvas(
+    'cell-staff-1',
+    mockCanvas,
+    'staff-stream',
+    { staffStreamMode: 'continuous' }
+  );
+  assert.strictEqual(fixedCoordinator.isContinuousStreamingActive(), true);
+
+  coordinator.destroy();
+  fixedCoordinator.destroy();
+  staffContinuousCoordinator.destroy();
+});
+
+test('RenderCoordinator: High-volume polyphonic stream retains all notes in continuous conveyor', () => {
+  // Config with streamMode: 'fixed' but staffStreamMode: 'continuous'
+  const config = { ...DEFAULT_CONFIG, streamMode: 'fixed' as const, staffStreamMode: 'continuous' as const };
+  const coordinator = new RenderCoordinator(config);
+
+  // Play 150 polyphonic notes in rapid succession
+  for (let i = 0; i < 150; i++) {
+    coordinator.triggerNoteOn(36 + (i % 48), 0.8);
+  }
+
+  // All 150 notes must be retained in streamItems without premature 48-item pruning
+  assert.strictEqual(coordinator.streamItems.length, 150);
+  assert.strictEqual(coordinator.streamItems[0].midi, 36);
+
+  coordinator.destroy();
+});
+
+test('Staff Stream: Renders discrete noteheads without offset duration ribbons', () => {
+  const renderer = new StaffStreamRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    beginPath: () => {},
+    rect: () => {},
+    clip: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    fill: () => {},
+    stroke: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    roundRect: () => {},
+    ellipse: () => {},
+    closePath: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const items: StreamItem[] = [
+    {
+      id: 'item-1',
+      midi: 60,
+      pitchClass: 0,
+      octave: 4,
+      velocity: 0.8,
+      timestamp: 1.0,
+      colorHex: '#38bdf8',
+      solfege: 'Do',
+      pitchName: 'C',
+      triPitchName: 'C',
+      interval: 'P1',
+      pianoTriangle: { triangle: 'D', point: 1 },
+      glyphType: 'base',
+      rotation: 0,
+      duration: 1.5, // Note has duration, but Staff Stream must render discrete noteheads
+    },
+  ];
+
+  assert.doesNotThrow(() => {
+    renderer.render(
+      mockCtx,
+      0,
+      0,
+      800,
+      400,
+      items,
+      { ...DEFAULT_CONFIG, staffStreamMode: 'continuous' },
+      2000
+    );
+  });
+});
+
+
+

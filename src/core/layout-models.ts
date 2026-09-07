@@ -449,7 +449,16 @@ export function splitCellInTree(
         type: 'cell',
         module: newModule,
         flex: 1,
-        title: newModule === 'orbital' ? 'Pitch Clock' : newModule === 'triangles' ? 'Piano Triangles' : newModule === 'overtones' ? 'Overtone Waves' : 'Note Stream',
+        title:
+          newModule === 'orbital'
+            ? 'Pitch Clock'
+            : newModule === 'triangles'
+            ? 'Piano Triangles'
+            : newModule === 'overtones'
+            ? 'Overtone Waves'
+            : newModule === 'staff-stream'
+            ? 'Staff Stream'
+            : 'Note Stream',
         configOverrides:
           newModule === 'stream'
             ? {
@@ -641,7 +650,16 @@ export function addCellToTree(
     type: 'cell',
     module,
     flex: 1,
-    title: module === 'orbital' ? 'Pitch Clock' : module === 'triangles' ? 'Piano Triangles' : module === 'overtones' ? 'Overtone Waves' : 'Note Stream',
+    title:
+      module === 'orbital'
+        ? 'Pitch Clock'
+        : module === 'triangles'
+        ? 'Piano Triangles'
+        : module === 'overtones'
+        ? 'Overtone Waves'
+        : module === 'staff-stream'
+        ? 'Staff Stream'
+        : 'Note Stream',
     configOverrides:
       module === 'stream'
         ? {

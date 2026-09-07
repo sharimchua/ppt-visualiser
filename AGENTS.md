@@ -88,5 +88,5 @@ Default section order:
 ## Child DOX Index
 
 - [src/core/AGENTS.md](src/core/AGENTS.md) — Theoretical foundation, mathematical models, scale alignment, MIDI I/O, audio synthesis, layout trees, and unit testing.
-- [src/renderers/AGENTS.md](src/renderers/AGENTS.md) — 2D Canvas and WebGL graphics engines, orbital pitch clock, piano triangles, stream ribbons, analog cosmetics, and shaders.
+- [src/renderers/AGENTS.md](src/renderers/AGENTS.md) — 2D Canvas and WebGL graphics engines, orbital pitch clock, piano triangles, stream ribbons, staff stream notation, analog cosmetics, and shaders.
 - [src/components/AGENTS.md](src/components/AGENTS.md) — React UI presentation layer, control toolbars, viewports, virtual keyboard, settings drawer, and info modal.

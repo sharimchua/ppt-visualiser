@@ -92,7 +92,19 @@ export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
 
 // --- FLEXBOX LAYOUT ARCHITECTURE ---
 export type LayoutFlexDirection = 'row' | 'column';
-export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones';
+export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones' | 'staff-stream';
+
+export type StaffSize = 'single' | 'grand';
+export type StaffClef =
+  | 'dynamic'
+  | 'treble'
+  | 'treble_8va'
+  | 'treble_8vb'
+  | 'bass'
+  | 'bass_8va'
+  | 'bass_8vb'
+  | 'alto'
+  | 'tenor';
 
 export interface OrbitalModuleConfig {
   octaveMode: 'dynamic' | 'fixed8';
@@ -129,6 +141,19 @@ export interface StreamModuleConfig {
   streamMinVelocity: number; // 0..1
 }
 
+export interface StaffStreamModuleConfig {
+  staffStreamMode: StreamMode; // 'fixed' | 'continuous'
+  staffFixedWindowSize: number; // default: 8
+  staffSize: StaffSize; // 'single' | 'grand'
+  staffClef: StaffClef; // default: 'dynamic'
+  includeCClefs: boolean; // default: false (Alto & Tenor C-clefs for single staff)
+  staffScrollSpeed: number; // px per second (default: 160)
+  showKeySignature: boolean; // default: false
+  showVoiceLeadingLines: boolean; // default: true
+  staffFilterRegister: 'all' | 'bass' | 'mid' | 'treble';
+  staffMinVelocity: number; // 0..1
+}
+
 export interface PianoTrianglesModuleConfig {
   showVertexLabels: boolean;
   vertexLabelType: 'syllables' | 'pitches' | 'triPitches' | 'intervals' | 'none';
@@ -144,7 +169,12 @@ export interface OvertonesModuleConfig {
   maxFrequency: number;
 }
 
-export type ModuleCellConfig = OrbitalModuleConfig | StreamModuleConfig | PianoTrianglesModuleConfig | OvertonesModuleConfig;
+export type ModuleCellConfig =
+  | OrbitalModuleConfig
+  | StreamModuleConfig
+  | StaffStreamModuleConfig
+  | PianoTrianglesModuleConfig
+  | OvertonesModuleConfig;
 
 export interface LayoutCellNode {
   id: string;
@@ -153,7 +183,13 @@ export interface LayoutCellNode {
   title?: string;
   flex?: number; // flex-grow weight (default 1)
   minSize?: number; // min width/height in px
-  configOverrides?: Partial<OrbitalModuleConfig & StreamModuleConfig & PianoTrianglesModuleConfig & OvertonesModuleConfig>;
+  configOverrides?: Partial<
+    OrbitalModuleConfig &
+      StreamModuleConfig &
+      StaffStreamModuleConfig &
+      PianoTrianglesModuleConfig &
+      OvertonesModuleConfig
+  >;
 }
 
 export interface LayoutContainerNode {
@@ -229,7 +265,14 @@ export interface LayoutDefinition {
   aesthetics?: Partial<AestheticsConfig>;
 }
 
-export interface VisualiserConfig extends SystemConfig, AestheticsConfig, OrbitalModuleConfig, StreamModuleConfig, PianoTrianglesModuleConfig, OvertonesModuleConfig {
+export interface VisualiserConfig
+  extends SystemConfig,
+    AestheticsConfig,
+    OrbitalModuleConfig,
+    StreamModuleConfig,
+    StaffStreamModuleConfig,
+    PianoTrianglesModuleConfig,
+    OvertonesModuleConfig {
   layoutMode: LayoutMode;
   activeLayout: LayoutDefinition;
 }

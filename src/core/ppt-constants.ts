@@ -262,3 +262,133 @@ export const PIANO_RANGE_PRESETS: PianoRangePreset[] = [
   { id: '76-key', name: '76 Keys (E1–G7)', shortName: '76k', keys: 76, startMidi: 28, endMidi: 103, rangeLabel: 'E1–G7' },
   { id: '88-key', name: '88 Keys (A0–C8)', shortName: '88k', keys: 88, startMidi: 21, endMidi: 108, rangeLabel: 'A0–C8' },
 ];
+
+// ============================================================================
+// PPT NOTEHEAD TAXONOMY & STAFF NOTATION (Prime Period Theory / ppt-engraver)
+// ============================================================================
+
+export type PptNoteheadShape =
+  | 'circle'
+  | 'diamond'
+  | 'square'
+  | 'triangle-down'
+  | 'triangle-up'
+  | 'semicircle-left'
+  | 'cross'
+  | 'semicircle-right';
+
+export interface PptNoteheadSpec {
+  semitone: number; // 0..11 relative to Do
+  syllable: string;
+  shape: PptNoteheadShape;
+  colorHex: string;
+}
+
+/**
+ * 12 Chromatic PPT Notehead Geometries defined by Solfège relative to tonic.
+ * Based on Prime Period Theory (ppt-engraver):
+ * - Do (0): Circle
+ * - Ra / Di (1): Diamond
+ * - Re (2): Square
+ * - Me / Ri (3): Triangle Down
+ * - Mi (4): Triangle Up
+ * - Fa / Se (5): Semicircle Left
+ * - Fi (6): Cross (X)
+ * - So / Si (7): Semicircle Right
+ * - Le / Si (8): Triangle Down
+ * - La / Li (9): Triangle Up
+ * - Te / Li (10): Diamond
+ * - Ti (11): Square
+ */
+export const PPT_NOTEHEAD_SPECS: PptNoteheadSpec[] = [
+  { semitone: 0, syllable: 'Do', shape: 'circle', colorHex: '#E13610' },
+  { semitone: 1, syllable: 'Ra', shape: 'diamond', colorHex: '#F98016' },
+  { semitone: 2, syllable: 'Re', shape: 'square', colorHex: '#F98016' },
+  { semitone: 3, syllable: 'Me', shape: 'triangle-down', colorHex: '#F5D432' },
+  { semitone: 4, syllable: 'Mi', shape: 'triangle-up', colorHex: '#F5D432' },
+  { semitone: 5, syllable: 'Fa', shape: 'semicircle-left', colorHex: '#43A440' },
+  { semitone: 6, syllable: 'Fi', shape: 'cross', colorHex: '#141414' },
+  { semitone: 7, syllable: 'So', shape: 'semicircle-right', colorHex: '#0032A4' },
+  { semitone: 8, syllable: 'Le', shape: 'triangle-down', colorHex: '#5300A4' },
+  { semitone: 9, syllable: 'La', shape: 'triangle-up', colorHex: '#5300A4' },
+  { semitone: 10, syllable: 'Te', shape: 'diamond', colorHex: '#F158A4' },
+  { semitone: 11, syllable: 'Ti', shape: 'square', colorHex: '#F158A4' },
+];
+
+/**
+ * Maps a chromatic semitone difference from tonic (0..11) to its canonical PPT notehead specification.
+ */
+export function getPptNoteheadSpec(semitoneFromTonic: number): PptNoteheadSpec {
+  const norm = ((semitoneFromTonic % 12) + 12) % 12;
+  return PPT_NOTEHEAD_SPECS[norm];
+}
+
+/**
+ * Diatonic Pitch Mapping:
+ * C4 (Middle C, MIDI 60) is diatonic step 0.
+ * Steps: C=0, D=1, E=2, F=3, G=4, A=5, B=6, C5=7, etc.
+ */
+const DIATONIC_STEP_BY_PC_SHARP = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6];
+const ACCIDENTAL_BY_PC_SHARP = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]; // 0=nat, 1=sharp
+
+const DIATONIC_STEP_BY_PC_FLAT = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6];
+const ACCIDENTAL_BY_PC_FLAT = [0, -1, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0]; // 0=nat, -1=flat
+
+export interface DiatonicStaffNote {
+  diatonicStep: number; // 0 = C4 (Middle C), 2 = E4, -10 = G2, etc.
+  accidental: -1 | 0 | 1; // -1 = flat, 0 = natural, 1 = sharp
+  letterName: string; // 'C', 'D', 'E', 'F', 'G', 'A', 'B'
+}
+
+/**
+ * Resolves a MIDI note to its diatonic staff step and accidental.
+ */
+export function midiToDiatonicStaffNote(
+  midi: number,
+  preferFlats: boolean = false
+): DiatonicStaffNote {
+  const pc = ((midi % 12) + 12) % 12;
+  const octave = Math.floor(midi / 12) - 1; // 60 -> octave 4
+  const octaveOffset = (octave - 4) * 7;
+
+  const steps = preferFlats ? DIATONIC_STEP_BY_PC_FLAT : DIATONIC_STEP_BY_PC_SHARP;
+  const accs = preferFlats ? ACCIDENTAL_BY_PC_FLAT : ACCIDENTAL_BY_PC_SHARP;
+
+  const letterSteps = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+  const baseStep = steps[pc];
+  const diatonicStep = octaveOffset + baseStep;
+  const accidental = accs[pc] as -1 | 0 | 1;
+  const letterName = letterSteps[baseStep];
+
+  return { diatonicStep, accidental, letterName };
+}
+
+/**
+ * Standard Key Signatures for all 12 tonics (Major scales):
+ * positive = sharps, negative = flats
+ */
+export const TONIC_TO_KEY_SIGNATURE: Record<number, { sharpsFlats: number; accidentals: string[] }> = {
+  0: { sharpsFlats: 0, accidentals: [] }, // C
+  1: { sharpsFlats: -5, accidentals: ['Bb', 'Eb', 'Ab', 'Db', 'Gb'] }, // Db
+  2: { sharpsFlats: 2, accidentals: ['F#', 'C#'] }, // D
+  3: { sharpsFlats: -3, accidentals: ['Bb', 'Eb', 'Ab'] }, // Eb
+  4: { sharpsFlats: 4, accidentals: ['F#', 'C#', 'G#', 'D#'] }, // E
+  5: { sharpsFlats: -1, accidentals: ['Bb'] }, // F
+  6: { sharpsFlats: 6, accidentals: ['F#', 'C#', 'G#', 'D#', 'A#', 'E#'] }, // F#
+  7: { sharpsFlats: 1, accidentals: ['F#'] }, // G
+  8: { sharpsFlats: -4, accidentals: ['Bb', 'Eb', 'Ab', 'Db'] }, // Ab
+  9: { sharpsFlats: 3, accidentals: ['F#', 'C#', 'G#'] }, // A
+  10: { sharpsFlats: -2, accidentals: ['Bb', 'Eb'] }, // Bb
+  11: { sharpsFlats: 5, accidentals: ['F#', 'C#', 'G#', 'D#', 'A#'] }, // B
+};
+
+/**
+ * Determines whether a MIDI note or pitch class corresponds to a physical black key on a standard piano.
+ * Black keys: C# (1), D# (3), F# (6), G# (8), A# (10).
+ * White keys: C (0), D (2), E (4), F (5), G (7), A (9), B (11).
+ */
+export function isBlackPianoKey(midiOrPitchClass: number): boolean {
+  const pc = ((midiOrPitchClass % 12) + 12) % 12;
+  return pc === 1 || pc === 3 || pc === 6 || pc === 8 || pc === 10;
+}
+

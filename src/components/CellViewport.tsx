@@ -13,6 +13,7 @@ import {
   Waves,
   Triangle,
   Activity,
+  Music,
   ArrowRight,
   ArrowLeft,
   ArrowDown,
@@ -152,6 +153,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
           ? 'Piano Triangles'
           : nextModule === 'overtones'
           ? 'Overtone Waves'
+          : nextModule === 'staff-stream'
+          ? 'Staff Stream'
           : 'Note Stream',
       configOverrides:
         nextModule === 'stream'
@@ -189,7 +192,17 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
           <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 flex items-center">
             {cell.module === 'triangles' && <Triangle className="w-2.5 h-2.5 text-red-400 mr-1 fill-red-500/40" />}
             {cell.module === 'overtones' && <Activity className="w-2.5 h-2.5 text-cyan-400 mr-1" />}
-            {cell.title || (cell.module === 'orbital' ? 'Orbital' : cell.module === 'triangles' ? 'Scale Signature' : cell.module === 'overtones' ? 'Overtones' : 'Stream')}
+            {cell.module === 'staff-stream' && <Music className="w-2.5 h-2.5 text-orange-400 mr-1" />}
+            {cell.title ||
+              (cell.module === 'orbital'
+                ? 'Orbital'
+                : cell.module === 'triangles'
+                ? 'Scale Signature'
+                : cell.module === 'overtones'
+                ? 'Overtones'
+                : cell.module === 'staff-stream'
+                ? 'Staff Stream'
+                : 'Stream')}
           </span>
 
           {cell.module === 'stream' && onUpdateCell && (
@@ -232,6 +245,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
             >
               <option value="orbital">🪐 Clock</option>
               <option value="stream">🌊 Stream</option>
+              <option value="staff-stream">🎼 Staff Stream</option>
               <option value="triangles">▲ Triangles</option>
               <option value="overtones">〰️ Overtones</option>
             </select>
@@ -562,6 +576,35 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 </div>
               </div>
 
+              {/* Fixed Queue Window Size Slider for Stream */}
+              {effectiveConfig.streamMode === 'fixed' && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>Queue Length:</span>
+                    <span className="font-mono text-purple-400 font-bold">
+                      {effectiveConfig.fixedWindowSize ?? 8} notes
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={2}
+                    max={24}
+                    step={1}
+                    value={effectiveConfig.fixedWindowSize ?? 8}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          fixedWindowSize: parseInt(e.target.value, 10),
+                        },
+                      })
+                    }
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              )}
+
               {/* Register Filter */}
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 block font-medium">Pitch Register Filter:</label>
@@ -585,6 +628,268 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                       }
                       className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
                         (effectiveConfig.streamFilterRegister || 'all') === f.id
+                          ? 'bg-purple-600/30 border-purple-500 text-white'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Staff Stream-Specific Options */}
+          {cell.module === 'staff-stream' && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <label className="text-[11px] text-orange-400 font-medium block uppercase tracking-wider">
+                Staff Stream Parameters
+              </label>
+
+              {/* Staff Size: Grand vs Single */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Staff Size:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          staffSize: 'grand',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      (effectiveConfig.staffSize || 'grand') === 'grand'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Grand Staff (10 Lines)
+                  </button>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          staffSize: 'single',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      effectiveConfig.staffSize === 'single'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Single Staff (5 Lines)
+                  </button>
+                </div>
+              </div>
+
+              {/* Window Mode: Continuous vs Fixed Queue */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Window Mode:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          staffStreamMode: 'continuous',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      (effectiveConfig.staffStreamMode || 'continuous') === 'continuous'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Continuous Conveyor
+                  </button>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          staffStreamMode: 'fixed',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[10px] font-medium transition ${
+                      effectiveConfig.staffStreamMode === 'fixed'
+                        ? 'bg-purple-600/30 border-purple-500 text-white'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Fixed Queue Window
+                  </button>
+                </div>
+              </div>
+
+              {/* Fixed Queue Length Slider (when fixed) */}
+              {effectiveConfig.staffStreamMode === 'fixed' && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>Queue Length:</span>
+                    <span className="font-mono text-purple-400 font-bold">
+                      {effectiveConfig.staffFixedWindowSize ?? 8} notes
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={2}
+                    max={24}
+                    step={1}
+                    value={effectiveConfig.staffFixedWindowSize ?? 8}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          staffFixedWindowSize: parseInt(e.target.value, 10),
+                        },
+                      })
+                    }
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+              )}
+
+              {/* Clef Selection */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                  <span>Clef Selection:</span>
+                  <span className="font-mono text-purple-400 capitalize">
+                    {effectiveConfig.staffClef || 'dynamic'}
+                  </span>
+                </div>
+                <select
+                  value={effectiveConfig.staffClef || 'dynamic'}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        staffClef: e.target.value as any,
+                      },
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-200 font-mono focus:border-purple-500 focus:outline-none cursor-pointer"
+                >
+                  <option value="dynamic">Dynamic (Auto-Prioritises Lines)</option>
+                  <option value="treble">Treble (G-clef)</option>
+                  <option value="treble_8va">Treble 8va (Octave Up)</option>
+                  <option value="treble_8vb">Treble 8vb (Octave Down)</option>
+                  <option value="bass">Bass (F-clef)</option>
+                  <option value="bass_8va">Bass 8va (Octave Up)</option>
+                  <option value="bass_8vb">Bass 8vb (Octave Down)</option>
+                  {effectiveConfig.staffSize === 'single' && effectiveConfig.includeCClefs && (
+                    <>
+                      <option value="alto">Alto (C-clef Line 3)</option>
+                      <option value="tenor">Tenor (C-clef Line 4)</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              {/* C-Clef Toggle (Single Staff only) */}
+              {effectiveConfig.staffSize === 'single' && (
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <span className="text-[10px] text-slate-300 font-medium block">Enable C-Clefs</span>
+                    <span className="text-[9px] text-slate-500 block">Include Alto &amp; Tenor in dynamic evaluation</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={effectiveConfig.includeCClefs || false}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          includeCClefs: e.target.checked,
+                        },
+                      })
+                    }
+                    className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                  />
+                </div>
+              )}
+
+              {/* Key Signature Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Key Signature</span>
+                  <span className="text-[9px] text-slate-500 block">Traditional key signature vs notehead accidentals</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.showKeySignature || false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        showKeySignature: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Voice Leading Lines Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Voice Leading Lines</span>
+                  <span className="text-[9px] text-slate-500 block">Chromatic Solfège gradient trails between onsets</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.showVoiceLeadingLines !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        showVoiceLeadingLines: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Pitch Register Filter */}
+              <div className="space-y-1 pt-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Pitch Register Filter:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                  {[
+                    { id: 'all' as const, label: 'All' },
+                    { id: 'bass' as const, label: 'Bass (<C4)' },
+                    { id: 'mid' as const, label: 'Mid' },
+                    { id: 'treble' as const, label: 'Treble' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            staffFilterRegister: f.id,
+                          },
+                        })
+                      }
+                      className={`py-1 px-1 rounded border text-[10px] text-center font-medium transition ${
+                        (effectiveConfig.staffFilterRegister || 'all') === f.id
                           ? 'bg-purple-600/30 border-purple-500 text-white'
                           : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                       }`}

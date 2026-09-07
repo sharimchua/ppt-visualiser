@@ -109,7 +109,11 @@ export class MidiManager {
     // Unbind all existing listeners
     for (const input of this.midiAccess.inputs.values()) {
       input.onmidimessage = null;
-      input.removeEventListener('midimessage', this.boundMessageHandler);
+    }
+
+    // Default to 'all' if not set
+    if (!this.state.selectedInputId) {
+      this.state.selectedInputId = 'all';
     }
 
     for (const input of this.midiAccess.inputs.values()) {
@@ -127,23 +131,12 @@ export class MidiManager {
 
     this.state.inputs = inputList;
     this.state.isConnected = inputList.length > 0;
-
-    // Default to 'all' if not set
-    if (!this.state.selectedInputId) {
-      this.state.selectedInputId = 'all';
-      // Re-bind all
-      for (const input of this.midiAccess.inputs.values()) {
-        this.bindInput(input);
-      }
-    }
-
     this.notifyState();
   }
 
   private bindInput(input: MIDIInput) {
     console.log(`[Web MIDI] Binding listener to input: ${input.name} (${input.id})`);
     input.onmidimessage = this.boundMessageHandler;
-    input.addEventListener('midimessage', this.boundMessageHandler);
   }
 
   public selectInput(id: string) {

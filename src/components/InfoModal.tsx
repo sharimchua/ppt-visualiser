@@ -21,6 +21,7 @@ import { UniformSolfegeDiagram } from './UniformSolfegeDiagram';
 import { PianoTrianglesDiagram } from './PianoTrianglesDiagram';
 import { ConcentricOrbitsDiagram } from './ConcentricOrbitsDiagram';
 import { TriPitchClassDiagram } from './TriPitchClassDiagram';
+import { PptNoteheadDiagram } from './PptNoteheadDiagram';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -240,9 +241,9 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
             <div>
               <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-red-400" />
-                Four Distinct Visual Modules
+                Five Distinct Visual Modules
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                 <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -280,6 +281,16 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                   <p className="text-xs text-slate-300">
                     Kinetic fluid wave simulation of the 7-harmonic acoustic overtone series, featuring Uniform Solfège colouring, velocity dynamics, and subterranean Plomp-Levelt dissonance curves.
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Staff Stream
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Horizontal right-to-left staff notation featuring PPT geometric noteheads, Solfège colours, dynamic clef selection, key signatures, and voice leading lines.
                   </p>
                 </div>
               </div>
@@ -516,6 +527,68 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                 </div>
               </div>
+
+              {/* Concept 8: The Philosophy of PPT Geometric Noteheads */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                    <span>8. The Philosophy of PPT Geometric Noteheads</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 self-start sm:self-auto">
+                    Form Follows Harmonic Function
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  In traditional music notation, every notehead is an identical oval. Pitch is communicated solely through vertical placement across lines and spaces, requiring performers to mentally cross-reference clefs, key signatures, and accidental signs before understanding a note&apos;s harmonic function.
+                </p>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  <strong>Prime Period Theory (PPT)</strong> replaces passive oval noteheads with an active geometric language. Each notehead&apos;s <strong>shape, orientation, and Solf&egrave;ge colour</strong> explicitly encode its harmonic interval relative to the active tonic (Do), whilst its <strong>outline boundary</strong> immediately identifies physical piano keyboard geography:
+                </p>
+
+                {/* Rich Vector PPT Notehead Diagram Component */}
+                <PptNoteheadDiagram />
+              </div>
+
+              {/* Concept 9: Staff Stream Notation & Conveyor Architecture */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Music className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <span>9. Staff Stream Notation &amp; Conveyor Architecture</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 self-start sm:self-auto">
+                    Kinetic Notation &bull; Diatonic Staves
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  The <strong>Staff Stream</strong> module merges traditional five-line staff engraving with Prime Period Theory&apos;s geometric notehead taxonomy in a smooth Right-to-Left (RTL) conveyor flow. Notes arrive at the red origin playhead line on the right and travel westward across the staves, cleanly terminating at the blue boundary line:
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-emerald-400 block">Dynamic Clef Line-Prioritisation</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Intelligently evaluates active pitches and switches between Treble, Bass, Octave clefs, and Alto/Tenor C-clefs with +8 hysteresis to keep notes on staff lines and minimise ledger lines.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-emerald-400 block">Stylised Grand Staff Clefs</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Treble and Bass staves share Middle C as their adjacent ledger line. Overlapping clef glyphs composite harmoniously: white Treble, black Bass, and a neutral grey intersection.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-emerald-400 block">SATB 1-to-1 Voice Leading</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Connecting gradient vectors map Soprano to Soprano, Bass to Bass, and inner voices by minimum diatonic distance, visualising true counterpoint and chord voicing progression.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* Section Divider: Customise */}
@@ -549,7 +622,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Edit Mode & Resizing</span>
-                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, or Overtone Waves), duplicate cells, or drag border dividers to resize flex ratios.</p>
+                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves, or Staff Stream), duplicate cells, or drag border dividers to resize flex ratios.</p>
                   </div>
                 </div>
               </div>
@@ -580,6 +653,40 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
                     <span className="font-bold text-cyan-400 block">Fluid Ripple Speed</span>
                     <p className="text-[10px] text-slate-400">Adjust the kinetic oscillation velocity of the fluid surface from gentle swells to rapid undulations.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Staff Stream Notation Controls */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Music className="w-5 h-5 text-emerald-400" />
+                    Staff Stream Notation Controls
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/60">
+                    Geometric Notation
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-300">
+                  Customise staff layout, clef behaviour, and conveyor modes in cell settings or the main settings drawer:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">Staff Size &amp; Clefs</span>
+                    <p className="text-[10px] text-slate-400">Toggle between Single and Grand Staff, or choose Dynamic Clef or manual locks (Treble, Bass, Alto, Tenor, Octaves).</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">C-Clef Toggle</span>
+                    <p className="text-[10px] text-slate-400">Enable or disable Alto/Tenor C-clefs for single staff dynamic selection to tailor readability to your preference.</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">Continuous vs Fixed</span>
+                    <p className="text-[10px] text-slate-400">Select continuous smooth scrolling or a fixed-length queue (defaulting to 8 notes, configurable up to 32).</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-emerald-400 block">Key Signatures &amp; Lines</span>
+                    <p className="text-[10px] text-slate-400">Toggle key signature accidental clusters and multi-coloured voice leading lines between note onsets.</p>
                   </div>
                 </div>
               </div>

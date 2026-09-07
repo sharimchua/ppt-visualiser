@@ -26,6 +26,7 @@ import { ScaleAlignmentTracker } from './scale-alignment';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
+import { StaffStreamRenderer } from '../renderers/staff-stream-canvas';
 import { OvertonesRenderer } from '../renderers/overtones-canvas';
 import {
   WebGLPostProcessingPipeline,
@@ -66,6 +67,7 @@ export class RenderCoordinator {
   public readonly pitchClockRenderer: PitchClockRenderer;
   public readonly pianoTrianglesRenderer: PianoTrianglesRenderer;
   public readonly streamRenderer: StreamRenderer;
+  public readonly staffStreamRenderer: StaffStreamRenderer;
   public readonly overtonesRenderer: OvertonesRenderer;
 
   // WebGL Post-Processing Pipeline
@@ -121,6 +123,7 @@ export class RenderCoordinator {
     this.pitchClockRenderer = new PitchClockRenderer();
     this.pianoTrianglesRenderer = new PianoTrianglesRenderer();
     this.streamRenderer = new StreamRenderer();
+    this.staffStreamRenderer = new StaffStreamRenderer();
     this.overtonesRenderer = new OvertonesRenderer();
 
     // Propagate initial focusMode setting to engines
@@ -262,6 +265,7 @@ export class RenderCoordinator {
     this.streamItems = [];
     this.tonicShiftMarkers = [];
     this.pitchClockRenderer.resetRevealsAndActivity();
+    this.staffStreamRenderer.reset();
     this.scaleTracker.reset();
     for (const listener of this.activeNotesListeners) {
       listener(this.activeNotes);
@@ -443,6 +447,23 @@ export class RenderCoordinator {
     this.cellCanvases.delete(id);
   }
 
+  public isContinuousStreamingActive(): boolean {
+    if (this.config.streamMode === 'continuous' || this.config.staffStreamMode === 'continuous') {
+      return true;
+    }
+    for (const cell of this.cellCanvases.values()) {
+      if (cell.module === 'stream') {
+        const mode = cell.configOverrides?.streamMode ?? this.config.streamMode;
+        if (mode === 'continuous') return true;
+      }
+      if (cell.module === 'staff-stream') {
+        const mode = cell.configOverrides?.staffStreamMode ?? this.config.staffStreamMode ?? 'continuous';
+        if (mode === 'continuous') return true;
+      }
+    }
+    return false;
+  }
+
   public triggerNoteOn = (midi: number, velocity: number = 0.8) => {
     if ((this.config.focusModeEnabled ?? true) && !this.isWindowFocused()) {
       return;
@@ -570,8 +591,13 @@ export class RenderCoordinator {
     };
 
     const nowSec = now / 1000;
-    if (this.config.streamMode === 'continuous') {
-      const maxAgeSec = 60;
+    if (this.isContinuousStreamingActive()) {
+      // Dynamic age retention: ensure notes are never pruned before they have had time to travel
+      // across any viewport width (including 4K monitors) at the configured scroll speed.
+      const scrollSpeed = Math.min(this.config.scrollSpeed || 160, this.config.staffScrollSpeed || 160);
+      const maxTravelSec = Math.ceil(4000 / Math.max(20, scrollSpeed)) + 30;
+      const maxAgeSec = Math.max(120, maxTravelSec);
+
       let startIndex = 0;
       while (startIndex < this.streamItems.length && nowSec - this.streamItems[startIndex].timestamp > maxAgeSec) {
         startIndex++;
@@ -579,12 +605,15 @@ export class RenderCoordinator {
       if (startIndex > 0) {
         this.streamItems = this.streamItems.slice(startIndex);
       }
-      if (this.streamItems.length >= 1200) {
-        this.streamItems = this.streamItems.slice(this.streamItems.length - 1199);
+      // Generous buffer limit (10,000 notes) safely accommodating dense polyphony and fast MIDI playback
+      if (this.streamItems.length >= 10000) {
+        this.streamItems = this.streamItems.slice(this.streamItems.length - 9999);
       }
       this.streamItems.push(streamItem);
     } else {
-      const limit = Math.max(48, (this.config.fixedWindowSize || 8) * 2);
+      // Fixed queue mode across all cells: accommodate polyphonic chords per queue slot
+      const fixedSize = Math.max(this.config.fixedWindowSize || 8, this.config.staffFixedWindowSize || 8);
+      const limit = Math.max(512, fixedSize * 16);
       if (this.streamItems.length >= limit) {
         this.streamItems = this.streamItems.slice(-limit + 1);
       }
@@ -721,6 +750,18 @@ export class RenderCoordinator {
           this.decayingNotes,
           effectiveConfig,
           time
+        );
+      } else if (module === 'staff-stream') {
+        this.staffStreamRenderer.render(
+          ctx,
+          0,
+          0,
+          width,
+          height,
+          this.streamItems,
+          effectiveConfig,
+          time,
+          this.tonicShiftMarkers
         );
       } else {
         this.streamRenderer.render(
