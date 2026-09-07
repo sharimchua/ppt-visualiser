@@ -286,7 +286,7 @@ export class PianoTrianglesRenderer {
     chainCenterY: number,
     triSize: number,
     availH: number,
-    config: VisualiserConfig
+    _config: VisualiserConfig
   ): void {
     if (!this.activeTonicShift) return;
     const elapsed = performance.now() - this.activeTonicShift.startTime;
@@ -304,14 +304,23 @@ export class PianoTrianglesRenderer {
     const beamY1 = chainCenterY - availH / 2 + 6;
     const beamY2 = chainCenterY + availH / 2 - 6;
 
+    // 1. Vertical Do Anchor Beam
+    // Ambient outer beam
+    ctx.beginPath();
+    ctx.moveTo(doX, beamY1);
+    ctx.lineTo(doX, beamY2);
+    ctx.strokeStyle = '#E13610';
+    ctx.lineWidth = 4.0 + (1 - t) * 6.0;
+    ctx.globalAlpha = surgeAlpha * 0.35;
+    ctx.stroke();
+
+    // Primary beam
     ctx.beginPath();
     ctx.moveTo(doX, beamY1);
     ctx.lineTo(doX, beamY2);
     ctx.strokeStyle = '#E13610';
     ctx.lineWidth = 1.5 + (1 - t) * 3.5;
     ctx.globalAlpha = surgeAlpha * 0.9;
-    ctx.shadowColor = '#E13610';
-    ctx.shadowBlur = 16 * (config.glowBloom ?? 0.8);
     ctx.stroke();
 
     // Inner white laser core
@@ -325,22 +334,35 @@ export class PianoTrianglesRenderer {
 
     // 2. Expanding Do Vertex Harmonic Ring Ripple
     const rippleR = 6 + t * 48;
+    // Ambient wider ripple
+    ctx.beginPath();
+    ctx.arc(doX, doY, rippleR, 0, Math.PI * 2);
+    ctx.strokeStyle = '#E13610';
+    ctx.lineWidth = Math.max(1.2, 4.8 * (1 - t));
+    ctx.globalAlpha = surgeAlpha * 0.3;
+    ctx.stroke();
+
+    // Focused core ripple
     ctx.beginPath();
     ctx.arc(doX, doY, rippleR, 0, Math.PI * 2);
     ctx.strokeStyle = '#E13610';
     ctx.lineWidth = Math.max(0.6, 2.4 * (1 - t));
     ctx.globalAlpha = surgeAlpha * 0.8;
-    ctx.shadowColor = '#E13610';
-    ctx.shadowBlur = 14 * (config.glowBloom ?? 0.8);
     ctx.stroke();
 
     // 3. Do Anchor Diamond Pip Flash
     const pipY = chainCenterY - triSize * 0.7;
+    // Ambient outer halo
     ctx.beginPath();
-    ctx.arc(doX, pipY, 3 + surgeAlpha * 4.5, 0, Math.PI * 2);
+    ctx.arc(doX, pipY, 6 + surgeAlpha * 6.0, 0, Math.PI * 2);
+    ctx.fillStyle = '#E13610';
+    ctx.globalAlpha = surgeAlpha * 0.45;
+    ctx.fill();
+
+    // White core pip
+    ctx.beginPath();
+    ctx.arc(doX, pipY, 3 + surgeAlpha * 3.5, 0, Math.PI * 2);
     ctx.fillStyle = '#FFFFFF';
-    ctx.shadowColor = '#E13610';
-    ctx.shadowBlur = 16 * (config.glowBloom ?? 0.8);
     ctx.globalAlpha = surgeAlpha;
     ctx.fill();
 
@@ -495,15 +517,12 @@ export class PianoTrianglesRenderer {
       ctx.save();
 
       if (isActive) {
-        // --- ACTIVE VERTEX: Vibrant Solfege Glow + White Halo ---
-        ctx.shadowColor = vertexColor;
-        ctx.shadowBlur = 18 * velocity;
-
-        // Outer glow disc
+        // --- ACTIVE VERTEX: Vibrant Solfège Dual-Concentric Disc + White Core ---
+        // Ambient soft outer disc (eliminates CPU software Gaussian shadowBlur)
         ctx.beginPath();
-        ctx.arc(vx, vy, radius + 2.5, 0, Math.PI * 2);
+        ctx.arc(vx, vy, radius + 3.0 + velocity * 2.5, 0, Math.PI * 2);
         ctx.fillStyle = vertexColor;
-        ctx.globalAlpha = 0.4;
+        ctx.globalAlpha = 0.35 * (0.6 + velocity * 0.4);
         ctx.fill();
 
         // Main active disc
@@ -539,8 +558,12 @@ export class PianoTrianglesRenderer {
         }
       } else if (isDecaying) {
         // --- DECAYING VERTEX: Smooth Alpha Fade ---
-        ctx.shadowColor = vertexColor;
-        ctx.shadowBlur = 10 * decayFactor;
+        // Soft outer ambient halo
+        ctx.beginPath();
+        ctx.arc(vx, vy, radius + 2.0 * decayFactor, 0, Math.PI * 2);
+        ctx.fillStyle = vertexColor;
+        ctx.globalAlpha = decayFactor * 0.25;
+        ctx.fill();
 
         ctx.beginPath();
         ctx.arc(vx, vy, radius, 0, Math.PI * 2);
@@ -690,8 +713,6 @@ export class PianoTrianglesRenderer {
 
     if (isActive) {
       ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 6;
     } else if (isScaleTone) {
       ctx.fillStyle = isDo ? '#ffffff' : color;
     } else {

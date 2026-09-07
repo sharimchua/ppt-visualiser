@@ -194,6 +194,10 @@ export class StaffStreamRenderer {
   private maskCanvas: HTMLCanvasElement | null = null;
   private maskCtx: CanvasRenderingContext2D | null = null;
 
+  // Preallocated scratch buffers for voice leading curves (zero per-frame GC allocations)
+  private static scratchPathX = new Float32Array(32);
+  private static scratchPathY = new Float32Array(32);
+
   private getClefBuffers(width: number, height: number): {
     clefCanvas: HTMLCanvasElement;
     clefCtx: CanvasRenderingContext2D;
@@ -1245,7 +1249,6 @@ export class StaffStreamRenderer {
       // Envelope sin(pi * t) strictly forces offset to 0 at t=0 and t=1
       const steps = 24;
       const waveSeed = (p1.item.pitchClass * 7 + p2.item.pitchClass * 13 + pairIdx * 5) % 100;
-      const pathPoints: Array<{ x: number; y: number }> = [];
 
       for (let s = 0; s <= steps; s++) {
         const t = s / steps;
@@ -1270,14 +1273,15 @@ export class StaffStreamRenderer {
         const wave2 = Math.sin(t * Math.PI * 4 - nowSec * 5.8 + waveSeed * 0.5) * 2.0;
         const undulationY = env * (wave1 + wave2);
 
-        pathPoints.push({ x: bx, y: by + undulationY });
+        StaffStreamRenderer.scratchPathX[s] = bx;
+        StaffStreamRenderer.scratchPathY[s] = by + undulationY;
       }
 
       // 1. Ambient outer glow pass
       ctx.beginPath();
-      ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
-      for (let i = 1; i < pathPoints.length; i++) {
-        ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+      ctx.moveTo(StaffStreamRenderer.scratchPathX[0], StaffStreamRenderer.scratchPathY[0]);
+      for (let i = 1; i <= steps; i++) {
+        ctx.lineTo(StaffStreamRenderer.scratchPathX[i], StaffStreamRenderer.scratchPathY[i]);
       }
       ctx.strokeStyle = grad;
       ctx.lineWidth = 4.2;
@@ -1294,19 +1298,27 @@ export class StaffStreamRenderer {
       const pulseT = ((nowSec * pulseSpeed + waveSeed * 0.08) % 1.0 + 1.0) % 1.0;
       const sampleIdx = Math.min(Math.floor(pulseT * steps), steps - 1);
       const frac = pulseT * steps - sampleIdx;
-      const ptA = pathPoints[sampleIdx];
-      const ptB = pathPoints[sampleIdx + 1] ?? ptA;
-      const pulseX = ptA.x + (ptB.x - ptA.x) * frac;
-      const pulseY = ptA.y + (ptB.y - ptA.y) * frac;
+      const ptAx = StaffStreamRenderer.scratchPathX[sampleIdx];
+      const ptAy = StaffStreamRenderer.scratchPathY[sampleIdx];
+      const ptBx = StaffStreamRenderer.scratchPathX[sampleIdx + 1];
+      const ptBy = StaffStreamRenderer.scratchPathY[sampleIdx + 1];
+      const pulseX = ptAx + (ptBx - ptAx) * frac;
+      const pulseY = ptAy + (ptBy - ptAy) * frac;
 
-      // Pulse bead glow
+      // Pulse bead glow: concentric dual-disc eliminates CPU Gaussian shadowBlur filter
       ctx.save();
-      ctx.globalAlpha = 0.9;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.shadowColor = p2.item.colorHex;
-      ctx.shadowBlur = 8;
+      // Outer ambient halo
+      ctx.globalAlpha = 0.45;
+      ctx.fillStyle = p2.item.colorHex;
       ctx.beginPath();
-      ctx.arc(pulseX, pulseY, 2.4, 0, Math.PI * 2);
+      ctx.arc(pulseX, pulseY, 5.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Crisp specular white core
+      ctx.globalAlpha = 0.95;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(pulseX, pulseY, 2.2, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }

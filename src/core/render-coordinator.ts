@@ -33,12 +33,20 @@ import {
   PostProcessingLight,
 } from '../renderers/webgl-post-processing';
 
+export interface CachedRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
 export interface CellCanvasEntry {
   id: string;
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
   module: VisualiserModuleType;
   configOverrides?: Partial<VisualiserConfig>;
+  cachedRect?: CachedRect;
 }
 
 export interface ScaleFitInfo {
@@ -89,6 +97,7 @@ export class RenderCoordinator {
   private bgCtx: CanvasRenderingContext2D | null = null;
 
   private readonly cellCanvases: Map<string, CellCanvasEntry> = new Map();
+  private cachedTargetRect: CachedRect | null = null;
 
   // Listeners & Callbacks
   private readonly activeNotesListeners: Set<ActiveNotesListener> = new Set();
@@ -116,6 +125,29 @@ export class RenderCoordinator {
     }
   };
 
+  /**
+   * Updates cached DOM bounding client rectangles for all registered cell canvases
+   * and the target effects/WebGL canvas. Executed strictly on window resize or canvas registration,
+   * completely eliminating DOM layout thrashing and forced reflows from the 60 FPS animation loop.
+   */
+  public updateAllCachedBounds = () => {
+    if (typeof window === 'undefined') return;
+    const target = this.postProcessingCanvas || this.effectsCanvas || this.overlayCanvas;
+    if (target && typeof target.getBoundingClientRect === 'function') {
+      const r = target.getBoundingClientRect();
+      this.cachedTargetRect = { left: r.left, top: r.top, width: r.width, height: r.height };
+    } else {
+      this.cachedTargetRect = null;
+    }
+
+    for (const cell of this.cellCanvases.values()) {
+      if (cell.canvas && typeof cell.canvas.getBoundingClientRect === 'function') {
+        const cr = cell.canvas.getBoundingClientRect();
+        cell.cachedRect = { left: cr.left, top: cr.top, width: cr.width, height: cr.height };
+      }
+    }
+  };
+
   constructor(initialConfig: VisualiserConfig = DEFAULT_CONFIG) {
     this.config = initialConfig;
     this.cosmeticsEngine = new CosmeticsEngine();
@@ -136,10 +168,11 @@ export class RenderCoordinator {
     this.unsubMidiOn = midiManagerInstance.onNoteOn((midi, vel) => this.triggerNoteOn(midi, vel));
     this.unsubMidiOff = midiManagerInstance.onNoteOff((midi) => this.triggerNoteOff(midi));
 
-    // Register focus/blur lifecycle listeners
+    // Register focus/blur and resize lifecycle listeners
     if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
       window.addEventListener('focus', this.handleFocusChange);
       window.addEventListener('blur', this.handleFocusChange);
+      window.addEventListener('resize', this.updateAllCachedBounds);
     }
     if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
       document.addEventListener('visibilitychange', this.handleFocusChange);
@@ -194,6 +227,7 @@ export class RenderCoordinator {
     if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
       window.removeEventListener('focus', this.handleFocusChange);
       window.removeEventListener('blur', this.handleFocusChange);
+      window.removeEventListener('resize', this.updateAllCachedBounds);
     }
     if (typeof document !== 'undefined' && typeof document.removeEventListener === 'function') {
       document.removeEventListener('visibilitychange', this.handleFocusChange);
@@ -301,23 +335,26 @@ export class RenderCoordinator {
     this.pitchClockRenderer.remapTonic(newTonic, this.config.keyboardLowestMidi);
 
     if (this.config.tonicShiftEffectsEnabled !== false) {
+      if (!this.cachedTargetRect && typeof window !== 'undefined') {
+        this.updateAllCachedBounds();
+      }
+
       // Find orbital clock center and radius on the effects canvas (if available)
-      let orbitalCellCanvas: HTMLCanvasElement | null = null;
+      let orbitalCell: CellCanvasEntry | null = null;
       for (const cell of this.cellCanvases.values()) {
         if (cell.module === 'orbital') {
-          orbitalCellCanvas = cell.canvas;
+          orbitalCell = cell;
           break;
         }
       }
 
-      const targetCanvas = this.effectsCanvas || this.overlayCanvas || this.postProcessingCanvas;
       let clockCx = (typeof window !== 'undefined' ? window.innerWidth : 1920) / 2;
       let clockCy = (typeof window !== 'undefined' ? window.innerHeight : 1080) / 2;
       let clockRadius = Math.min(clockCx, clockCy) * 0.45;
 
-      if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
-        const cellRect = orbitalCellCanvas.getBoundingClientRect();
-        const targetRect = targetCanvas.getBoundingClientRect();
+      if (orbitalCell && orbitalCell.cachedRect && this.cachedTargetRect) {
+        const cellRect = orbitalCell.cachedRect;
+        const targetRect = this.cachedTargetRect;
         clockCx = (cellRect.left - targetRect.left) + cellRect.width / 2;
         clockCy = (cellRect.top - targetRect.top) + cellRect.height / 2;
         clockRadius = Math.min(cellRect.width, cellRect.height) * 0.45;
@@ -360,6 +397,7 @@ export class RenderCoordinator {
       this.webglPipeline.destroy();
     }
     this.webglPipeline = new WebGLPostProcessingPipeline(canvas);
+    this.updateAllCachedBounds();
   }
 
   public unregisterPostProcessingCanvas() {
@@ -368,26 +406,31 @@ export class RenderCoordinator {
       this.webglPipeline = null;
     }
     this.postProcessingCanvas = null;
+    this.updateAllCachedBounds();
   }
 
   public registerEffectsCanvas(canvas: HTMLCanvasElement) {
     this.effectsCanvas = canvas;
     this.effectsCtx = canvas.getContext('2d');
+    this.updateAllCachedBounds();
   }
 
   public unregisterEffectsCanvas() {
     this.effectsCanvas = null;
     this.effectsCtx = null;
+    this.updateAllCachedBounds();
   }
 
   public registerOverlayCanvas(canvas: HTMLCanvasElement) {
     this.overlayCanvas = canvas;
     this.overlayCtx = canvas.getContext('2d');
+    this.updateAllCachedBounds();
   }
 
   public unregisterOverlayCanvas() {
     this.overlayCanvas = null;
     this.overlayCtx = null;
+    this.updateAllCachedBounds();
   }
 
   public registerBgCanvas(canvas: HTMLCanvasElement) {
@@ -429,6 +472,7 @@ export class RenderCoordinator {
       module,
       configOverrides,
     });
+    this.updateAllCachedBounds();
   }
 
   public updateCellCanvas(
@@ -440,11 +484,13 @@ export class RenderCoordinator {
     if (existing) {
       existing.module = module;
       existing.configOverrides = configOverrides;
+      this.updateAllCachedBounds();
     }
   }
 
   public unregisterCellCanvas(id: string) {
     this.cellCanvases.delete(id);
+    this.updateAllCachedBounds();
   }
 
   public isContinuousStreamingActive(): boolean {
@@ -860,6 +906,7 @@ export class RenderCoordinator {
     // 5. Render 2D kinetic sparks & expanding shockwave rings (+ 2D post-processing fallback if WebGL unavailable)
     const effCanvas = this.effectsCanvas || this.overlayCanvas;
     const effCtx = this.effectsCtx || this.overlayCtx;
+    const webglActive = !!(this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false);
 
     if (effCanvas && effCtx) {
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
@@ -871,14 +918,21 @@ export class RenderCoordinator {
         effCtx.scale(dpr, dpr);
         effCtx.clearRect(0, 0, width, height);
 
-        // A. Kinetic sparks & shockwaves (only if active)
+        // A. Kinetic sparks & shockwaves
         if (hasKinetics) {
-          const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
-          this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow, width, height);
+          if (!webglActive) {
+            // 2D Canvas fallback: render particles and shockwaves on CPU context
+            const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
+            this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow, width, height);
+          } else if (this.cosmeticsEngine.hasActiveTonicHUD()) {
+            // When WebGL is active, particles and shockwaves run on the GPU!
+            // Only render 2D HUD text banner on this context.
+            const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
+            this.cosmeticsEngine.renderHUDOnly(effCtx, effectiveGlow, width, height);
+          }
         }
 
         // B. If WebGL is not active/supported or disabled, render 2D post-processing fallback directly on this context
-        const webglActive = this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false;
         if (!webglActive) {
           const lights = this.collectFlareLightSources();
           this.render2DPostProcessingFallback(effCtx, width, height, lights);
@@ -888,10 +942,12 @@ export class RenderCoordinator {
       }
     }
 
-    // 6. Render Fullscreen Atmospheric Post-Processing on WebGL (if hardware pipeline active and enabled)
-    if (this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false) {
+    // 6. Render Fullscreen Atmospheric Post-Processing + Point Sprites + Shockwaves on WebGL (if active)
+    if (webglActive && this.webglPipeline) {
       const lights = this.collectFlareLightSources();
-      this.webglPipeline.render(this.config, lights, time);
+      const shockwaves = this.cosmeticsEngine.getActiveShockwaves();
+      const { buffer: pBuf, count: pCount } = this.cosmeticsEngine.getParticleGpuData();
+      this.webglPipeline.render(this.config, lights, time, shockwaves, pBuf, pCount);
     }
 
     this.animId = requestAnimationFrame(this.masterLoop);
@@ -909,18 +965,23 @@ export class RenderCoordinator {
       return lights;
     }
 
+    if (!this.cachedTargetRect && typeof window !== 'undefined') {
+      this.updateAllCachedBounds();
+    }
+
     const tonic = this.config.tonic;
     const lowestMidi = this.config.keyboardLowestMidi;
 
-    let orbitalCellCanvas: HTMLCanvasElement | null = null;
+    let orbitalCell: CellCanvasEntry | null = null;
     for (const cell of this.cellCanvases.values()) {
       if (cell.module === 'orbital') {
-        orbitalCellCanvas = cell.canvas;
+        orbitalCell = cell;
         break;
       }
     }
 
     const targetCanvas = this.postProcessingCanvas || this.effectsCanvas || this.overlayCanvas;
+    const targetRect = this.cachedTargetRect;
     let offsetLeft = 0;
     let offsetTop = 0;
     let clockCx = (typeof window !== 'undefined' ? window.innerWidth : 1920) / 2;
@@ -928,14 +989,12 @@ export class RenderCoordinator {
     let maxClockRadius = Math.min(clockCx, clockCy) * 0.45;
     let hasOrbitalCell = false;
 
-    if (orbitalCellCanvas && targetCanvas && typeof window !== 'undefined') {
-      const cellRect = orbitalCellCanvas.getBoundingClientRect();
-      const targetRect = targetCanvas.getBoundingClientRect();
-      offsetLeft = cellRect.left - targetRect.left;
-      offsetTop = cellRect.top - targetRect.top;
-      clockCx = offsetLeft + cellRect.width / 2;
-      clockCy = offsetTop + cellRect.height / 2;
-      maxClockRadius = Math.min(cellRect.width, cellRect.height) * 0.45;
+    if (orbitalCell && orbitalCell.cachedRect && targetRect) {
+      offsetLeft = orbitalCell.cachedRect.left - targetRect.left;
+      offsetTop = orbitalCell.cachedRect.top - targetRect.top;
+      clockCx = offsetLeft + orbitalCell.cachedRect.width / 2;
+      clockCy = offsetTop + orbitalCell.cachedRect.height / 2;
+      maxClockRadius = Math.min(orbitalCell.cachedRect.width, orbitalCell.cachedRect.height) * 0.45;
       hasOrbitalCell = true;
     }
 
@@ -1006,17 +1065,15 @@ export class RenderCoordinator {
     }
 
     // 3. Piano Triangles active vertices
-    if (targetCanvas && typeof window !== 'undefined') {
-      const targetRect = targetCanvas.getBoundingClientRect();
+    if (targetRect) {
       for (const cell of this.cellCanvases.values()) {
-        if (cell.module === 'triangles') {
+        if (cell.module === 'triangles' && cell.cachedRect) {
           const effConfig = cell.configOverrides
             ? { ...this.config, ...cell.configOverrides }
             : this.config;
           if (effConfig.triangleLensFlaresEnabled !== false) {
-            const cellRect = cell.canvas.getBoundingClientRect();
-            const cellLeft = cellRect.left - targetRect.left;
-            const cellTop = cellRect.top - targetRect.top;
+            const cellLeft = cell.cachedRect.left - targetRect.left;
+            const cellTop = cell.cachedRect.top - targetRect.top;
             const vertices = this.pianoTrianglesRenderer.getActiveVertexCoordinates();
             for (const v of vertices) {
               lights.push({

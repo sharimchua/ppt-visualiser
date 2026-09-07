@@ -44,6 +44,39 @@ export interface TonicShiftHUDNotification {
   durationMs: number;
 }
 
+const COLOR_CACHE = new Map<string, [number, number, number]>();
+
+export function parseColorToRgb(color: string): [number, number, number] {
+  const cached = COLOR_CACHE.get(color);
+  if (cached) return cached;
+
+  let r = 1, g = 1, b = 1;
+  if (color.startsWith('#')) {
+    const clean = color.replace('#', '');
+    if (clean.length === 3) {
+      r = parseInt(clean[0] + clean[0], 16) / 255;
+      g = parseInt(clean[1] + clean[1], 16) / 255;
+      b = parseInt(clean[2] + clean[2], 16) / 255;
+    } else {
+      r = (parseInt(clean.substring(0, 2), 16) || 255) / 255;
+      g = (parseInt(clean.substring(2, 4), 16) || 255) / 255;
+      b = (parseInt(clean.substring(4, 6), 16) || 255) / 255;
+    }
+  } else if (color.startsWith('rgb')) {
+    const parts = color.match(/\d+/g);
+    if (parts && parts.length >= 3) {
+      r = Number(parts[0]) / 255;
+      g = Number(parts[1]) / 255;
+      b = Number(parts[2]) / 255;
+    }
+  }
+  const result: [number, number, number] = [r, g, b];
+  if (COLOR_CACHE.size < 128) {
+    COLOR_CACHE.set(color, result);
+  }
+  return result;
+}
+
 export class CosmeticsEngine {
   private tonicShiftHUD: TonicShiftHUDNotification | null = null;
   private static readonly GRAIN_PATTERNS_COUNT = 6;
@@ -60,6 +93,10 @@ export class CosmeticsEngine {
   private shockwaves: ShockwaveRing[] = [];
   private ghosts: PhosphorGhost[] = [];
   private scanlinePatternMap: Map<number, CanvasPattern | null> = new Map();
+
+  // Preallocated GPU particle buffer: 512 particles * 8 floats
+  // [x, y, radius, alpha, r, g, b, coreRatio] (zero per-frame GC allocations)
+  private gpuParticleBuffer = new Float32Array(512 * 8);
 
   constructor() {
     this.initGrain();
@@ -420,6 +457,48 @@ export class CosmeticsEngine {
   }
 
   /**
+   * Streams particle coordinates, sizes, colours, and alphas into preallocated Float32Array
+   * for zero-allocation WebGL point sprite upload.
+   */
+  public getParticleGpuData(): { buffer: Float32Array; count: number } {
+    const count = Math.min(512, this.particles.length);
+    for (let i = 0; i < count; i++) {
+      const p = this.particles[i];
+      const baseIdx = i * 8;
+      this.gpuParticleBuffer[baseIdx + 0] = p.x;
+      this.gpuParticleBuffer[baseIdx + 1] = p.y;
+      this.gpuParticleBuffer[baseIdx + 2] = p.radius;
+      this.gpuParticleBuffer[baseIdx + 3] = Math.max(0, Math.min(1, p.alpha));
+
+      const rgb = parseColorToRgb(p.color);
+      this.gpuParticleBuffer[baseIdx + 4] = rgb[0];
+      this.gpuParticleBuffer[baseIdx + 5] = rgb[1];
+      this.gpuParticleBuffer[baseIdx + 6] = rgb[2];
+      this.gpuParticleBuffer[baseIdx + 7] = 0.4; // Specular core ratio
+    }
+    return { buffer: this.gpuParticleBuffer, count };
+  }
+
+  /**
+   * Retrieves active shockwaves formatted for GPU fragment shader rendering.
+   */
+  public getActiveShockwaves(): Array<{ x: number; y: number; radius: number; alpha: number; colorHex: string }> {
+    const count = Math.min(4, this.shockwaves.length);
+    const list: Array<{ x: number; y: number; radius: number; alpha: number; colorHex: string }> = [];
+    for (let i = 0; i < count; i++) {
+      const sw = this.shockwaves[i];
+      list.push({
+        x: sw.x,
+        y: sw.y,
+        radius: sw.currentRadius,
+        alpha: Math.max(0, Math.min(1, sw.alpha)),
+        colorHex: sw.color,
+      });
+    }
+    return list;
+  }
+
+  /**
    * Spawns a CRT phosphor ghost echo with chromatic aberration
    */
   public spawnGhost(x: number, y: number, color: string, radius: number = 14, velocity: number = 0.5) {
@@ -514,15 +593,24 @@ export class CosmeticsEngine {
   ) {
     ctx.save();
 
-    // Render shockwaves
+    // Render shockwaves: concentric strokes eliminate CPU Gaussian blur filter bottlenecks
     for (const sw of this.shockwaves) {
+      // 1. Soft ambient outer ring
+      if (glowBloom > 0.05) {
+        ctx.beginPath();
+        ctx.arc(sw.x, sw.y, sw.currentRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = sw.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, sw.alpha * 0.35 * glowBloom));
+        ctx.lineWidth = sw.lineWidth * 2.4;
+        ctx.stroke();
+      }
+
+      // 2. Focused core ring
       ctx.beginPath();
       ctx.arc(sw.x, sw.y, sw.currentRadius, 0, Math.PI * 2);
       ctx.strokeStyle = sw.color;
       ctx.globalAlpha = Math.max(0, Math.min(1, sw.alpha));
       ctx.lineWidth = sw.lineWidth;
-      ctx.shadowColor = sw.color;
-      ctx.shadowBlur = 12 * glowBloom;
       ctx.stroke();
     }
 
@@ -569,6 +657,38 @@ export class CosmeticsEngine {
     }
 
     ctx.restore();
+  }
+
+  /**
+   * Renders only the transient kinetic HUD card on the 2D context
+   * when particle physics and shockwaves are accelerated on the GPU.
+   */
+  public renderHUDOnly(
+    ctx: CanvasRenderingContext2D,
+    glowBloom: number = 0.8,
+    vpWidth: number = 0,
+    vpHeight: number = 0
+  ) {
+    if (!this.tonicShiftHUD) return;
+    const elapsed = performance.now() - this.tonicShiftHUD.startTime;
+    if (elapsed >= this.tonicShiftHUD.durationMs) {
+      this.tonicShiftHUD = null;
+      return;
+    }
+    const progress = elapsed / this.tonicShiftHUD.durationMs;
+    let alpha = 1.0;
+    if (progress < 0.12) {
+      alpha = progress / 0.12;
+    } else if (progress > 0.65) {
+      alpha = 1.0 - (progress - 0.65) / 0.35;
+    }
+    alpha = Math.max(0, Math.min(1, alpha));
+
+    if (alpha > 0.02 && vpWidth > 0 && vpHeight > 0) {
+      ctx.save();
+      this.renderTonicHUDCard(ctx, vpWidth / 2, Math.max(40, vpHeight * 0.06), this.tonicShiftHUD, alpha, glowBloom);
+      ctx.restore();
+    }
   }
 
   /**

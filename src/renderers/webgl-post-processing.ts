@@ -7,6 +7,14 @@ export interface PostProcessingLight {
   colorHex: string;
 }
 
+export interface PostProcessingShockwave {
+  x: number;
+  y: number;
+  radius: number;
+  alpha: number;
+  colorHex: string;
+}
+
 const VERTEX_SHADER_SOURCE = `
 attribute vec2 a_position;
 varying vec2 v_uv;
@@ -16,6 +24,45 @@ void main() {
   // Canvas coordinate system has (0,0) at top-left
   v_uv.y = 1.0 - v_uv.y;
   gl_Position = vec4(a_position, 0.0, 1.0);
+}
+`;
+
+const PARTICLE_VERTEX_SHADER_SOURCE = `
+attribute vec4 a_particlePosRadius; // x, y, radius, alpha
+attribute vec4 a_particleColor;     // r, g, b, coreRatio
+uniform vec2 u_resolution;
+uniform float u_dpr;
+varying vec4 v_color;
+varying float v_coreRatio;
+
+void main() {
+  vec2 pos = a_particlePosRadius.xy * u_dpr;
+  vec2 clipSpace = (pos / u_resolution) * 2.0 - 1.0;
+  // Canvas coordinate system has (0,0) at top-left
+  clipSpace.y = -clipSpace.y;
+  gl_Position = vec4(clipSpace, 0.0, 1.0);
+  gl_PointSize = max(1.0, a_particlePosRadius.z * 2.0 * u_dpr);
+  v_color = vec4(a_particleColor.rgb, a_particlePosRadius.w);
+  v_coreRatio = a_particleColor.a > 0.0 ? a_particleColor.a : 0.4;
+}
+`;
+
+const PARTICLE_FRAGMENT_SHADER_SOURCE = `
+precision mediump float;
+varying vec4 v_color;
+varying float v_coreRatio;
+
+void main() {
+  vec2 coord = gl_PointCoord - vec2(0.5);
+  float dist = length(coord) * 2.0;
+  if (dist > 1.0) {
+    discard;
+  }
+  float halo = clamp(1.0 - dist, 0.0, 1.0);
+  float core = clamp(1.0 - dist / v_coreRatio, 0.0, 1.0);
+  float a = halo * v_color.a;
+  vec3 rgb = mix(v_color.rgb, vec3(1.0), core * 0.75);
+  gl_FragColor = vec4(rgb * a, a);
 }
 `;
 
@@ -39,6 +86,11 @@ uniform int u_lightCount;
 uniform vec4 u_lights[8]; // x, y, velocity, active
 uniform vec3 u_lightColors[8];
 uniform vec2 u_opticalCenter;
+
+// Expanding kinetic shockwaves
+uniform int u_shockwaveCount;
+uniform vec4 u_shockwaves[4]; // x, y, radius, alpha
+uniform vec3 u_shockwaveColors[4];
 
 // PRNG hash for procedural animated film grain
 float hash(vec2 p) {
@@ -170,6 +222,31 @@ void main() {
     }
   }
 
+  // --- EXPANDING KINETIC SHOCKWAVES ---
+  if (u_shockwaveCount > 0) {
+    for (int i = 0; i < 4; i++) {
+      if (i >= u_shockwaveCount) break;
+      vec2 swPos = u_shockwaves[i].xy;
+      float swRadius = u_shockwaves[i].z;
+      float swAlpha = u_shockwaves[i].w;
+      vec3 swCol = u_shockwaveColors[i];
+
+      if (swAlpha > 0.01 && swRadius > 1.0) {
+        float d = length(pixelCoord - swPos);
+        float ringDist = abs(d - swRadius);
+        float ringWidth = max(2.5, swRadius * 0.045);
+        if (ringDist < ringWidth * 2.5) {
+          float ringFalloff = clamp(1.0 - ringDist / (ringWidth * 2.5), 0.0, 1.0);
+          float rA = pow(ringFalloff, 1.8) * swAlpha;
+          // Inner bright crest + outer glow
+          vec3 col = mix(swCol, vec3(1.0), clamp(1.0 - ringDist / ringWidth, 0.0, 1.0) * 0.65);
+          additiveColor += col * rA;
+          additiveAlpha = max(additiveAlpha, rA);
+        }
+      }
+    }
+  }
+
   // --- PROCEDURAL ANIMATED FILM GRAIN ---
   if (u_grainIntensity > 0.01) {
     // Authentic 24fps cadence: lock temporal step
@@ -236,7 +313,15 @@ export class WebGLPostProcessingPipeline {
   private quadBuffer: WebGLBuffer | null = null;
   private isSupported: boolean = false;
 
-  // Cached Uniform Locations
+  // Particle Point Sprite Program
+  private particleProgram: WebGLProgram | null = null;
+  private particleBuffer: WebGLBuffer | null = null;
+  private uParticleResolutionLoc: WebGLUniformLocation | null = null;
+  private uParticleDprLoc: WebGLUniformLocation | null = null;
+  private aParticlePosRadiusLoc: number = -1;
+  private aParticleColorLoc: number = -1;
+
+  // Cached Post-Processing Uniform Locations
   private uResolutionLoc: WebGLUniformLocation | null = null;
   private uTimeLoc: WebGLUniformLocation | null = null;
   private uGrainIntensityLoc: WebGLUniformLocation | null = null;
@@ -253,6 +338,17 @@ export class WebGLPostProcessingPipeline {
   private uLightsLoc: WebGLUniformLocation | null = null;
   private uLightColorsLoc: WebGLUniformLocation | null = null;
   private uOpticalCenterLoc: WebGLUniformLocation | null = null;
+
+  // Shockwave Uniform Locations
+  private uShockwaveCountLoc: WebGLUniformLocation | null = null;
+  private uShockwavesLoc: WebGLUniformLocation | null = null;
+  private uShockwaveColorsLoc: WebGLUniformLocation | null = null;
+
+  // Preallocated Scratch Buffers (zero per-frame memory allocation)
+  private lightsData = new Float32Array(32); // 8 * 4
+  private lightColorsData = new Float32Array(24); // 8 * 3
+  private shockwavesData = new Float32Array(16); // 4 * 4
+  private shockwaveColorsData = new Float32Array(12); // 4 * 3
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -287,7 +383,7 @@ export class WebGLPostProcessingPipeline {
 
       this.gl = gl;
 
-      // Compile shaders
+      // 1. Compile post-processing fullscreen quad shaders
       const vertShader = this.compileShader(gl.VERTEX_SHADER, VERTEX_SHADER_SOURCE);
       const fragShader = this.compileShader(gl.FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
@@ -327,7 +423,7 @@ export class WebGLPostProcessingPipeline {
       gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
       this.quadBuffer = buffer;
 
-      // Cache uniform locations
+      // Cache post-processing uniform locations
       this.uResolutionLoc = gl.getUniformLocation(program, 'u_resolution');
       this.uTimeLoc = gl.getUniformLocation(program, 'u_time');
       this.uGrainIntensityLoc = gl.getUniformLocation(program, 'u_grainIntensity');
@@ -345,9 +441,34 @@ export class WebGLPostProcessingPipeline {
       this.uLightColorsLoc = gl.getUniformLocation(program, 'u_lightColors');
       this.uOpticalCenterLoc = gl.getUniformLocation(program, 'u_opticalCenter');
 
+      // Cache shockwave uniform locations
+      this.uShockwaveCountLoc = gl.getUniformLocation(program, 'u_shockwaveCount');
+      this.uShockwavesLoc = gl.getUniformLocation(program, 'u_shockwaves');
+      this.uShockwaveColorsLoc = gl.getUniformLocation(program, 'u_shockwaveColors');
+
+      // 2. Compile kinetic particle point sprite shaders
+      const partVertShader = this.compileShader(gl.VERTEX_SHADER, PARTICLE_VERTEX_SHADER_SOURCE);
+      const partFragShader = this.compileShader(gl.FRAGMENT_SHADER, PARTICLE_FRAGMENT_SHADER_SOURCE);
+      if (partVertShader && partFragShader) {
+        const pProg = gl.createProgram();
+        if (pProg) {
+          gl.attachShader(pProg, partVertShader);
+          gl.attachShader(pProg, partFragShader);
+          gl.linkProgram(pProg);
+          if (gl.getProgramParameter(pProg, gl.LINK_STATUS)) {
+            this.particleProgram = pProg;
+            this.particleBuffer = gl.createBuffer();
+            this.uParticleResolutionLoc = gl.getUniformLocation(pProg, 'u_resolution');
+            this.uParticleDprLoc = gl.getUniformLocation(pProg, 'u_dpr');
+            this.aParticlePosRadiusLoc = gl.getAttribLocation(pProg, 'a_particlePosRadius');
+            this.aParticleColorLoc = gl.getAttribLocation(pProg, 'a_particleColor');
+          }
+        }
+      }
+
       this.isSupported = true;
     } catch (e) {
-      console.warn('[WebGL] Post-processing initialization failed, falling back to 2D Canvas:', e);
+      console.warn('[WebGL] Post-processing initialisation failed, falling back to 2D Canvas:', e);
       this.isSupported = false;
     }
   }
@@ -371,7 +492,10 @@ export class WebGLPostProcessingPipeline {
   public render(
     config: VisualiserConfig,
     lights: PostProcessingLight[],
-    time: number
+    time: number,
+    shockwaves: PostProcessingShockwave[] = [],
+    particleBuffer?: Float32Array,
+    particleCount: number = 0
   ) {
     if (!this.isSupported || !this.gl || !this.program || !this.quadBuffer) return;
     if (config.webglEnabled === false) return;
@@ -387,21 +511,55 @@ export class WebGLPostProcessingPipeline {
     gl.clearColor(0.0, 0.0, 0.0, 0.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
+    // Alpha blending (Premultiplied alpha pipeline)
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
+    // 1. Draw GPU Point Sprite Particles in a single draw call
+    if (
+      this.particleProgram &&
+      this.particleBuffer &&
+      particleBuffer &&
+      particleCount > 0 &&
+      this.aParticlePosRadiusLoc >= 0 &&
+      this.aParticleColorLoc >= 0
+    ) {
+      gl.useProgram(this.particleProgram);
+      gl.uniform2f(this.uParticleResolutionLoc, width, height);
+      gl.uniform1f(this.uParticleDprLoc, dpr);
+
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.particleBuffer);
+      // Upload interleaved particle data: [x, y, radius, alpha, r, g, b, coreRatio]
+      gl.bufferData(gl.ARRAY_BUFFER, particleBuffer.subarray(0, particleCount * 8), gl.DYNAMIC_DRAW);
+
+      const stride = 32; // 8 floats * 4 bytes
+      gl.enableVertexAttribArray(this.aParticlePosRadiusLoc);
+      gl.vertexAttribPointer(this.aParticlePosRadiusLoc, 4, gl.FLOAT, false, stride, 0);
+
+      gl.enableVertexAttribArray(this.aParticleColorLoc);
+      gl.vertexAttribPointer(this.aParticleColorLoc, 4, gl.FLOAT, false, stride, 16);
+
+      gl.drawArrays(gl.POINTS, 0, particleCount);
+
+      if (typeof gl.disableVertexAttribArray === 'function') {
+        gl.disableVertexAttribArray(this.aParticlePosRadiusLoc);
+        gl.disableVertexAttribArray(this.aParticleColorLoc);
+      }
+    }
+
+    // 2. Fullscreen Post-Processing Quad (CRT, scanlines, lens flares, light bleed, grain, shockwaves)
     const grainOn = (config.filmGrainEnabled ?? true) && (config.filmGrainIntensity > 0);
     const scanlinesOn = (config.scanlinesEnabled ?? true) && ((config.scanlineIntensity ?? 0) > 0);
     const vignetteOn = (config.scanlinesEnabled ?? true) && ((config.crtVignette ?? 0) > 0);
     const lightBleedOn = (config.lightBleedEnabled ?? true) && ((config.lightBleedIntensity ?? 0) > 0);
     const lensFlareOn = (config.lensFlareEnabled ?? true) && ((config.lensFlareIntensity ?? 0) > 0);
+    const shockwaveCount = Math.min(4, shockwaves.length);
 
-    // If all visual post-processing effects are toggled off, exit immediately!
-    // Low-end GPUs incur ZERO rasterization or fragment shader load.
-    if (!grainOn && !scanlinesOn && !vignetteOn && !lightBleedOn && !lensFlareOn) {
+    // If all visual post-processing effects and shockwaves are toggled off, exit immediately!
+    // Low-end GPUs incur ZERO rasterisation or fragment shader load.
+    if (!grainOn && !scanlinesOn && !vignetteOn && !lightBleedOn && !lensFlareOn && shockwaveCount === 0) {
       return;
     }
-
-    // Alpha blending (Premultiplied alpha pipeline)
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 
     gl.useProgram(this.program);
 
@@ -442,24 +600,41 @@ export class WebGLPostProcessingPipeline {
     gl.uniform1i(this.uLightCountLoc, maxLights);
 
     if (maxLights > 0) {
-      const lightsData = new Float32Array(32); // 8 * 4
-      const colorsData = new Float32Array(24); // 8 * 3
-
       for (let i = 0; i < maxLights; i++) {
         const l = lights[i];
-        lightsData[i * 4 + 0] = l.x * dpr;
-        lightsData[i * 4 + 1] = l.y * dpr;
-        lightsData[i * 4 + 2] = l.velocity;
-        lightsData[i * 4 + 3] = 1.0;
+        this.lightsData[i * 4 + 0] = l.x * dpr;
+        this.lightsData[i * 4 + 1] = l.y * dpr;
+        this.lightsData[i * 4 + 2] = l.velocity;
+        this.lightsData[i * 4 + 3] = 1.0;
 
         const rgb = parseHexColor(l.colorHex);
-        colorsData[i * 3 + 0] = rgb[0];
-        colorsData[i * 3 + 1] = rgb[1];
-        colorsData[i * 3 + 2] = rgb[2];
+        this.lightColorsData[i * 3 + 0] = rgb[0];
+        this.lightColorsData[i * 3 + 1] = rgb[1];
+        this.lightColorsData[i * 3 + 2] = rgb[2];
       }
 
-      gl.uniform4fv(this.uLightsLoc, lightsData);
-      gl.uniform3fv(this.uLightColorsLoc, colorsData);
+      gl.uniform4fv(this.uLightsLoc, this.lightsData);
+      gl.uniform3fv(this.uLightColorsLoc, this.lightColorsData);
+    }
+
+    // Pack shockwaves into uniform arrays
+    gl.uniform1i(this.uShockwaveCountLoc, shockwaveCount);
+    if (shockwaveCount > 0) {
+      for (let i = 0; i < shockwaveCount; i++) {
+        const sw = shockwaves[i];
+        this.shockwavesData[i * 4 + 0] = sw.x * dpr;
+        this.shockwavesData[i * 4 + 1] = sw.y * dpr;
+        this.shockwavesData[i * 4 + 2] = sw.radius * dpr;
+        this.shockwavesData[i * 4 + 3] = sw.alpha;
+
+        const rgb = parseHexColor(sw.colorHex);
+        this.shockwaveColorsData[i * 3 + 0] = rgb[0];
+        this.shockwaveColorsData[i * 3 + 1] = rgb[1];
+        this.shockwaveColorsData[i * 3 + 2] = rgb[2];
+      }
+
+      gl.uniform4fv(this.uShockwavesLoc, this.shockwavesData);
+      gl.uniform3fv(this.uShockwaveColorsLoc, this.shockwaveColorsData);
     }
 
     // Execute single fullscreen quad draw
@@ -476,6 +651,14 @@ export class WebGLPostProcessingPipeline {
     if (this.program) {
       gl.deleteProgram(this.program);
       this.program = null;
+    }
+    if (this.particleBuffer) {
+      gl.deleteBuffer(this.particleBuffer);
+      this.particleBuffer = null;
+    }
+    if (this.particleProgram) {
+      gl.deleteProgram(this.particleProgram);
+      this.particleProgram = null;
     }
     this.gl = null;
     this.isSupported = false;

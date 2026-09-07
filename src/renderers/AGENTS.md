@@ -13,13 +13,16 @@ The `src/renderers` domain contains all high-performance 2D Canvas and WebGL gra
 - `src/renderers/smufl-glyphs.ts` — Standard SMuFL (Bravura reference) vector glyph outlines for clefs (`gClef`, `fClef`, `cClef`) and accidentals (`accidentalSharp`, `accidentalFlat`, `accidentalNatural`) with exact staff-space unit scaling.
 - `src/renderers/notehead-renderer.ts` — Canvas 2D Prime Period Theory notehead drawing routines (Circle, Diamond, Square, Triangle Down, Triangle Up, Semicircle Left, Cross, Semicircle Right), Solfège colouring, contrast borders, and SMuFL accidental glyphs.
 - `src/renderers/overtones-canvas.ts` — 7-harmonic-partial kinetic fluid wave simulation renderer, Uniform Solfège colouring, velocity dynamics, and Plomp-Levelt psychoacoustic dissonance curves.
-- `src/renderers/cosmetics.ts` — Canvas 2D effects engine (kinetic note sparks physics, analogue light bleed, halation, optical lens flare starbursts, and tonic shift shockwaves/HUD badges).
-- `src/renderers/webgl-post-processing.ts` — GPU WebGL fragment shader pipeline (CRT scanlines, chromatic phosphor ghosts, bloom, and 24fps procedural film grain).
+- `src/renderers/cosmetics.ts` — Canvas 2D effects engine and GPU particle/shockwave data provider (preallocated GPU particle streaming buffers, kinetic note sparks physics, analogue light bleed, halation, optical lens flare starbursts, and tonic shift shockwaves/HUD badges).
+- `src/renderers/webgl-post-processing.ts` — GPU WebGL shader pipeline: Point Sprite particle engine (`gl.POINTS`), analytical expanding shockwaves, CRT scanlines, chromatic phosphor ghosts, bloom, and 24fps procedural film grain.
 
 ## Local Contracts
 
 - **60 FPS Performance Target**: Drawing routines must execute within a strict ~16.6ms per-frame budget.
 - **Zero React Reconciliation in Render Loops**: Never trigger React state updates or hook dispatches inside animation frames. Renderers subscribe to `RenderCoordinator` or read directly from the canvas viewport.
+- **GPU Point Sprite Particle & Analytical Shockwave Pipeline**: Point sprite particle rendering is offloaded directly to the GPU via interleaved `Float32Array` buffers in a single draw call (`gl.POINTS`) when WebGL is active, completely bypassing 2D Canvas CPU `ctx.arc()` and `ctx.fill()` rendering loops. Expanding shockwaves are evaluated analytically directly in the fullscreen post-processing fragment shader. When WebGL is unavailable, headless, or disabled, `CosmeticsEngine` provides a seamless 2D Canvas fallback.
+- **Zero Software Blurs in High-Frequency Paths**: Software CPU Gaussian blurs (`ctx.shadowBlur`) are strictly prohibited in per-frame animation loops (including voice leading counterpoint pulse beads, piano triangle active and decaying vertices, and expanding shockwave rings), replaced with high-performance concentric dual-disc fills and strokes while optical bleed is delegated to the GPU.
+- **Voice Leading Memory Preallocation**: Static scratch arrays (`scratchPathX`, `scratchPathY`) are preallocated on `StaffStreamRenderer` to eliminate all per-frame heap object allocations during voice leading harmonic standing wave evaluation.
 - **Staff Stream Flow & Notation Contracts**:
   - Staff Stream strictly enforces Right-to-Left (RTL) horizontal conveyor flow; vertical and LTR modes are disallowed.
   - Grand Staff spacing reserves exactly $2 \times \text{lineSpacing}$ between staves such that the 1st ledger line below the top staff is identical to the 1st ledger line above the bottom staff ($C4 / \text{Middle C}$).

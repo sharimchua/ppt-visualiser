@@ -3161,5 +3161,47 @@ test('StaffStreamRenderer: getPlayheadCoordinatesForMidi', () => {
   assert.ok(typeof coord.y === 'number' && coord.y > 50 && coord.y < 350, 'Playhead Y must sit within cell bounds');
 });
 
+test('GPU Offloading & Zero-Thrashing Bounding Rect Cache', () => {
+  const cosmetics = new CosmeticsEngine();
+  cosmetics.spawnNoteSparks(100, 100, '#E13610', 0.9, 10);
+  cosmetics.spawnShockwave(200, 200, '#38BDF8', 80);
+
+  // 1. GPU particle streaming data contract
+  const { buffer, count } = cosmetics.getParticleGpuData();
+  assert.ok(count >= 10);
+  assert.ok(buffer instanceof Float32Array);
+  assert.strictEqual(buffer.length, 512 * 8);
+  // Verify first particle x, y, radius, alpha
+  assert.strictEqual(buffer[0], 100);
+  assert.strictEqual(buffer[1], 100);
+  assert.ok(buffer[2] > 0); // radius
+  assert.strictEqual(buffer[3], 1.0); // alpha
+
+  // 2. Active shockwaves query for GPU fragment shader
+  const shockwaves = cosmetics.getActiveShockwaves();
+  assert.strictEqual(shockwaves.length, 1);
+  assert.strictEqual(shockwaves[0].x, 200);
+  assert.strictEqual(shockwaves[0].y, 200);
+  assert.strictEqual(shockwaves[0].colorHex, '#38BDF8');
+
+  // 3. RenderCoordinator cached rects contract
+  const coord = new RenderCoordinator();
+  let getBoundingClientRectCallCount = 0;
+  const mockCanvas: any = {
+    getContext: () => ({}),
+    getBoundingClientRect: () => {
+      getBoundingClientRectCallCount++;
+      return { left: 50, top: 50, width: 400, height: 300 };
+    },
+  };
+
+  coord.registerCellCanvas('test-cell', mockCanvas, 'orbital');
+  assert.strictEqual(getBoundingClientRectCallCount, 1, 'Bounding client rect should be queried only on registration');
+
+  coord.updateAllCachedBounds();
+  assert.strictEqual(getBoundingClientRectCallCount, 2, 'Bounding client rect should be queried when explicitly updating bounds');
+  coord.destroy();
+});
+
 
 
