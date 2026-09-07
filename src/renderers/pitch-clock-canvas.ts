@@ -10,6 +10,7 @@ import {
   getClockAngleRad,
   getBaseCenterDo,
   resolveMidiToRegisterAndSemitone,
+  getDecayFadeFactor,
 } from '../core/ppt-constants';
 import { ActiveNote, VisualiserConfig, PianoTriangleType, PianoTrianglePoint } from '../core/types';
 import { drawUniformSolfegeOnCanvas, drawPianoTriangleOnCanvas } from './glyph-renderer';
@@ -1171,7 +1172,8 @@ export class PitchClockRenderer {
           for (const { note, decayProgress } of decayingNotes.values()) {
             const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, config.keyboardLowestMidi);
             if (res.registerIndex === r && res.semitone === s) {
-              decayAlpha = (1 - decayProgress) * note.velocity;
+              const decayEased = getDecayFadeFactor(decayProgress);
+              decayAlpha = decayEased * note.velocity;
               decayMatch = note;
               break;
             }
@@ -1179,7 +1181,7 @@ export class PitchClockRenderer {
         }
 
         const isActive = activeMatch !== null;
-        const isDecaying = decayAlpha > 0.01;
+        const isDecaying = decayAlpha > 0.0005;
         const effectiveVelocity = activeMatch ? activeMatch.velocity : (decayMatch ? decayMatch.velocity : 0);
         const popScale = this.tonePopScale.get(toneKey) ?? 1.0;
 
@@ -1236,23 +1238,35 @@ export class PitchClockRenderer {
           }
         } else if (isDecaying) {
           if (isFi) {
-            ctx.fillStyle = `rgba(241, 245, 249, ${0.4 + decayAlpha * 0.6})`;
-            ctx.shadowColor = '#ffffff';
-            ctx.shadowBlur = 12 * decayAlpha * config.glowBloom;
+            ctx.fillStyle = `rgba(241, 245, 249, ${0.15 + decayAlpha * 0.85})`;
+            if (decayAlpha > 0.01) {
+              ctx.shadowColor = '#ffffff';
+              ctx.shadowBlur = 14 * decayAlpha * config.glowBloom;
+            }
             ctx.fill();
 
-            ctx.strokeStyle = '#f8fafc';
-            ctx.lineWidth = 2.0;
+            const borderAlpha = 0.4 + decayAlpha * 0.6;
+            ctx.strokeStyle = `rgba(248, 250, 252, ${borderAlpha})`;
+            ctx.lineWidth = 1.4 + decayAlpha * 0.6;
             ctx.stroke();
           } else {
             ctx.fillStyle = solfegeColor;
-            ctx.globalAlpha = Math.min(1.0, 0.25 + decayAlpha * 0.75);
-            ctx.shadowColor = solfegeColor;
-            ctx.shadowBlur = 12 * decayAlpha * config.glowBloom;
+            ctx.globalAlpha = Math.min(1.0, 0.20 + decayAlpha * 0.80);
+            if (decayAlpha > 0.01) {
+              ctx.shadowColor = solfegeColor;
+              ctx.shadowBlur = 14 * decayAlpha * config.glowBloom;
+            }
             ctx.fill();
 
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 + decayAlpha * 0.65})`;
-            ctx.lineWidth = 2.0;
+            // Smoothly interpolate stroke width and colour down to resting state
+            const idleWidth = s === 0 ? 2.8 : 1.5;
+            const strokeWidth = idleWidth + decayAlpha * (2.0 - idleWidth);
+            ctx.lineWidth = strokeWidth;
+
+            // White border at peak decayAlpha, smoothly blending into resting Solfège border
+            const whiteWeight = Math.min(1.0, decayAlpha * 1.4);
+            const borderAlpha = 0.95;
+            ctx.strokeStyle = mixHexWithWhite(solfegeColor, whiteWeight, borderAlpha);
             ctx.stroke();
           }
         } else {
@@ -1410,4 +1424,16 @@ function hexToRgba(hex: string, alpha: number): string {
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function mixHexWithWhite(hex: string, whiteWeight: number, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const w = Math.max(0, Math.min(1, whiteWeight));
+  const mr = Math.round(r + (255 - r) * w);
+  const mg = Math.round(g + (255 - g) * w);
+  const mb = Math.round(b + (255 - b) * w);
+  return `rgba(${mr}, ${mg}, ${mb}, ${alpha})`;
 }

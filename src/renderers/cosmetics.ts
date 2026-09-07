@@ -1,5 +1,5 @@
 import { ActiveNote, BackgroundTheme, VisualiserConfig } from '../core/types';
-import { getClockAngleRad, resolveMidiToRegisterAndSemitone, PITCH_NAMES_DUAL } from '../core/ppt-constants';
+import { getClockAngleRad, resolveMidiToRegisterAndSemitone, PITCH_NAMES_DUAL, getDecayFadeFactor } from '../core/ppt-constants';
 
 export interface KineticParticle {
   x: number;
@@ -13,17 +13,23 @@ export interface KineticParticle {
   decay: number;
   life: number;
   maxLife: number;
+  drag?: number; // Aerodynamic drag factor (defaults to 0.94 for sparks, 0.982 for ballistic fluid droplets)
 }
 
 export interface ShockwaveRing {
   x: number;
   y: number;
   currentRadius: number;
+  initialRadius: number;
   maxRadius: number;
   color: string;
   alpha: number;
-  decayRate: number;
+  initialAlpha: number;
+  progress: number; // 0.0 -> 1.0
+  durationMs: number;
+  elapsedMs: number;
   lineWidth: number;
+  decayRate?: number; // legacy fallback
 }
 
 export interface PhosphorGhost {
@@ -260,9 +266,70 @@ export class CosmeticsEngine {
   }
 
   /**
+   * Spawns an amped-up fountain splash burst of fluid droplets ejected upward from an overtone wave crest.
+   * Ejection velocity is strongly governed by note dynamics: soft strikes produce a low, gentle
+   * bubbling fountain; hard strikes erupt into a powerful geyser splash arcing high into the airspace.
+   * Fluid droplets follow authentic parabolic ballistic trajectories with subtle aerodynamic drag.
+   */
+  public spawnFluidDroplets(
+    x: number,
+    y: number,
+    color: string,
+    velocity: number = 0.8,
+    count: number = 24,
+    sizeMultiplier: number = 1.0,
+    speedMultiplier: number = 1.0,
+    gravity: number = 0.22
+  ): void {
+    const clampedVel = Math.max(0.12, Math.min(1.0, velocity));
+
+    // Dynamic droplet count: scales expressively with note velocity
+    const totalCount = Math.max(3, Math.round(count * (0.35 + Math.pow(clampedVel, 1.1) * 0.95)));
+
+    // Ejection impulse strongly governed by note velocity:
+    // Soft touches produce a gentle, bubbling lift; hard strikes erupt into a high-energy geyser
+    const ejectionPower = 0.35 + Math.pow(clampedVel, 1.35) * 2.25;
+
+    for (let i = 0; i < totalCount; i++) {
+      // Differentiate between central high-velocity plume droplets and peripheral splash mist
+      const isCoreJet = Math.random() < 0.55;
+      const coneSpread = isCoreJet ? 0.36 : (0.75 + (1.0 - clampedVel) * 0.25);
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * coneSpread;
+
+      const speedVariation = isCoreJet ? (Math.random() * 3.8 + 4.2) : (Math.random() * 3.2 + 2.0);
+      const speed = speedVariation * speedMultiplier * ejectionPower;
+
+      // Higher velocity extends droplet airtime to complete full ballistic crest and splashdown
+      const life = (Math.random() * 30 + 28) * (0.75 + clampedVel * 0.65);
+
+      // Mix of prominent fluid beads (65%) and fine micro-droplets/mist (35%)
+      const isMicro = Math.random() < 0.35;
+      const radius = (isMicro ? Math.random() * 1.0 + 0.7 : Math.random() * 2.5 + 1.6) * sizeMultiplier;
+
+      // Effective gravity scales slightly with velocity to produce tight, energetic arcs
+      const effectiveGravity = gravity * (0.85 + clampedVel * 0.35);
+
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 8, // slight horizontal origin jitter along wave crest
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed, // upward impulse
+        gravity: effectiveGravity, // pulls down into arc
+        radius,
+        color,
+        alpha: isMicro ? 0.8 : 0.98,
+        decay: 1.0 / life,
+        life: 0,
+        maxLife: life,
+        drag: 0.982, // Fluid aerodynamic drag allows natural parabolic trajectory
+      });
+    }
+  }
+
+  /**
    * Spawns an absorption dissipation ripple at the termination boundary line.
-   * Creates an imploding/collapsing ripple in luminous cyan and Solfège colour,
-   * with micro-droplet mist dissipating westward.
+   * Creates an expanding boundary shockwave in luminous cyan and Solfège colour,
+   * with micro-droplet mist and splash particles dissipating westward into the past.
    */
   public spawnAbsorptionEffect(
     x: number,
@@ -275,29 +342,49 @@ export class CosmeticsEngine {
       x,
       y,
       currentRadius: 4,
-      maxRadius: Math.max(16, height * 0.8),
+      initialRadius: 4,
+      maxRadius: Math.max(18, height * 0.85),
       color: '#38BDF8', // Cyan optical complement
-      alpha: 0.9,
-      decayRate: 0.045,
-      lineWidth: 2.2,
+      alpha: 0.95,
+      initialAlpha: 0.95,
+      progress: 0,
+      durationMs: 450,
+      elapsedMs: 0,
+      lineWidth: 2.5,
     });
 
-    // 2. Solfège harmonic dissipation particles spraying leftward (-X)
-    const particleCount = 8;
+    // 2. Solfège harmonic secondary shockwave
+    this.shockwaves.push({
+      x,
+      y,
+      currentRadius: 2,
+      initialRadius: 2,
+      maxRadius: Math.max(12, height * 0.6),
+      color,
+      alpha: 0.85,
+      initialAlpha: 0.85,
+      progress: 0,
+      durationMs: 380,
+      elapsedMs: 0,
+      lineWidth: 1.8,
+    });
+
+    // 3. Solfège harmonic dissipation particles spraying westward (-X) and vertically
+    const particleCount = 12;
     for (let i = 0; i < particleCount; i++) {
-      const angle = Math.PI + (Math.random() - 0.5) * (Math.PI * 0.6); // Westward fan
-      const speed = Math.random() * 2.5 + 0.8;
-      const life = Math.random() * 20 + 15;
+      const angle = Math.PI + (Math.random() - 0.5) * (Math.PI * 0.7); // Wide westward fan
+      const speed = Math.random() * 3.2 + 1.0;
+      const life = Math.random() * 24 + 16;
 
       this.particles.push({
         x,
-        y: y + (Math.random() - 0.5) * (height * 0.6),
+        y: y + (Math.random() - 0.5) * (height * 0.7),
         vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        gravity: 0,
-        radius: Math.random() * 1.8 + 0.6,
+        vy: Math.sin(angle) * speed * 0.8,
+        gravity: (Math.random() - 0.5) * 0.04, // subtle vertical drift
+        radius: Math.random() * 2.0 + 0.7,
         color: i % 2 === 0 ? color : '#38BDF8',
-        alpha: 0.85,
+        alpha: 0.9,
         decay: 1.0 / life,
         life: 0,
         maxLife: life,
@@ -308,15 +395,31 @@ export class CosmeticsEngine {
   /**
    * Spawns an expanding kinetic shockwave ring
    */
-  public spawnShockwave(cx: number, cy: number, color: string, maxRadius: number = 75) {
+  public spawnShockwave(
+    cx: number,
+    cy: number,
+    color: string,
+    baseMaxRadius: number = 75,
+    radiusMultiplier: number = 1.0,
+    speedMultiplier: number = 1.0,
+    durationMs: number = 650
+  ) {
+    const effectiveMaxRadius = Math.max(15, baseMaxRadius * radiusMultiplier);
+    const effectiveDuration = Math.max(150, durationMs / Math.max(0.2, speedMultiplier));
+    const initialRadius = Math.min(8, effectiveMaxRadius * 0.15);
+
     this.shockwaves.push({
       x: cx,
       y: cy,
-      currentRadius: 8,
-      maxRadius,
+      currentRadius: initialRadius,
+      initialRadius,
+      maxRadius: effectiveMaxRadius,
       color,
-      alpha: 0.85,
-      decayRate: 0.025,
+      alpha: 0.88,
+      initialAlpha: 0.88,
+      progress: 0,
+      durationMs: effectiveDuration,
+      elapsedMs: 0,
       lineWidth: 2.5,
     });
   }
@@ -341,10 +444,14 @@ export class CosmeticsEngine {
       x: cx,
       y: cy,
       currentRadius: Math.max(12, clockRadius * 0.15),
+      initialRadius: Math.max(12, clockRadius * 0.15),
       maxRadius: Math.max(120, clockRadius * 1.55),
       color: '#E13610',
       alpha: 0.95,
-      decayRate: 0.015,
+      initialAlpha: 0.95,
+      progress: 0,
+      durationMs: 1100,
+      elapsedMs: 0,
       lineWidth: 3.5,
     });
 
@@ -353,10 +460,14 @@ export class CosmeticsEngine {
       x: cx,
       y: cy,
       currentRadius: 6,
+      initialRadius: 6,
       maxRadius: Math.max(90, clockRadius * 1.25),
       color: '#38BDF8',
       alpha: 0.8,
-      decayRate: 0.022,
+      initialAlpha: 0.8,
+      progress: 0,
+      durationMs: 950,
+      elapsedMs: 0,
       lineWidth: 2.0,
     });
 
@@ -402,7 +513,7 @@ export class CosmeticsEngine {
   /**
    * Updates all active particles and shockwaves
    */
-  public update() {
+  public update(deltaMs: number = 16.66) {
     this.grainFrame++;
     // Animated at authentic ~24-30fps film cadence (updates every 2 frames at 60Hz)
     if (this.grainFrame % 2 === 0) {
@@ -417,8 +528,9 @@ export class CosmeticsEngine {
       p.x += p.vx;
       p.y += p.vy;
       p.vy += p.gravity; // Apply particle gravity or upward buoyancy
-      p.vx *= 0.94; // air friction
-      p.vy *= 0.94;
+      const drag = p.drag ?? 0.94; // Custom aerodynamic drag (0.982 for fluid droplets)
+      p.vx *= drag;
+      p.vy *= drag;
       p.life++;
       p.alpha = Math.max(0, 1 - (p.life / p.maxLife));
       if (p.alpha <= 0 || p.life >= p.maxLife) {
@@ -426,13 +538,27 @@ export class CosmeticsEngine {
       }
     }
 
-    // Update shockwaves
+    // Update shockwaves with smooth Hann window cosine decay and natural expansion deceleration
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
       const sw = this.shockwaves[i];
-      sw.currentRadius += (sw.maxRadius - sw.currentRadius) * 0.12 + 1.5;
-      sw.alpha -= sw.decayRate;
-      sw.lineWidth = Math.max(0.5, sw.lineWidth * 0.96);
-      if (sw.alpha <= 0 || sw.currentRadius >= sw.maxRadius) {
+      const duration = sw.durationMs || (sw.decayRate ? (1.0 / sw.decayRate) * 16.66 : 650);
+      sw.elapsedMs = (sw.elapsedMs || 0) + deltaMs;
+      const progress = Math.min(1.0, sw.elapsedMs / duration);
+      sw.progress = progress;
+
+      // Smooth cubic expansion deceleration: expands with momentum and settles
+      const easeExpansion = 1 - Math.pow(1 - progress, 2.5);
+      const initR = sw.initialRadius ?? 8;
+      sw.currentRadius = initR + (sw.maxRadius - initR) * easeExpansion;
+
+      // Smooth Hann window cosine fade: zero derivative at start (no sudden drop) and at finish (smooth dissolve to zero)
+      const fade = getDecayFadeFactor(progress);
+      const initA = sw.initialAlpha ?? 0.88;
+      sw.alpha = initA * fade;
+      sw.lineWidth = Math.max(0.5, sw.lineWidth * (1 - progress * 0.35));
+
+      // Terminate only when progress has completed (where alpha has eased to zero)
+      if (progress >= 1.0 || sw.alpha <= 0.0001) {
         this.shockwaves.splice(i, 1);
       }
     }
@@ -474,7 +600,7 @@ export class CosmeticsEngine {
       this.gpuParticleBuffer[baseIdx + 4] = rgb[0];
       this.gpuParticleBuffer[baseIdx + 5] = rgb[1];
       this.gpuParticleBuffer[baseIdx + 6] = rgb[2];
-      this.gpuParticleBuffer[baseIdx + 7] = 0.4; // Specular core ratio
+      this.gpuParticleBuffer[baseIdx + 7] = p.radius >= 1.8 ? 0.65 : 0.4; // Specular core ratio
     }
     return { buffer: this.gpuParticleBuffer, count };
   }
@@ -633,6 +759,15 @@ export class CosmeticsEngine {
       ctx.fillStyle = p.color;
       ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha));
       ctx.fill();
+
+      // Specular liquid glint pip on prominent fluid droplets
+      if (p.radius >= 1.8 && p.alpha > 0.35) {
+        ctx.beginPath();
+        ctx.arc(p.x - p.radius * 0.28, p.y - p.radius * 0.28, p.radius * 0.32, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.alpha * 0.85));
+        ctx.fill();
+      }
     }
 
     // 3. Transient Kinetic Tonic HUD Banner
@@ -808,8 +943,9 @@ export class CosmeticsEngine {
       const r = clockRadius * orbitRatio;
       const x = clockCx + r * Math.cos(angle);
       const y = clockCy + r * Math.sin(angle);
-      const vel = note.velocity * (1 - decayProgress);
-      if (vel > 0.04) {
+      const decayEased = Math.pow(1 - decayProgress, 2.2);
+      const vel = note.velocity * decayEased;
+      if (vel > 0.002) {
         sources.push({ x, y, color: note.colorHex, velocity: vel });
       }
     }
@@ -821,10 +957,12 @@ export class CosmeticsEngine {
     if (bleed > 0.01 && sources.length > 0) {
       for (const src of sources) {
         const velAlpha = Math.min(1.0, src.velocity * bleed);
-        if (velAlpha <= 0.02) continue;
+        if (velAlpha <= 0.001) continue;
 
         // Radial film halation (soft warm glow around bright highlight)
-        const halationR = Math.max(35, Math.min(180, 60 * bleed + src.velocity * 50));
+        // Scale radius and alpha smoothly so it tapers seamlessly to zero
+        const halationScale = Math.min(1.0, src.velocity * 14.0);
+        const halationR = Math.max(6, (45 * bleed + src.velocity * 50) * halationScale);
         const radGrad = ctx.createRadialGradient(src.x, src.y, 2, src.x, src.y, halationR);
         radGrad.addColorStop(0, hexToRgba(src.color, velAlpha * 0.55));
         radGrad.addColorStop(0.35, 'rgba(251, 146, 60, ' + (velAlpha * 0.22) + ')'); // warm 35mm halation
@@ -914,7 +1052,7 @@ export class CosmeticsEngine {
 
     for (const src of activeSources) {
       const alpha = Math.min(1.0, src.velocity * intensity);
-      if (alpha <= 0.02) continue;
+      if (alpha <= 0.001) continue;
 
       // 1. Starburst diffraction rays with feathered falloff
       if (style === 'starburst' || style === 'cinematic') {

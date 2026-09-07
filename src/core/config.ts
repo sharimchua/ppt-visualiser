@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   showSyllables: true,
   showPitchNames: true,
   showIntervals: false,
-  decayDurationMs: 900,
+  decayDurationMs: 1200,
   connectChordRays: true,
   chordRayMode: 'hull',
   showRadialMovementTrails: true,
@@ -76,6 +76,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   vertexLabelType: 'syllables',
   showCenterAnchor: true,
   triangleSparksEnabled: true,
+  triangleShockwavesEnabled: true,
   triangleLensFlaresEnabled: true,
 
   // Overtones Waveform
@@ -85,6 +86,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   waveFluidity: 0.8,
   minFrequency: 27.5,
   maxFrequency: 6000,
+  overtoneDropletsEnabled: true,
 
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
@@ -98,6 +100,10 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   particleVolume: 1.0,
   particleGravity: 0.15,
   particleOriginDistance: 0,
+  shockwavesEnabled: true,
+  shockwaveRadius: 1.0,
+  shockwaveSpeed: 1.0,
+  shockwaveDecayDurationMs: 650,
   glowBloomEnabled: true,
   glowBloom: 0.8,
   tonicShiftEffectsEnabled: true,
@@ -278,6 +284,8 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
       typeof merged.triangleSparksEnabled === 'boolean' ? merged.triangleSparksEnabled : true;
     merged.triangleLensFlaresEnabled =
       typeof merged.triangleLensFlaresEnabled === 'boolean' ? merged.triangleLensFlaresEnabled : true;
+    merged.overtoneDropletsEnabled =
+      typeof merged.overtoneDropletsEnabled === 'boolean' ? merged.overtoneDropletsEnabled : true;
 
     // Sanitize film grain & artifact settings
     merged.filmGrainEnabled = typeof merged.filmGrainEnabled === 'boolean' ? merged.filmGrainEnabled : (merged.filmGrainIntensity > 0);
@@ -297,6 +305,10 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.lensFlareIntensity = Math.max(0, Math.min(1, typeof merged.lensFlareIntensity === 'number' ? merged.lensFlareIntensity : 0.35));
     const validFlareStyles = new Set(['anamorphic', 'starburst', 'cinematic']);
     if (!validFlareStyles.has(merged.lensFlareStyle)) merged.lensFlareStyle = 'cinematic';
+    merged.decayDurationMs =
+      typeof merged.decayDurationMs === 'number'
+        ? Math.max(200, Math.min(3500, Math.round(merged.decayDurationMs)))
+        : 1200;
 
     // Sanitize Note Sparks & Bloom
     merged.sparksEnabled = typeof merged.sparksEnabled === 'boolean' ? merged.sparksEnabled : ((merged.particleIntensity ?? 0) > 0);
@@ -310,6 +322,13 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.particleVolume = Math.max(0.2, Math.min(3.0, typeof merged.particleVolume === 'number' ? merged.particleVolume : 1.0));
     merged.particleGravity = Math.max(-2.0, Math.min(2.0, typeof merged.particleGravity === 'number' ? merged.particleGravity : 0.15));
     merged.particleOriginDistance = Math.max(0, Math.min(60, typeof merged.particleOriginDistance === 'number' ? merged.particleOriginDistance : 0));
+
+    // Sanitize Note Activation Shockwaves
+    merged.shockwavesEnabled = typeof merged.shockwavesEnabled === 'boolean' ? merged.shockwavesEnabled : true;
+    merged.shockwaveRadius = Math.max(0.4, Math.min(2.5, typeof merged.shockwaveRadius === 'number' ? merged.shockwaveRadius : 1.0));
+    merged.shockwaveSpeed = Math.max(0.4, Math.min(2.5, typeof merged.shockwaveSpeed === 'number' ? merged.shockwaveSpeed : 1.0));
+    merged.shockwaveDecayDurationMs = Math.max(200, Math.min(2000, typeof merged.shockwaveDecayDurationMs === 'number' ? merged.shockwaveDecayDurationMs : 650));
+    merged.triangleShockwavesEnabled = typeof merged.triangleShockwavesEnabled === 'boolean' ? merged.triangleShockwavesEnabled : true;
 
     // Sanitize chord geometry & radial movement trails
     merged.chordRayMode = merged.chordRayMode === 'web' ? 'web' : 'hull';

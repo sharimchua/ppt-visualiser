@@ -16,6 +16,7 @@ import {
   TRI_PITCH_CLASSES,
   resolveMidiToRegisterAndSemitone,
   getClockAngleRad,
+  getDecayFadeFactor,
 } from './ppt-constants';
 import { DEFAULT_CONFIG } from './config';
 import { midiManagerInstance } from './midi-manager';
@@ -163,6 +164,31 @@ export class RenderCoordinator {
     midiManagerInstance.setFocusMode(focusMode);
     synthInstance.setFocusMode(focusMode);
     midiPlayerInstance.setFocusMode(focusMode);
+
+    // Subscribe to Staff Stream boundary absorption events for particle dissipation mist
+    this.staffStreamRenderer.onNoteAbsorbed = (x, y, colorHex, noteSize) => {
+      const targetRect = this.cachedTargetRect;
+      if (!targetRect) return;
+
+      for (const cell of this.cellCanvases.values()) {
+        if (cell.module === 'staff-stream' && cell.cachedRect) {
+          const effConfig = cell.configOverrides
+            ? { ...this.config, ...cell.configOverrides }
+            : this.config;
+          if (effConfig.staffAbsorptionEnabled !== false) {
+            const cellLeft = cell.cachedRect.left - targetRect.left;
+            const cellTop = cell.cachedRect.top - targetRect.top;
+            this.cosmeticsEngine.spawnAbsorptionEffect(
+              cellLeft + x,
+              cellTop + y,
+              colorHex,
+              noteSize * 2.6
+            );
+          }
+          break;
+        }
+      }
+    };
 
     // Subscribe to MIDI events directly
     this.unsubMidiOn = midiManagerInstance.onNoteOn((midi, vel) => this.triggerNoteOn(midi, vel));
@@ -600,26 +626,41 @@ export class RenderCoordinator {
     }
 
     const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
-    if (sparksOn && (orbitalCellCanvas || this.cellCanvases.size === 0)) {
-      this.cosmeticsEngine.spawnNoteSparks(
-        sparkX,
-        sparkY,
-        spec.colorHex,
-        velocity,
-        Math.round(20 * this.config.particleIntensity),
-        this.config.particleSize,
-        this.config.particleVolume,
-        this.config.particleGravity,
-        this.config.particleOriginDistance,
-        radialAngle
-      );
-      if (this.config.pulseShockwaves) {
-        this.cosmeticsEngine.spawnShockwave(sparkX, sparkY, spec.colorHex, 65 + velocity * 30);
+    const shockwavesOn = (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
+    const shockwaveRadiusMult = this.config.shockwaveRadius ?? 1.0;
+    const shockwaveSpeedMult = this.config.shockwaveSpeed ?? 1.0;
+    const shockwaveDecayDuration = this.config.shockwaveDecayDurationMs ?? 650;
+
+    if (orbitalCellCanvas || this.cellCanvases.size === 0) {
+      if (sparksOn) {
+        this.cosmeticsEngine.spawnNoteSparks(
+          sparkX,
+          sparkY,
+          spec.colorHex,
+          velocity,
+          Math.round(20 * this.config.particleIntensity),
+          this.config.particleSize,
+          this.config.particleVolume,
+          this.config.particleGravity,
+          this.config.particleOriginDistance,
+          radialAngle
+        );
+      }
+      if (shockwavesOn) {
+        this.cosmeticsEngine.spawnShockwave(
+          sparkX,
+          sparkY,
+          spec.colorHex,
+          65 + velocity * 30,
+          shockwaveRadiusMult,
+          shockwaveSpeedMult,
+          shockwaveDecayDuration
+        );
       }
     }
 
-    // Additional cell-specific note sparks
-    if (targetCanvas && typeof window !== 'undefined' && sparksOn) {
+    // Additional cell-specific note kinetics
+    if (targetCanvas && typeof window !== 'undefined') {
       const overlayRect = targetCanvas.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
 
@@ -628,7 +669,7 @@ export class RenderCoordinator {
           ? { ...this.config, ...cell.configOverrides }
           : this.config;
 
-        if (cell.module === 'staff-stream' && effConfig.staffSparksEnabled !== false) {
+        if (cell.module === 'staff-stream' && sparksOn && effConfig.staffSparksEnabled !== false) {
           const cellRect = cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
@@ -657,29 +698,78 @@ export class RenderCoordinator {
             this.config.particleVolume,
             this.config.particleGravity
           );
-        } else if (cell.module === 'triangles' && effConfig.triangleSparksEnabled !== false) {
+        } else if (cell.module === 'triangles') {
           const cellRect = cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
           const coord = this.pianoTrianglesRenderer.getVertexCoordinatesForPc(pc);
 
           if (coord) {
-            this.cosmeticsEngine.spawnNoteSparks(
-              cellLeft + coord.x,
-              cellTop + coord.y,
-              spec.colorHex,
-              velocity,
-              Math.round(16 * this.config.particleIntensity),
-              this.config.particleSize,
-              this.config.particleVolume,
-              this.config.particleGravity
-            );
-            if (this.config.pulseShockwaves) {
-              this.cosmeticsEngine.spawnShockwave(
-                cellLeft + coord.x,
-                cellTop + coord.y,
+            const vx = cellLeft + coord.x;
+            const vy = cellTop + coord.y;
+            if (sparksOn && effConfig.triangleSparksEnabled !== false) {
+              this.cosmeticsEngine.spawnNoteSparks(
+                vx,
+                vy,
                 spec.colorHex,
-                45 + velocity * 25
+                velocity,
+                Math.round(16 * this.config.particleIntensity),
+                this.config.particleSize,
+                this.config.particleVolume,
+                this.config.particleGravity
+              );
+            }
+            if (shockwavesOn && effConfig.triangleShockwavesEnabled !== false) {
+              this.cosmeticsEngine.spawnShockwave(
+                vx,
+                vy,
+                spec.colorHex,
+                45 + velocity * 25,
+                shockwaveRadiusMult,
+                shockwaveSpeedMult,
+                shockwaveDecayDuration
+              );
+            }
+          }
+        } else if (cell.module === 'overtones' && effConfig.overtoneDropletsEnabled !== false) {
+          const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
+          const cellLeft = cellRect.left - overlayRect.left;
+          const cellTop = cellRect.top - overlayRect.top;
+          const w = cell.canvas.width / dpr;
+          const h = cell.canvas.height / dpr;
+          const coords = this.overtonesRenderer.getFundamentalCoordinatesForMidi(
+            midi,
+            w,
+            h,
+            effConfig,
+            velocity
+          );
+          if (coords) {
+            // 1. Eject upward fountain splash of fluid droplets with velocity-governed impulse
+            this.cosmeticsEngine.spawnFluidDroplets(
+              cellLeft + coords.x,
+              cellTop + coords.y,
+              coords.colorHex,
+              velocity,
+              Math.round(28 * this.config.particleIntensity),
+              this.config.particleSize * 1.15,
+              1.0,
+              0.22
+            );
+
+            // 2. Amped up: Burst of kinetic sparks at the fundamental wave crest
+            if (effConfig.sparksEnabled !== false) {
+              this.cosmeticsEngine.spawnDirectionalSparks(
+                cellLeft + coords.x,
+                cellTop + coords.y,
+                coords.colorHex,
+                velocity,
+                -Math.PI / 2, // Upward fan cone (-90 deg)
+                Math.PI * 0.65, // ~117 deg upward cone
+                Math.round(14 * this.config.particleIntensity),
+                1.0 + velocity * 0.9, // Sparks ejection speed also strongly governed by velocity!
+                this.config.particleSize * 0.95,
+                0.35
               );
             }
           }
@@ -866,6 +956,43 @@ export class RenderCoordinator {
           effectiveConfig,
           time
         );
+
+        // Sustained gentle fluid micro-droplets bubbling off active fundamental wave crests
+        const dropletsOn =
+          (effectiveConfig.overtoneDropletsEnabled ?? true) &&
+          effectiveConfig.particleIntensity > 0;
+        if (dropletsOn && this.activeNotes.size > 0 && Math.random() < 0.38) {
+          const targetRect = this.cachedTargetRect;
+          if (cell.cachedRect && targetRect) {
+            const cellLeft = cell.cachedRect.left - targetRect.left;
+            const cellTop = cell.cachedRect.top - targetRect.top;
+            for (const note of this.activeNotes.values()) {
+              // Continuous bubbling probability and vigour scale with note dynamics
+              const bubbleProb = 0.25 + note.velocity * 0.55;
+              if (note.velocity > 0.05 && Math.random() < bubbleProb) {
+                const coords = this.overtonesRenderer.getFundamentalCoordinatesForMidi(
+                  note.midi,
+                  width,
+                  height,
+                  effectiveConfig,
+                  note.velocity
+                );
+                if (coords) {
+                  this.cosmeticsEngine.spawnFluidDroplets(
+                    cellLeft + coords.x,
+                    cellTop + coords.y,
+                    coords.colorHex,
+                    note.velocity * 0.45,
+                    Math.random() < note.velocity ? 2 : 1,
+                    this.config.particleSize * 0.85,
+                    0.65 + note.velocity * 0.45,
+                    0.16
+                  );
+                }
+              }
+            }
+          }
+        }
       } else if (module === 'staff-stream') {
         this.staffStreamRenderer.render(
           ctx,
@@ -897,7 +1024,7 @@ export class RenderCoordinator {
 
     // 4. Update procedural kinetics, sparks, and phosphor physics (if any are active)
     const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
-    const shockwavesOn = this.config.pulseShockwaves;
+    const shockwavesOn = (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
     const hasKinetics = sparksOn || shockwavesOn || this.cosmeticsEngine.hasActiveParticles();
     if (hasKinetics) {
       this.cosmeticsEngine.update();
@@ -1032,8 +1159,9 @@ export class RenderCoordinator {
 
       // 2. Orbital decaying notes
       for (const { note, decayProgress } of this.decayingNotes.values()) {
-        const vel = note.velocity * (1 - decayProgress);
-        if (vel <= 0.04) continue;
+        const decayEased = getDecayFadeFactor(decayProgress);
+        const vel = note.velocity * decayEased;
+        if (vel <= 0.0001) continue;
         const coords = this.pitchClockRenderer.getToneCoordinates(note.midi, tonic, lowestMidi);
         let lx: number;
         let ly: number;
@@ -1088,7 +1216,7 @@ export class RenderCoordinator {
       }
     }
 
-    if (lights.length > 8) {
+    if (lights.length > 16) {
       lights.sort((a, b) => b.velocity - a.velocity);
     }
 
@@ -1121,11 +1249,12 @@ export class RenderCoordinator {
       ctx.globalCompositeOperation = 'screen';
 
       for (const light of lights) {
-        if (light.velocity <= 0.02) continue;
+        if (light.velocity <= 0.001) continue;
 
         // Radial film halation (warm soft glow around active notes)
         if (bleed > 0.01) {
-          const halationR = Math.max(35, Math.min(180, 60 * bleed + light.velocity * 50));
+          const halationScale = Math.min(1.0, light.velocity * 14.0);
+          const halationR = Math.max(6, (45 * bleed + light.velocity * 50) * halationScale);
           const radGrad = ctx.createRadialGradient(light.x, light.y, 2, light.x, light.y, halationR);
           radGrad.addColorStop(0, hexToRgba(light.colorHex, light.velocity * bleed * 0.55));
           radGrad.addColorStop(0.35, `rgba(251, 146, 60, ${light.velocity * bleed * 0.22})`);

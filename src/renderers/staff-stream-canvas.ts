@@ -182,6 +182,17 @@ const CLEF_RANGES: Record<Exclude<StaffClef, 'dynamic'>, ClefRange> = {
   tenor: { bottomStep: -6, topStep: 2, middleCStep: 0 },          // D3 to E4 (C4 on line 4)
 };
 
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hex;
+}
+
 export class StaffStreamRenderer {
   // Kinetic animation state for dynamic clef switching
   private activeSingleClef: Exclude<StaffClef, 'dynamic'> = 'treble';
@@ -197,6 +208,10 @@ export class StaffStreamRenderer {
   // Preallocated scratch buffers for voice leading curves (zero per-frame GC allocations)
   private static scratchPathX = new Float32Array(32);
   private static scratchPathY = new Float32Array(32);
+
+  // Track absorbed note item IDs to trigger particle dissipation effect exactly once at boundary
+  private absorbedItemIds = new Set<string>();
+  public onNoteAbsorbed?: (x: number, y: number, colorHex: string, noteSize: number) => void;
 
   private getClefBuffers(width: number, height: number): {
     clefCanvas: HTMLCanvasElement;
@@ -1045,29 +1060,79 @@ export class StaffStreamRenderer {
 
         // 2. Termination Boundary Absorption Effect
         let squishX = 1.0;
+        let squishY = 1.0;
         const distToTerm = noteX - terminationX;
-        if (config.staffAbsorptionEnabled !== false && distToTerm >= -12 && distToTerm <= 28) {
-          squishX = Math.max(0.12, Math.min(1.0, (distToTerm + 12) / 40));
-          const absorbNorm = 1.0 - Math.max(0, distToTerm) / 28;
+        if (config.staffAbsorptionEnabled !== false && distToTerm >= -14 && distToTerm <= 30) {
+          squishX = Math.max(0.10, Math.min(1.0, (distToTerm + 14) / 44));
+          // Area conservation: horizontal flattening induces proportional vertical bulging
+          squishY = 1.0 + (1.0 - squishX) * 0.45;
+          const absorbNorm = 1.0 - Math.max(0, distToTerm) / 30;
+
           if (absorbNorm > 0.05) {
             ctx.save();
+
+            // Multi-layer dynamic meniscus contour hugging the vertical termination boundary
+            const meniscusH = noteSize * (1.2 + absorbNorm * 1.6);
+            const meniscusGrad = ctx.createLinearGradient(terminationX, noteY - meniscusH, terminationX, noteY + meniscusH);
+            meniscusGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+            meniscusGrad.addColorStop(0.25, hexToRgba(item.colorHex, 0.7));
+            meniscusGrad.addColorStop(0.5, '#FFFFFF');
+            meniscusGrad.addColorStop(0.75, hexToRgba(item.colorHex, 0.7));
+            meniscusGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+
+            // Outer radiant meniscus bloom
             ctx.beginPath();
-            ctx.ellipse(terminationX, noteY, 3 + absorbNorm * 9, noteSize * (0.6 + absorbNorm * 0.6), 0, 0, Math.PI * 2);
-            ctx.fillStyle = '#38bdf8';
-            ctx.globalAlpha = absorbNorm * 0.75;
+            ctx.ellipse(terminationX, noteY, 4 + absorbNorm * 8, meniscusH, 0, 0, Math.PI * 2);
+            ctx.fillStyle = meniscusGrad;
+            ctx.globalAlpha = absorbNorm * 0.65;
             ctx.fill();
+
+            // Focused cyan impact crest along termination line
+            ctx.beginPath();
+            ctx.ellipse(terminationX, noteY, 1.8 + absorbNorm * 3.2, noteSize * (0.6 + absorbNorm * 0.8), 0, 0, Math.PI * 2);
+            ctx.fillStyle = '#38BDF8';
+            ctx.globalAlpha = absorbNorm * 0.9;
+            ctx.fill();
+
+            // Radiant white contact flash pip at impact point
+            if (absorbNorm > 0.35) {
+              const flashStrength = (absorbNorm - 0.35) / 0.65;
+              ctx.beginPath();
+              ctx.ellipse(terminationX, noteY, 1.5, noteSize * 0.45 * flashStrength, 0, 0, Math.PI * 2);
+              ctx.fillStyle = '#FFFFFF';
+              ctx.globalAlpha = flashStrength * 0.95;
+              ctx.fill();
+            }
+
             ctx.restore();
+          }
+
+          // Trigger particle dissipation splash once as notehead meets barrier
+          if (distToTerm <= 4 && !this.absorbedItemIds.has(item.id)) {
+            this.absorbedItemIds.add(item.id);
+            if (this.absorbedItemIds.size > 800) {
+              // Bound memory by pruning oldest IDs
+              const iter = this.absorbedItemIds.values();
+              for (let prune = 0; prune < 200; prune++) {
+                const nextVal = iter.next().value;
+                if (nextVal) this.absorbedItemIds.delete(nextVal);
+              }
+            }
+            if (this.onNoteAbsorbed) {
+              this.onNoteAbsorbed(terminationX, noteY, item.colorHex, noteSize);
+            }
           }
         }
 
         // Render PPT Notehead: in continuous mode, no accidentals are rendered
-        const semitoneFromTonic = ((item.pitchClass - config.tonic) % 12 + 12) % 12;
-        const isBlackKey = isBlackPianoKey(item.pitchClass);
+        const pc = item.pitchClass ?? (item.midi % 12);
+        const semitoneFromTonic = ((pc - config.tonic) % 12 + 12) % 12;
+        const isBlackKey = isBlackPianoKey(pc);
 
         if (squishX < 0.98) {
           ctx.save();
           ctx.translate(noteX, noteY);
-          ctx.scale(squishX, 1.0);
+          ctx.scale(squishX, squishY);
           ctx.translate(-noteX, -noteY);
         }
 

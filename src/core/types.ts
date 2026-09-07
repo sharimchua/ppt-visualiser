@@ -163,6 +163,7 @@ export interface PianoTrianglesModuleConfig {
   vertexLabelType: 'syllables' | 'pitches' | 'triPitches' | 'intervals' | 'none';
   showCenterAnchor: boolean;
   triangleSparksEnabled?: boolean; // default: true (kinetic spark bursts on active vertices)
+  triangleShockwavesEnabled?: boolean; // default: true (kinetic shockwave rings on active vertices)
   triangleLensFlaresEnabled?: boolean; // default: true (optical lens flares on active vertices)
 }
 
@@ -173,6 +174,7 @@ export interface OvertonesModuleConfig {
   waveFluidity: number; // 0..1
   minFrequency: number;
   maxFrequency: number;
+  overtoneDropletsEnabled?: boolean; // default: true (fluid droplet particle ejection from fundamental crests)
 }
 
 export type ModuleCellConfig =
@@ -223,6 +225,10 @@ export interface AestheticsConfig {
   particleVolume: number; // 0.2..3.0
   particleGravity: number; // -2.0..+2.0 (buoyancy to gravity)
   particleOriginDistance: number; // 0..60px offset from tone circle edge
+  shockwavesEnabled?: boolean; // master toggle for note activation shockwaves
+  shockwaveRadius?: number; // 0.4..2.5 max radius multiplier
+  shockwaveSpeed?: number; // 0.4..2.5 expansion speed multiplier
+  shockwaveDecayDurationMs?: number; // 200..2000 ms decay duration
   glowBloomEnabled?: boolean;
   glowBloom: number; // 0..1
   tonicShiftEffectsEnabled?: boolean;

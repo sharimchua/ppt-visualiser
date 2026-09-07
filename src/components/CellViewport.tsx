@@ -1235,7 +1235,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
               <div className="flex items-center justify-between pt-1">
                 <div>
                   <span className="text-[10px] text-slate-300 font-medium block">Vertex Spark Bursts</span>
-                  <span className="text-[9px] text-slate-500 block">Particle bursts &amp; expanding shockwave rings on active vertices</span>
+                  <span className="text-[9px] text-slate-500 block">Directional particle sparks on active vertices</span>
                 </div>
                 <input
                   type="checkbox"
@@ -1246,6 +1246,28 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                       configOverrides: {
                         ...(cell.configOverrides || {}),
                         triangleSparksEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Vertex Shockwave Rings Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Vertex Shockwave Rings</span>
+                  <span className="text-[9px] text-slate-500 block">Expanding kinetic rings with smooth Hann dissolve</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.triangleShockwavesEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        triangleShockwavesEnabled: e.target.checked,
                       },
                     })
                   }
@@ -1328,6 +1350,28 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 >
                   {effectiveConfig.showOvertoneLabels ? 'Active' : 'Hidden'}
                 </button>
+              </div>
+
+              {/* Fluid Droplets Toggle */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Fluid Droplets</span>
+                  <span className="text-[9px] text-slate-500 block">Eject liquid droplet particles from fundamental wave crests</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.overtoneDropletsEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        overtoneDropletsEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-cyan-600 focus:ring-cyan-500 w-3.5 h-3.5"
+                />
               </div>
 
               {/* Fluid Ripple Speed Slider */}

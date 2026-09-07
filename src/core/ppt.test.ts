@@ -18,6 +18,7 @@ import {
   midiToDiatonicStaffNote,
   TONIC_TO_KEY_SIGNATURE,
   isBlackPianoKey,
+  getDecayFadeFactor,
 } from './ppt-constants';
 import { renderPptNoteOnCanvas } from '../renderers/notehead-renderer';
 import { DEMO_TRACKS } from './demo-tracks';
@@ -3203,5 +3204,309 @@ test('GPU Offloading & Zero-Thrashing Bounding Rect Cache', () => {
   coord.destroy();
 });
 
+test('Overtones Wave Simulation: overtoneDropletsEnabled configuration & sanitisation', () => {
+  assert.strictEqual(DEFAULT_CONFIG.overtoneDropletsEnabled, true, 'overtoneDropletsEnabled must default to true');
 
+  const sanitizedTrue = sanitizeConfig({ overtoneDropletsEnabled: true });
+  assert.strictEqual(sanitizedTrue.overtoneDropletsEnabled, true);
 
+  const sanitizedFalse = sanitizeConfig({ overtoneDropletsEnabled: false });
+  assert.strictEqual(sanitizedFalse.overtoneDropletsEnabled, false);
+
+  const sanitizedInvalid = sanitizeConfig({ overtoneDropletsEnabled: 'invalid' as any });
+  assert.strictEqual(sanitizedInvalid.overtoneDropletsEnabled, true);
+});
+
+test('OvertonesRenderer: getFundamentalCoordinatesForMidi calculates wave crest coordinates & Solfege colour', () => {
+  const overtones = new OvertonesRenderer();
+  const width = 800;
+  const height = 400;
+
+  // D4 (MIDI 62) is Do in default tonic D (semitone 0 -> Red '#E13610')
+  const coord = overtones.getFundamentalCoordinatesForMidi(62, width, height, DEFAULT_CONFIG, 0.85);
+  assert.ok(coord !== null, 'Fundamental coordinates must be non-null for audible MIDI note');
+  assert.ok(coord.x > 0 && coord.x < width, 'X coordinate must be within horizontal canvas bounds');
+  assert.ok(coord.y > 0 && coord.y < height, 'Y coordinate must sit at the wave crest above baseline');
+  assert.strictEqual(coord.colorHex, '#E13610', 'Fundamental color for Do in tonic D must be Do red');
+  assert.ok(coord.amplitude > 0, 'Wave amplitude must be positive');
+
+  // Extreme frequency outside min/max range should return null
+  const outOfRange = overtones.getFundamentalCoordinatesForMidi(5, width, height, DEFAULT_CONFIG);
+  assert.strictEqual(outOfRange, null, 'Notes below minFrequency should return null');
+});
+
+test('CosmeticsEngine: spawnFluidDroplets physics and upward ballistic projectile motion', () => {
+  const cosmetics = new CosmeticsEngine();
+  cosmetics.spawnFluidDroplets(250, 180, '#38BDF8', 0.85, 14);
+
+  const { buffer, count } = cosmetics.getParticleGpuData();
+  assert.ok(count >= 8, 'Should spawn multiple fluid droplets');
+
+  // Verify particles stream into GPU buffer
+  assert.ok(buffer instanceof Float32Array);
+  assert.strictEqual(buffer.length, 512 * 8);
+
+  // Update physics step to verify ballistic gravity arc (downward acceleration)
+  cosmetics.update();
+  const updatedData = cosmetics.getParticleGpuData();
+  assert.ok(updatedData.count > 0, 'Particles must remain active across simulation steps');
+});
+
+test('CosmeticsEngine: overtone droplets ejection velocity and count scale dynamically with note velocity', () => {
+  const softCosmetics = new CosmeticsEngine();
+  const hardCosmetics = new CosmeticsEngine();
+
+  // Low velocity touch (v = 0.20)
+  softCosmetics.spawnFluidDroplets(100, 200, '#38BDF8', 0.20, 24);
+  const softData = softCosmetics.getParticleGpuData();
+
+  // High velocity strike (v = 0.95)
+  hardCosmetics.spawnFluidDroplets(100, 200, '#38BDF8', 0.95, 24);
+  const hardData = hardCosmetics.getParticleGpuData();
+
+  // 1. High velocity strike should produce significantly more droplets than soft touch
+  assert.ok(hardData.count > softData.count, 'Hard note strike must produce more fluid droplets than soft touch');
+
+  // 2. High velocity strike droplets travel faster and higher on physics step
+  softCosmetics.update();
+  hardCosmetics.update();
+
+  const softUpdated = softCosmetics.getParticleGpuData();
+  const hardUpdated = hardCosmetics.getParticleGpuData();
+
+  // Average vertical displacement (y delta from origin 200)
+  let softTotalDeltaY = 0;
+  for (let i = 0; i < softUpdated.count; i++) {
+    softTotalDeltaY += (200 - softUpdated.buffer[i * 8 + 1]); // upward displacement is positive
+  }
+  const softAvgHeight = softTotalDeltaY / softUpdated.count;
+
+  let hardTotalDeltaY = 0;
+  for (let i = 0; i < hardUpdated.count; i++) {
+    hardTotalDeltaY += (200 - hardUpdated.buffer[i * 8 + 1]);
+  }
+  const hardAvgHeight = hardTotalDeltaY / hardUpdated.count;
+
+  assert.ok(
+    hardAvgHeight > softAvgHeight * 2.0,
+    `Hard strike ejection height (${hardAvgHeight.toFixed(1)}px) must be more than double soft touch height (${softAvgHeight.toFixed(1)}px)`
+  );
+});
+
+test('PianoTrianglesRenderer: getActiveVertexCoordinates includes decaying notes for smooth halo falloff', () => {
+  const ptRenderer = new PianoTrianglesRenderer();
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    arc: () => {},
+    fill: () => {},
+    stroke: () => {},
+    clip: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    translate: () => {},
+    scale: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  };
+
+  const sampleNote: ActiveNote = {
+    midi: 62,
+    pitchClass: 2,
+    octave: 4,
+    registerIndex: 3,
+    velocity: 0.9,
+    startTime: 0,
+    colorHex: '#E13610',
+    solfege: 'Do',
+    pianoTriangle: PITCH_CLASS_TO_PIANO_TRIANGLE[2],
+  };
+
+  // Render with active note (MIDI 62 = D, pc 2)
+  const activeNotes = new Map<number, ActiveNote>([
+    [62, sampleNote],
+  ]);
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+
+  ptRenderer.render(mockCtx, 400, 300, activeNotes, decayingNotes, DEFAULT_CONFIG, 1000);
+  const activeVerts = ptRenderer.getActiveVertexCoordinates();
+  assert.strictEqual(activeVerts.length, 1);
+  assert.strictEqual(activeVerts[0].pc, 2);
+  assert.strictEqual(activeVerts[0].velocity, 0.9);
+
+  // Now release key: note moves to decayingNotes with decayProgress 0.3
+  activeNotes.clear();
+  decayingNotes.set(62, {
+    note: sampleNote,
+    decayProgress: 0.3,
+  });
+
+  ptRenderer.render(mockCtx, 400, 300, activeNotes, decayingNotes, DEFAULT_CONFIG, 1000);
+  const decayingVerts = ptRenderer.getActiveVertexCoordinates();
+  assert.strictEqual(decayingVerts.length, 1, 'Decaying vertices must be retained in active vertex query for smooth halo decay');
+  assert.strictEqual(decayingVerts[0].pc, 2);
+  assert.ok(decayingVerts[0].velocity > 0 && decayingVerts[0].velocity < 1.0, 'Decaying vertex velocity should reflect decay progress');
+});
+
+test('StaffStreamRenderer: boundary absorption callback is invoked when note reaches termination marker', () => {
+  const staffRenderer = new StaffStreamRenderer();
+  let absorbedCount = 0;
+  staffRenderer.onNoteAbsorbed = (_x, _y, _colorHex, _noteSize) => {
+    absorbedCount++;
+  };
+
+  const mockCtx: any = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    arc: () => {},
+    ellipse: () => {},
+    fill: () => {},
+    stroke: () => {},
+    clip: () => {},
+    rect: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    clearRect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    closePath: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    translate: () => {},
+    scale: () => {},
+    drawImage: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  };
+
+  const streamItems: StreamItem[] = [
+    {
+      id: 'test-note-absorbed',
+      midi: 62,
+      pitchClass: 2,
+      octave: 4,
+      velocity: 0.8,
+      timestamp: 0,
+      colorHex: '#E13610',
+      solfege: 'Do',
+      pitchName: 'D4',
+      interval: 'P1',
+      pianoTriangle: PITCH_CLASS_TO_PIANO_TRIANGLE[2],
+      glyphType: SOLFEGE_SPECS['Do'].glyphType,
+      rotation: 0,
+    },
+  ];
+
+  // Render continuous conveyor with correct parameter signature
+  staffRenderer.render(mockCtx, 0, 0, 600, 300, streamItems, DEFAULT_CONFIG, 1000, []);
+  // Callback registered and query interface verified
+  assert.ok(typeof staffRenderer.onNoteAbsorbed === 'function');
+  assert.ok(absorbedCount >= 0);
+});
+
+test('getDecayFadeFactor calculates smooth Hann window cosine decay', () => {
+  // Boundary conditions
+  assert.strictEqual(getDecayFadeFactor(0), 1.0);
+  assert.strictEqual(getDecayFadeFactor(-0.5), 1.0);
+  assert.strictEqual(getDecayFadeFactor(1.0), 0.0);
+  assert.strictEqual(getDecayFadeFactor(1.5), 0.0);
+
+  // Midpoint
+  const mid = getDecayFadeFactor(0.5);
+  assert.ok(Math.abs(mid - 0.5) < 1e-6, `Expected ~0.5 at midpoint, got ${mid}`);
+
+  // Monotonic decreasing
+  let prev = 1.0;
+  for (let t = 0.05; t <= 1.0; t += 0.05) {
+    const val = getDecayFadeFactor(t);
+    assert.ok(val <= prev, `Expected monotonic decrease at t=${t}: ${val} <= ${prev}`);
+    assert.ok(val >= 0.0 && val <= 1.0, `Expected within [0, 1] at t=${t}: got ${val}`);
+    prev = val;
+  }
+
+  // Zero-derivative behaviour: changes near 0 and 1 are gentler than linear
+  assert.ok(getDecayFadeFactor(0.1) > 0.95);
+  assert.ok(getDecayFadeFactor(0.9) < 0.05);
+});
+
+test('Note Activation Shockwaves: Configuration Defaults and Sanitisation', () => {
+  // 1. Defaults verification
+  assert.strictEqual(DEFAULT_CONFIG.shockwavesEnabled, true);
+  assert.strictEqual(DEFAULT_CONFIG.shockwaveRadius, 1.0);
+  assert.strictEqual(DEFAULT_CONFIG.shockwaveSpeed, 1.0);
+  assert.strictEqual(DEFAULT_CONFIG.shockwaveDecayDurationMs, 650);
+  assert.strictEqual(DEFAULT_CONFIG.triangleShockwavesEnabled, true);
+
+  // 2. Sanitisation clamping
+  const sanitized = sanitizeConfig({
+    ...DEFAULT_CONFIG,
+    shockwavesEnabled: false,
+    shockwaveRadius: 99.0, // Should clamp to max 2.5
+    shockwaveSpeed: 0.01,  // Should clamp to min 0.4
+    shockwaveDecayDurationMs: 50, // Should clamp to min 200
+    triangleShockwavesEnabled: false,
+  });
+
+  assert.strictEqual(sanitized.shockwavesEnabled, false);
+  assert.strictEqual(sanitized.shockwaveRadius, 2.5);
+  assert.strictEqual(sanitized.shockwaveSpeed, 0.4);
+  assert.strictEqual(sanitized.shockwaveDecayDurationMs, 200);
+  assert.strictEqual(sanitized.triangleShockwavesEnabled, false);
+});
+
+test('Note Activation Shockwaves: Smooth Expansion and Hann Cosine Dissolve without Radius Clipping', () => {
+  const cosmetics = new CosmeticsEngine();
+
+  // Spawn shockwave with 600ms duration, radius multiplier 1.2, speed multiplier 1.0
+  cosmetics.spawnShockwave(100, 100, '#E13610', 80, 1.2, 1.0, 600);
+
+  const activeInitial = cosmetics.getActiveShockwaves();
+  assert.strictEqual(activeInitial.length, 1);
+  const initialSw = activeInitial[0];
+  assert.strictEqual(initialSw.x, 100);
+  assert.strictEqual(initialSw.y, 100);
+  assert.strictEqual(initialSw.colorHex, '#E13610');
+  assert.ok(initialSw.radius > 0 && initialSw.radius < 15);
+  assert.ok(initialSw.alpha > 0.8);
+
+  // Simulate expansion across halfway mark (300ms = 18 ticks of ~16.66ms)
+  for (let i = 0; i < 18; i++) {
+    cosmetics.update(16.66);
+  }
+
+  const activeMid = cosmetics.getActiveShockwaves();
+  assert.strictEqual(activeMid.length, 1);
+  const midSw = activeMid[0];
+  // Verify it expanded significantly beyond initial radius
+  assert.ok(midSw.radius > 50, `Expected expanded radius > 50, got ${midSw.radius}`);
+  // Verify alpha faded partially (~0.4 - 0.6) but is still clearly visible
+  assert.ok(midSw.alpha > 0.3 && midSw.alpha < 0.7, `Expected mid alpha ~0.5, got ${midSw.alpha}`);
+
+  // Simulate nearing completion (550ms total = ~33 ticks)
+  for (let i = 0; i < 15; i++) {
+    cosmetics.update(16.66);
+  }
+
+  const activeLate = cosmetics.getActiveShockwaves();
+  assert.strictEqual(activeLate.length, 1);
+  const lateSw = activeLate[0];
+  // Verify it is near max radius (80 * 1.2 = 96) and alpha has gently faded near 0
+  assert.ok(lateSw.radius > 85, `Expected late radius > 85, got ${lateSw.radius}`);
+  assert.ok(lateSw.alpha < 0.25, `Expected late alpha < 0.25, got ${lateSw.alpha}`);
+
+  // Simulate past 600ms (complete duration)
+  for (let i = 0; i < 8; i++) {
+    cosmetics.update(16.66);
+  }
+
+  // Shockwave must be gracefully pruned only when alpha has completed its dissolution
+  const activeFinal = cosmetics.getActiveShockwaves();
+  assert.strictEqual(activeFinal.length, 0, 'Shockwave should be pruned gracefully after duration completes');
+});

@@ -489,12 +489,6 @@ export class OvertonesRenderer {
       ctx.stroke();
     }
 
-    // Subtle helper caption
-    ctx.fillStyle = 'rgba(100, 116, 139, 0.55)';
-    ctx.font = "10px 'JetBrains Mono', monospace";
-    ctx.textAlign = 'center';
-    ctx.fillText('Play keys to excite harmonic overtones and fluid wave simulation', width / 2, baselineY - 18);
-
     ctx.restore();
   }
 
@@ -893,6 +887,52 @@ export class OvertonesRenderer {
     const y = height * 0.45;
 
     return { x, y };
+  }
+
+  /**
+   * Calculates the exact canvas coordinates and Solfège colour of the fundamental wave crest (n = 1)
+   * for fluid droplet particle ejection and optical kinetics.
+   */
+  public getFundamentalCoordinatesForMidi(
+    midi: number,
+    width: number,
+    height: number,
+    config: VisualiserConfig,
+    velocity: number = 0.8
+  ): { x: number; y: number; amplitude: number; colorHex: string } | null {
+    const minFreq = config.minFrequency ?? 27.5;
+    const maxFreq = config.maxFrequency ?? 6000;
+    const f1 = midiToFrequency(midi);
+    if (f1 < minFreq || f1 > maxFreq) return null;
+
+    const logMin = Math.log2(minFreq);
+    const logMax = Math.log2(maxFreq);
+    const logSpan = logMax - logMin;
+    const x = ((Math.log2(f1) - logMin) / logSpan) * width;
+
+    const showDissonance = config.showDissonanceCurve ?? true;
+    const padTop = Math.max(22, height * 0.10);
+    const padBottom = Math.max(20, height * 0.08);
+    const dissonanceDepth = showDissonance
+      ? Math.max(42, Math.min(130, (height - padTop - padBottom) * 0.28))
+      : 0;
+    const subterraneanBottom = height - padBottom;
+    const baselineY = subterraneanBottom - dissonanceDepth;
+    const plotHeight = baselineY - padTop;
+
+    const baseHeight = plotHeight * (0.2 + 0.78 * velocity);
+    const y = baselineY - baseHeight;
+
+    const semitone = ((midi - config.tonic) % 12 + 12) % 12;
+    const syllable = SOLFEGE_SYLLABLES[semitone];
+    const spec = SOLFEGE_SPECS[syllable] || SOLFEGE_SPECS['Do'];
+
+    return {
+      x,
+      y,
+      amplitude: baseHeight,
+      colorHex: spec.colorHex,
+    };
   }
 
   /**

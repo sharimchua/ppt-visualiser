@@ -13,6 +13,7 @@ import {
   PITCH_NAMES_FLAT,
   getTriPitchClass,
   INTERVAL_NAMES,
+  getDecayFadeFactor,
 } from '../core/ppt-constants';
 import { getEffectiveModeIntervals } from '../core/scale-alignment';
 
@@ -133,6 +134,7 @@ export interface ActiveTriangleVertex {
 export class PianoTrianglesRenderer {
   private activeTonicShift: TonicTriangleShiftAnimation | null = null;
   private activeVertices: ActiveTriangleVertex[] = [];
+  private activeVerticesByPc = new Map<number, { vertex: ActiveTriangleVertex; isScaleTone: boolean }>();
   private vertexPositionsByPc = new Map<number, { x: number; y: number; colorHex: string }>();
 
   /**
@@ -176,6 +178,7 @@ export class PianoTrianglesRenderer {
     if (width <= 0 || height <= 0) return;
 
     this.activeVertices = [];
+    this.activeVerticesByPc.clear();
     this.vertexPositionsByPc.clear();
 
     // Resolve scale intervals based on active mode
@@ -235,10 +238,10 @@ export class PianoTrianglesRenderer {
       activePcMap.set(pc, Math.max(activePcMap.get(pc) || 0, note.velocity ?? 0.8));
     }
 
-    const decayPcMap = new Map<number, number>(); // pc -> intensity (1 - progress)
+    const decayPcMap = new Map<number, number>(); // pc -> intensity (eased 1 - progress)
     for (const data of decayingNotes.values()) {
       const pc = ((data.note.midi % 12) + 12) % 12;
-      const factor = Math.max(0, 1 - data.decayProgress);
+      const factor = Math.max(0, getDecayFadeFactor(data.decayProgress) * (data.note.velocity ?? 0.8));
       decayPcMap.set(pc, Math.max(decayPcMap.get(pc) || 0, factor));
     }
 
@@ -267,6 +270,7 @@ export class PianoTrianglesRenderer {
         _timeMs
       );
     });
+    this.activeVertices = Array.from(this.activeVerticesByPc.values()).map((e) => e.vertex);
 
     // 4. Kinetic tonic modulation surge & Do anchor pulse
     if (config.tonicShiftEffectsEnabled !== false && this.activeTonicShift) {
@@ -492,16 +496,30 @@ export class PianoTrianglesRenderer {
       // Record canvas-space coordinates for lens flares and particle effects
       const absX = x + vx;
       const absY = y + vy;
-      this.vertexPositionsByPc.set(pc, { x: absX, y: absY, colorHex: vertexColor });
+      const existingPos = this.vertexPositionsByPc.get(pc);
+      if (!existingPos || isScaleTone) {
+        this.vertexPositionsByPc.set(pc, { x: absX, y: absY, colorHex: vertexColor });
+      }
 
-      if (isActive) {
-        this.activeVertices.push({
-          x: absX,
-          y: absY,
-          pc,
-          velocity,
-          colorHex: vertexColor,
-        });
+      if (isActive || (isDecaying && decayFactor > 0.0005)) {
+        const vel = isActive ? velocity : decayFactor;
+        const existingActive = this.activeVerticesByPc.get(pc);
+        if (
+          !existingActive ||
+          (isScaleTone && !existingActive.isScaleTone) ||
+          (isScaleTone === existingActive.isScaleTone && vel > existingActive.vertex.velocity)
+        ) {
+          this.activeVerticesByPc.set(pc, {
+            vertex: {
+              x: absX,
+              y: absY,
+              pc,
+              velocity: vel,
+              colorHex: vertexColor,
+            },
+            isScaleTone,
+          });
+        }
       }
 
       // Base radius calculation with proportional scaling
@@ -559,16 +577,18 @@ export class PianoTrianglesRenderer {
       } else if (isDecaying) {
         // --- DECAYING VERTEX: Smooth Alpha Fade ---
         // Soft outer ambient halo
-        ctx.beginPath();
-        ctx.arc(vx, vy, radius + 2.0 * decayFactor, 0, Math.PI * 2);
-        ctx.fillStyle = vertexColor;
-        ctx.globalAlpha = decayFactor * 0.25;
-        ctx.fill();
+        if (decayFactor > 0.01) {
+          ctx.beginPath();
+          ctx.arc(vx, vy, radius + 2.0 * decayFactor, 0, Math.PI * 2);
+          ctx.fillStyle = vertexColor;
+          ctx.globalAlpha = decayFactor * 0.25;
+          ctx.fill();
+        }
 
         ctx.beginPath();
         ctx.arc(vx, vy, radius, 0, Math.PI * 2);
         ctx.fillStyle = vertexColor;
-        ctx.globalAlpha = decayFactor * 0.85;
+        ctx.globalAlpha = Math.max(0.12, decayFactor * 0.85);
         ctx.fill();
 
         ctx.strokeStyle = '#ffffff';

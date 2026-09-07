@@ -83,8 +83,8 @@ uniform float u_lightBleed;
 uniform float u_lensFlare;
 uniform int u_flareStyle; // 0 = anamorphic, 1 = starburst, 2 = cinematic
 uniform int u_lightCount;
-uniform vec4 u_lights[8]; // x, y, velocity, active
-uniform vec3 u_lightColors[8];
+uniform vec4 u_lights[16]; // x, y, velocity, active
+uniform vec3 u_lightColors[16];
 uniform vec2 u_opticalCenter;
 
 // Expanding kinetic shockwaves
@@ -109,8 +109,9 @@ vec2 crtDistort(vec2 uv, float bend) {
 
 void main() {
   vec2 uv = v_uv;
+  vec2 screenPixelCoord = v_uv * u_resolution;
 
-  // 1. Subtle CRT spherical glass curve
+  // 1. Subtle CRT spherical glass curve (applied to scanlines, vignette & grain texture)
   if (u_crtCurvature > 0.001) {
     uv = crtDistort(uv, u_crtCurvature * 0.15);
   }
@@ -126,27 +127,29 @@ void main() {
 
   // --- OPTICAL LENS FLARES & HALATION ---
   if ((u_lightBleed > 0.01 || u_lensFlare > 0.01) && u_lightCount > 0) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 16; i++) {
       if (i >= u_lightCount) break;
       vec2 lightPos = u_lights[i].xy;
       float vel = u_lights[i].z;
       vec3 lightColor = u_lightColors[i];
 
-      vec2 d = pixelCoord - lightPos;
+      // Measure distance using undistorted screen coordinates matching 2D canvas elements
+      vec2 d = screenPixelCoord - lightPos;
       float dist = length(d);
 
       // A. Radial Film Halation (warm soft glow around active notes)
-      if (u_lightBleed > 0.01 && vel > 0.02) {
-        float halationR = 40.0 * u_lightBleed + vel * 50.0;
+      if (u_lightBleed > 0.01 && vel > 0.0001) {
+        // Radius remains broad and natural throughout decay (dissolves gracefully rather than collapsing)
+        float halationR = max(16.0, 42.0 * u_lightBleed + vel * 32.0);
         float hFalloff = exp(-dist / halationR);
         vec3 halationColor = mix(lightColor, vec3(0.98, 0.57, 0.24), 0.35); // 35mm warm halation tint
-        float hAlpha = hFalloff * vel * u_lightBleed * 0.55;
+        float hAlpha = hFalloff * vel * u_lightBleed * 0.70;
         additiveColor += halationColor * hAlpha;
         additiveAlpha = max(additiveAlpha, hAlpha);
 
         // Anamorphic horizontal light bleed streak
         float streakHalfW = min(u_resolution.x * 0.45, 120.0 + 260.0 * u_lightBleed);
-        float streakH = max(2.0, 6.0 * vel);
+        float streakH = max(2.5, 5.0 * vel);
         if (abs(d.y) < streakH * 2.0 && abs(d.x) < streakHalfW) {
           float sX = clamp(1.0 - abs(d.x) / streakHalfW, 0.0, 1.0);
           float sY = clamp(1.0 - abs(d.y) / (streakH * 2.0), 0.0, 1.0);
@@ -157,11 +160,11 @@ void main() {
       }
 
       // B. Multi-Element Optical Lens Flares
-      if (u_lensFlare > 0.01 && vel > 0.02) {
+      if (u_lensFlare > 0.01 && vel > 0.0001) {
         float flareAlpha = vel * u_lensFlare;
 
         // Central radiant optical core disc
-        float coreR = max(8.0, 18.0 * u_lensFlare * (0.6 + vel * 0.6));
+        float coreR = max(8.0, 16.0 * u_lensFlare * (0.65 + vel * 0.55));
         float coreFalloff = exp(-dist / (coreR * 0.7));
         float cAlpha = coreFalloff * flareAlpha * 0.95;
         additiveColor += vec3(1.0) * cAlpha + lightColor * (cAlpha * 0.6);
@@ -169,7 +172,7 @@ void main() {
 
         // 1. Starburst diffraction rays (style 1: starburst, 2: cinematic)
         if (u_flareStyle == 1 || u_flareStyle == 2) {
-          float rayLen = min(u_resolution.x * 0.35, 70.0 + 160.0 * u_lensFlare * vel);
+          float rayLen = min(u_resolution.x * 0.35, 50.0 + 160.0 * u_lensFlare * (0.55 + vel * 0.45));
           if (dist < rayLen && dist > 1.0) {
             float angle = atan(d.y, d.x);
             // 6-pointed starburst diffraction pattern
@@ -185,7 +188,7 @@ void main() {
         // 2. Anamorphic wide horizontal optical streak (style 0: anamorphic, 2: cinematic)
         if (u_flareStyle == 0 || u_flareStyle == 2) {
           float aStreakW = min(u_resolution.x * 0.72, 220.0 + 460.0 * u_lensFlare);
-          float aStreakH = max(3.0, 5.0 * vel);
+          float aStreakH = max(2.5, 4.5 * vel);
           if (abs(d.y) < aStreakH * 2.5 && abs(d.x) < aStreakW) {
             float aX = clamp(1.0 - abs(d.x) / aStreakW, 0.0, 1.0);
             float aY = clamp(1.0 - abs(d.y) / (aStreakH * 2.5), 0.0, 1.0);
@@ -201,7 +204,7 @@ void main() {
           vec2 optDelta = u_opticalCenter - lightPos;
           // Ghost 1 at 0.4x reflection
           vec2 gPos1 = lightPos + optDelta * 1.4;
-          float gDist1 = length(pixelCoord - gPos1);
+          float gDist1 = length(screenPixelCoord - gPos1);
           float gR1 = 14.0 * (0.8 + vel * 0.4) * u_lensFlare;
           if (gDist1 < gR1) {
             float gA1 = (1.0 - gDist1 / gR1) * flareAlpha * 0.18;
@@ -210,7 +213,7 @@ void main() {
           }
           // Ghost 2 at 0.75x reflection
           vec2 gPos2 = lightPos + optDelta * 1.75;
-          float gDist2 = length(pixelCoord - gPos2);
+          float gDist2 = length(screenPixelCoord - gPos2);
           float gR2 = 24.0 * (0.8 + vel * 0.4) * u_lensFlare;
           if (gDist2 < gR2) {
             float gA2 = (1.0 - gDist2 / gR2) * flareAlpha * 0.12;
@@ -232,7 +235,7 @@ void main() {
       vec3 swCol = u_shockwaveColors[i];
 
       if (swAlpha > 0.01 && swRadius > 1.0) {
-        float d = length(pixelCoord - swPos);
+        float d = length(screenPixelCoord - swPos);
         float ringDist = abs(d - swRadius);
         float ringWidth = max(2.5, swRadius * 0.045);
         if (ringDist < ringWidth * 2.5) {
@@ -345,8 +348,8 @@ export class WebGLPostProcessingPipeline {
   private uShockwaveColorsLoc: WebGLUniformLocation | null = null;
 
   // Preallocated Scratch Buffers (zero per-frame memory allocation)
-  private lightsData = new Float32Array(32); // 8 * 4
-  private lightColorsData = new Float32Array(24); // 8 * 3
+  private lightsData = new Float32Array(64); // 16 * 4
+  private lightColorsData = new Float32Array(48); // 16 * 3
   private shockwavesData = new Float32Array(16); // 4 * 4
   private shockwaveColorsData = new Float32Array(12); // 4 * 3
 
@@ -595,8 +598,8 @@ export class WebGLPostProcessingPipeline {
 
     gl.uniform2f(this.uOpticalCenterLoc, width / 2, height / 2);
 
-    // Pack up to 8 lights into uniform arrays (only if flares or light bleed are active)
-    const maxLights = (lensFlareOn || lightBleedOn) ? Math.min(8, lights.length) : 0;
+    // Pack up to 16 lights into uniform arrays (only if flares or light bleed are active)
+    const maxLights = (lensFlareOn || lightBleedOn) ? Math.min(16, lights.length) : 0;
     gl.uniform1i(this.uLightCountLoc, maxLights);
 
     if (maxLights > 0) {

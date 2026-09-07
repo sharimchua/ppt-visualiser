@@ -661,12 +661,14 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-1">
             <div className="flex justify-between items-center text-slate-300">
               <span className="font-medium">Note Glow Decay:</span>
-              <span className="font-mono text-red-400">{config.decayDurationMs}ms</span>
+              <span className="font-mono text-red-400">
+                {(config.decayDurationMs / 1000).toFixed(1)}s ({config.decayDurationMs}ms)
+              </span>
             </div>
             <input
               type="range"
               min={200}
-              max={2500}
+              max={3500}
               step={50}
               value={config.decayDurationMs}
               onChange={(e) => onUpdateConfig({ decayDurationMs: parseInt(e.target.value, 10) })}
@@ -746,8 +748,11 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
               </label>
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
-              <span className="text-slate-300 font-medium">Kinetic Shockwave Rings</span>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <div>
+                <span className="text-slate-300 font-medium block">Sustained Tone Pulse Rings</span>
+                <span className="text-[10px] text-slate-400 block">Rhythmic pulsing concentric rings around held notes</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
                 <input
                   type="checkbox"
                   checked={config.pulseShockwaves}
@@ -1249,6 +1254,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     glowBloomEnabled: true,
                     motionTrailsEnabled: true,
                     tonicShiftEffectsEnabled: true,
+                    overtoneDropletsEnabled: true,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-purple-500/50 bg-purple-600/20 hover:bg-purple-600/30 text-[10px] text-purple-300 font-medium transition text-center"
@@ -1268,6 +1274,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     glowBloomEnabled: true,
                     motionTrailsEnabled: true,
                     tonicShiftEffectsEnabled: true,
+                    overtoneDropletsEnabled: true,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/50 text-[10px] text-slate-300 font-medium transition text-center"
@@ -1287,6 +1294,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     glowBloomEnabled: false,
                     motionTrailsEnabled: false,
                     tonicShiftEffectsEnabled: false,
+                    overtoneDropletsEnabled: false,
                   })
                 }
                 className="py-1.5 px-1 rounded border border-emerald-500/50 bg-emerald-600/20 hover:bg-emerald-600/30 text-[10px] text-emerald-300 font-medium transition text-center"
@@ -1454,22 +1462,43 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
             </div>
 
             {(config.lightBleedEnabled ?? true) && (
-              <div className="space-y-1 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
-                <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                  <span>Light Bleed Intensity:</span>
-                  <span className="font-mono text-purple-400">
-                    {Math.round((config.lightBleedIntensity ?? 0.25) * 100)}%
-                  </span>
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Light Bleed Intensity:</span>
+                    <span className="font-mono text-purple-400">
+                      {Math.round((config.lightBleedIntensity ?? 0.25) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={config.lightBleedIntensity ?? 0.25}
+                    onChange={(e) => onUpdateConfig({ lightBleedIntensity: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={config.lightBleedIntensity ?? 0.25}
-                  onChange={(e) => onUpdateConfig({ lightBleedIntensity: parseFloat(e.target.value) })}
-                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
-                />
+
+                {/* Halation Decay Duration */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Halation Decay Duration:</span>
+                    <span className="font-mono text-purple-400">
+                      {(config.decayDurationMs / 1000).toFixed(1)}s ({config.decayDurationMs}ms)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={200}
+                    max={3500}
+                    step={50}
+                    value={config.decayDurationMs}
+                    onChange={(e) => onUpdateConfig({ decayDurationMs: parseInt(e.target.value, 10) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1694,6 +1723,25 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                     <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
                   </label>
                 </div>
+
+                {/* Flare Decay Duration Slider */}
+                <div className="space-y-1 pt-2 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Flare & Starburst Decay Duration:</span>
+                    <span className="font-mono text-purple-400">
+                      {(config.decayDurationMs / 1000).toFixed(1)}s ({config.decayDurationMs}ms)
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={200}
+                    max={3500}
+                    step={50}
+                    value={config.decayDurationMs}
+                    onChange={(e) => onUpdateConfig({ decayDurationMs: parseInt(e.target.value, 10) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1818,13 +1866,109 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
                   <div>
                     <span className="text-[11px] text-slate-300 block font-medium">Piano Triangles Vertex Sparks</span>
-                    <span className="text-[9px] text-slate-400 block">Spark bursts &amp; shockwaves on active triangle vertices</span>
+                    <span className="text-[9px] text-slate-400 block">Directional particle bursts on active triangle vertices</span>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
                     <input
                       type="checkbox"
                       checked={config.triangleSparksEnabled !== false}
                       onChange={(e) => onUpdateConfig({ triangleSparksEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 6b. Note Activation Shockwaves */}
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            <div className="flex justify-between items-center text-slate-300">
+              <div>
+                <span className="font-medium block">Note Activation Shockwaves</span>
+                <span className="text-[10px] text-slate-400 block">Expanding kinetic rings with smooth Hann window dissolve</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!(config.shockwavesEnabled ?? true) && (
+                  <span className="text-[10px] text-slate-500 font-mono">Off</span>
+                )}
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.shockwavesEnabled ?? true}
+                    onChange={(e) => onUpdateConfig({ shockwavesEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+            </div>
+
+            {(config.shockwavesEnabled ?? true) && (
+              <div className="space-y-3 pt-2 border-t border-slate-800/60 animate-in fade-in duration-150">
+                {/* Max Expansion Radius */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Expansion Radius:</span>
+                    <span className="font-mono text-purple-400">{Math.round((config.shockwaveRadius ?? 1.0) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.4}
+                    max={2.5}
+                    step={0.05}
+                    value={config.shockwaveRadius ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ shockwaveRadius: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Expansion Speed */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Expansion Speed:</span>
+                    <span className="font-mono text-purple-400">{(config.shockwaveSpeed ?? 1.0).toFixed(2)}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.4}
+                    max={2.5}
+                    step={0.05}
+                    value={config.shockwaveSpeed ?? 1.0}
+                    onChange={(e) => onUpdateConfig({ shockwaveSpeed: parseFloat(e.target.value) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Decay / Dissolve Duration */}
+                <div className="space-y-1 pt-1 border-t border-slate-800/60">
+                  <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                    <span>Dissolve Duration:</span>
+                    <span className="font-mono text-purple-400">{config.shockwaveDecayDurationMs ?? 650}ms</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={200}
+                    max={2000}
+                    step={50}
+                    value={config.shockwaveDecayDurationMs ?? 650}
+                    onChange={(e) => onUpdateConfig({ shockwaveDecayDurationMs: parseInt(e.target.value, 10) })}
+                    className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-purple-500"
+                  />
+                </div>
+
+                {/* Piano Triangles Shockwaves Toggle */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                  <div>
+                    <span className="text-[11px] text-slate-300 block font-medium">Piano Triangles Vertex Shockwaves</span>
+                    <span className="text-[9px] text-slate-400 block">Expanding rings on active triangle vertices</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-2">
+                    <input
+                      type="checkbox"
+                      checked={config.triangleShockwavesEnabled !== false}
+                      onChange={(e) => onUpdateConfig({ triangleShockwavesEnabled: e.target.checked })}
                       className="sr-only peer"
                     />
                     <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
@@ -2051,6 +2195,22 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                   type="checkbox"
                   checked={config.showOvertoneLabels ?? true}
                   onChange={(e) => onUpdateConfig({ showOvertoneLabels: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>
+              </label>
+            </div>
+
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="font-medium block">Fluid Droplet Ejection</span>
+                <span className="text-[10px] text-slate-400 block">Eject upward fluid droplets and mist from fundamental wave crests</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.overtoneDropletsEnabled ?? true}
+                  onChange={(e) => onUpdateConfig({ overtoneDropletsEnabled: e.target.checked })}
                   className="sr-only peer"
                 />
                 <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-600"></div>

@@ -393,3 +393,16 @@ export function isBlackPianoKey(midiOrPitchClass: number): boolean {
   return pc === 1 || pc === 3 || pc === 6 || pc === 8 || pc === 10;
 }
 
+/**
+ * Calculates a smooth, organic optical decay factor from release progress (0.0 to 1.0).
+ * Uses a cosine-squared (Hann) window curve:
+ * - Has zero derivative at t=0 (no jarring velocity cliff on key release)
+ * - Has a gentle, natural photographic half-life around t=0.5
+ * - Has zero derivative and reaches exactly 0.0 at t=1.0 (no popping or abrupt threshold drop)
+ */
+export function getDecayFadeFactor(progress: number): number {
+  if (progress <= 0) return 1.0;
+  if (progress >= 1.0) return 0.0;
+  return 0.5 * (1 + Math.cos(progress * Math.PI));
+}
+
