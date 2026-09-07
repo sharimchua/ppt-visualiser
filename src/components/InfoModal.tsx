@@ -395,12 +395,86 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 </div>
               </div>
 
-              {/* Concept 2: Uniform Solfège */}
+              {/* Concept 2: Why Default Do = D */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Compass className="w-5 h-5 text-amber-400 shrink-0" />
+                    <span>2. Why Default Do = D (The Symmetries of D)</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 self-start sm:self-auto">
+                    Alphabet &bull; Keyboard &bull; Polar Axis
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Most conventional music pedagogy defaults to C simply because C major has no black keys on a piano. Prime Period Theory chooses <strong>D</strong> as its default starting anchor because D is the true symmetrical centre of both our alphabet and physical keyboard topography:
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  {/* Card 1: Alphabet & Dorian Symmetry */}
+                  <div className="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-400" />
+                        <span>Alphabet &amp; Dorian Symmetry</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        In our 7-letter musical alphabet (<span className="font-mono text-slate-300">A, B, C, <strong>D</strong>, E, F, G</span>), <strong>D</strong> sits at the exact mathematical centre. Stepping downward 3 natural steps reaches <strong>A</strong>; stepping upward 3 natural steps reaches <strong>G</strong>. When played on all natural keys, D forms the <strong>Dorian mode</strong>—the only diatonic mode that is an exact symmetrical palindrome of its own intervals.
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/80 px-2.5 py-1.5 rounded border border-slate-800 text-[10.5px] font-mono text-amber-300/90 text-center">
+                      A &larr; 3 steps &ndash; [D] &ndash; 3 steps &rarr; G
+                    </div>
+                  </div>
+
+                  {/* Card 2: Keyboard Reflection & Hand Ergonomics */}
+                  <div className="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="font-semibold text-cyan-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                        <span>Keyboard Mirror &amp; Ergonomics</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        D sits centrally between the two black keys (C♯ and D♯). Stepping outward in either direction preserves identical key colours across every interval distance (&plusmn;1 semitone is black, &plusmn;2 is white, &plusmn;3 is white, etc.). Thumbs on D strike identical keys in contrary motion, and the D major pentascale (<span className="font-mono text-slate-300">D-E-F♯-G-A</span>) naturally arches the hand with the long middle finger on elevated F♯.
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/80 px-2.5 py-1.5 rounded border border-slate-800 text-[10.5px] font-mono text-cyan-300/90 text-center">
+                      &plusmn;n st: Bilateral colour reflection
+                    </div>
+                  </div>
+
+                  {/* Card 3: Polar Balance & Triangle Foundations */}
+                  <div className="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80 space-y-2 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="font-semibold text-indigo-400 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                        <span>Polar Axis &amp; Triangle Anchor</span>
+                      </div>
+                      <p className="text-slate-400 leading-relaxed text-[11.5px]">
+                        In PPT geometry, D anchors the base <strong>Down Triangle</strong> (&triangledown;) on the keyboard. Looking directly across the 12-tone clock to the 6 o&apos;clock tritone nadir brings you to <strong>&Delta;D</strong> (A♭/G♯)—the centre of the <strong>Up Triangle</strong> (&Delta;). Setting Do to D grounds both our polar naming and physical keyboard geometry across a single vertical spine.
+                      </p>
+                    </div>
+                    <div className="bg-slate-900/80 px-2.5 py-1.5 rounded border border-slate-800 text-[10.5px] font-mono text-indigo-300/90 text-center">
+                      Zenith: D &bull; Nadir: &Delta;D (A♭)
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/50 p-2.5 sm:p-3 rounded-lg border border-slate-800/60 text-[11px] text-slate-400 flex items-start sm:items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+                  <span>
+                    <strong>Movable Do Freedom:</strong> While D is PPT&apos;s symmetrical default, Prime Period Theory is fundamentally <em>movable Do</em>. You can rotate the tonic to C or any other key at any time from the top toolbar, or enable <em>Auto-Alignment</em> to track incoming MIDI in real time.
+                  </span>
+                </div>
+              </div>
+
+              {/* Concept 3: Uniform Solfège */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
-                    <span>2. Uniform Solfège & 4-Fold Symmetry</span>
+                    <span>3. Uniform Solfège & 4-Fold Symmetry</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-400 border border-amber-800/60 self-start sm:self-auto">
                     3 Glyphs &times; 4 Rotations = 12 Tones
@@ -415,12 +489,12 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <UniformSolfegeDiagram />
               </div>
 
-              {/* Concept 3: Tri Pitch-Class Notation */}
+              {/* Concept 4: Tri Pitch-Class Notation */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Compass className="w-5 h-5 text-cyan-400 shrink-0" />
-                    <span>3. Tri Pitch-Class Notation (Absolute Pitch Alternative)</span>
+                    <span>4. Tri Pitch-Class Notation (Absolute Pitch Alternative)</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
                     Default 12TET Polar Naming
@@ -435,12 +509,12 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <TriPitchClassDiagram />
               </div>
 
-              {/* Concept 4: Piano Triangles */}
+              {/* Concept 5: Piano Triangles */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
-                    <span>4. Piano Triangles (Keyboard Topography)</span>
+                    <span>5. Piano Triangles (Keyboard Topography)</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950/80 text-indigo-300 border border-indigo-800/60 self-start sm:self-auto">
                     Down &bull; Left &bull; Up &bull; Right
@@ -459,12 +533,12 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <PianoTrianglesDiagram />
               </div>
 
-              {/* Concept 5: Concentric Orbits & Nearest-Address */}
+              {/* Concept 6: Concentric Orbits & Nearest-Address */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Eye className="w-5 h-5 text-cyan-400 shrink-0" />
-                    <span>5. Concentric Orbits & Octave Wrapping</span>
+                    <span>6. Concentric Orbits & Octave Wrapping</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
                     Octave Seam at 6 to 7 o&apos;clock
@@ -479,23 +553,23 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <ConcentricOrbitsDiagram />
               </div>
 
-              {/* Concept 6: Auto-Alignment */}
+              {/* Concept 7: Auto-Alignment */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
                 <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                   <Compass className="w-5 h-5 text-red-400 shrink-0" />
-                  <span>6. Auto-Alignment of Do (Diatonic Key Tracking)</span>
+                  <span>7. Auto-Alignment of Do (Diatonic Key Tracking)</span>
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300">
                   When <strong>Auto-Alignment</strong> is enabled in the settings or header toolbar, the engine continuously monitors incoming notes over an organic time decay window. It calculates diatonic correlation scores against all 12 candidate tonics and automatically rotates Do to match the musical key of the song in real time.
                 </p>
               </div>
 
-              {/* Concept 7: Acoustic Overtone Series & Harmonic Waves */}
+              {/* Concept 8: Acoustic Overtone Series & Harmonic Waves */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Activity className="w-5 h-5 text-cyan-400 shrink-0" />
-                    <span>7. Acoustic Overtone Series &amp; Fluid Waves</span>
+                    <span>8. Acoustic Overtone Series &amp; Fluid Waves</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/60 self-start sm:self-auto">
                     Partials 1× to 7× &bull; Plomp-Levelt Curve
@@ -528,12 +602,12 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 </div>
               </div>
 
-              {/* Concept 8: The Philosophy of PPT Geometric Noteheads */}
+              {/* Concept 9: The Philosophy of PPT Geometric Noteheads */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
-                    <span>8. The Philosophy of PPT Geometric Noteheads</span>
+                    <span>9. The Philosophy of PPT Geometric Noteheads</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 self-start sm:self-auto">
                     Form Follows Harmonic Function
@@ -552,12 +626,12 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <PptNoteheadDiagram />
               </div>
 
-              {/* Concept 9: Staff Stream Notation & Conveyor Architecture */}
+              {/* Concept 10: Staff Stream Notation & Conveyor Architecture */}
               <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                     <Music className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <span>9. Staff Stream Notation &amp; Conveyor Architecture</span>
+                    <span>10. Staff Stream Notation &amp; Conveyor Architecture</span>
                   </h3>
                   <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 self-start sm:self-auto">
                     Kinetic Notation &bull; Diatonic Staves
