@@ -2472,6 +2472,7 @@ test('PPT Noteheads: Taxonomy of 12 chromatic degrees matches shapes and Solfèg
 
   assert.strictEqual(PPT_NOTEHEAD_SPECS[8].shape, 'triangle-down');
   assert.strictEqual(PPT_NOTEHEAD_SPECS[8].colorHex, '#5300A4'); // Le/Si
+  assert.strictEqual(PPT_NOTEHEAD_SPECS[8].neonColorHex, '#C084FC'); // Le/Si neon violet
   assert.strictEqual(PPT_NOTEHEAD_SPECS[8].semitone, 8);
 
   assert.strictEqual(PPT_NOTEHEAD_SPECS[9].shape, 'triangle-up');
@@ -2865,9 +2866,13 @@ test('PPT Noteheads: Outline colour indicates physical piano key (white or black
   renderPptNoteOnCanvas(mockCtx, 0, 100, 100, 20, 0, false, false, false);
   assert.strictEqual(capturedStrokeStyle, '#ffffff', 'White piano key must have white outline');
 
-  // 2. Black piano key notehead -> Black outline (#090d16)
+  // 2. Black piano key notehead -> Luminous neon Solfège outline (e.g. #FB923C for semitone 1 Ra)
   renderPptNoteOnCanvas(mockCtx, 1, 100, 100, 20, 0, false, false, true);
-  assert.strictEqual(capturedStrokeStyle, '#090d16', 'Black piano key must have black outline');
+  assert.strictEqual(capturedStrokeStyle, '#FB923C', 'Black piano key Ra must have neon orange outline');
+
+  // 3. Minor 6th (semitone 8 Le) on black key -> Radiant neon violet outline (#C084FC)
+  renderPptNoteOnCanvas(mockCtx, 8, 100, 100, 20, 0, false, false, true);
+  assert.strictEqual(capturedStrokeStyle, '#C084FC', 'Black piano key Le must have neon violet outline');
 });
 
 test('Staff Stream: Mode-specific accidentals, key signatures, and timing alignment', () => {

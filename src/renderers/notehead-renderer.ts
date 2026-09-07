@@ -25,7 +25,8 @@ export function drawPptNotehead(
   outlineColor: string = '#0b0d13',
   isHighContrast: boolean = false,
   outlineWidth: number = 2.0,
-  hasCenterDot: boolean = false
+  hasCenterDot: boolean = false,
+  centerDotColor: string = '#090d16'
 ): void {
   const isFi = colorHex === '#141414' || colorHex.toLowerCase() === '#141414';
   const radius = size * 0.5;
@@ -59,11 +60,11 @@ export function drawPptNotehead(
       ctx.lineWidth = Math.max(2.2, outlineWidth);
       ctx.stroke();
     } else {
-      // Canonical Fi: Charcoal/obsidian with sleek slate boundary
+      // Neon or canonical Fi: charcoal/obsidian fill with neon outline
       ctx.fillStyle = '#141414';
       ctx.fill();
-      ctx.strokeStyle = '#94a3b8';
-      ctx.lineWidth = Math.max(2.0, outlineWidth * 1.2);
+      ctx.strokeStyle = outlineColor;
+      ctx.lineWidth = Math.max(2.2, outlineWidth);
       ctx.stroke();
     }
   } else {
@@ -82,12 +83,12 @@ export function drawPptNotehead(
     drawFiCrossLines(ctx, radius, isFi && isHighContrast ? '#0f172a' : (isFi ? '#f8fafc' : '#ffffff'));
   }
 
-  // Draw black center dot for black piano keys to clearly distinguish them
+  // Draw center pip for black piano keys
   if (hasCenterDot) {
-    const dotRadius = Math.max(2.0, radius * 0.28);
+    const dotRadius = Math.max(2.0, radius * 0.26);
     ctx.beginPath();
     ctx.arc(0, 0, dotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#090d16';
+    ctx.fillStyle = centerDotColor;
     ctx.fill();
   }
 
@@ -258,9 +259,9 @@ export function drawAccidental(
 
 /**
  * Renders a complete PPT note onset with notehead, optional accidental, and high-contrast outline.
- * The outline color indicates whether the underlying piano key is white or black:
- * - White outline for white piano keys (C, D, E, F, G, A, B).
- * - Black outline for black piano keys (C#, D#, F#, G#, A#).
+ * The outline and body styling indicate whether the underlying piano key is white or black:
+ * - White piano keys (C, D, E, F, G, A, B): Solid Solfège fill with crisp white outline (#ffffff).
+ * - Black piano keys (C#, D#, F#, G#, A#): Deep obsidian body (#090d16) with luminous neon Solfège outline and neon centre pip.
  */
 export function renderPptNoteOnCanvas(
   ctx: CanvasRenderingContext2D,
@@ -274,29 +275,47 @@ export function renderPptNoteOnCanvas(
   isBlackKey?: boolean
 ): void {
   const spec = getPptNoteheadSpec(semitoneFromTonic);
+  const neonColor = spec.neonColorHex || spec.colorHex;
 
-  // Derive piano key outline colour
+  // Derive piano key styling
   let outlineColor = '#0b0d13';
+  let fillColor = spec.colorHex;
+  let outlineWidth = 2.0;
+  let hasCenterDot = false;
+  let centerDotColor = '#090d16';
+
   if (isBlackKey === true) {
-    outlineColor = '#090d16';
+    // Black piano key: Deep obsidian body with radiant neon Solfège outline & neon centre pip
+    outlineColor = neonColor;
+    fillColor = '#090d16';
+    outlineWidth = 2.4;
+    hasCenterDot = true;
+    centerDotColor = neonColor;
   } else if (isBlackKey === false) {
+    // White piano key: Solid Solfège fill with crisp white outline
     outlineColor = '#ffffff';
+    fillColor = spec.colorHex;
+    outlineWidth = 2.0;
+    hasCenterDot = false;
   } else if (isHighContrast) {
     outlineColor = '#ffffff';
+    fillColor = spec.colorHex;
+    outlineWidth = 2.5;
   }
 
-  // Render notehead with black dot in center for black piano keys
+  // Render notehead
   drawPptNotehead(
     ctx,
     spec.shape,
     cx,
     cy,
     size,
-    spec.colorHex,
+    fillColor,
     outlineColor,
     isHighContrast && isBlackKey === undefined,
-    2.2,
-    isBlackKey === true
+    outlineWidth,
+    hasCenterDot,
+    centerDotColor
   );
 
   // Render accidental if required, with strict kerning margin preventing any overlap

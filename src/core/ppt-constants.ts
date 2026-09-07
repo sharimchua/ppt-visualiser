@@ -282,6 +282,7 @@ export interface PptNoteheadSpec {
   syllable: string;
   shape: PptNoteheadShape;
   colorHex: string;
+  neonColorHex: string;
 }
 
 /**
@@ -301,18 +302,18 @@ export interface PptNoteheadSpec {
  * - Ti (11): Square
  */
 export const PPT_NOTEHEAD_SPECS: PptNoteheadSpec[] = [
-  { semitone: 0, syllable: 'Do', shape: 'circle', colorHex: '#E13610' },
-  { semitone: 1, syllable: 'Ra', shape: 'diamond', colorHex: '#F98016' },
-  { semitone: 2, syllable: 'Re', shape: 'square', colorHex: '#F98016' },
-  { semitone: 3, syllable: 'Me', shape: 'triangle-down', colorHex: '#F5D432' },
-  { semitone: 4, syllable: 'Mi', shape: 'triangle-up', colorHex: '#F5D432' },
-  { semitone: 5, syllable: 'Fa', shape: 'semicircle-left', colorHex: '#43A440' },
-  { semitone: 6, syllable: 'Fi', shape: 'cross', colorHex: '#141414' },
-  { semitone: 7, syllable: 'So', shape: 'semicircle-right', colorHex: '#0032A4' },
-  { semitone: 8, syllable: 'Le', shape: 'triangle-down', colorHex: '#5300A4' },
-  { semitone: 9, syllable: 'La', shape: 'triangle-up', colorHex: '#5300A4' },
-  { semitone: 10, syllable: 'Te', shape: 'diamond', colorHex: '#F158A4' },
-  { semitone: 11, syllable: 'Ti', shape: 'square', colorHex: '#F158A4' },
+  { semitone: 0, syllable: 'Do', shape: 'circle', colorHex: '#E13610', neonColorHex: '#FF4D4D' },
+  { semitone: 1, syllable: 'Ra', shape: 'diamond', colorHex: '#F98016', neonColorHex: '#FB923C' },
+  { semitone: 2, syllable: 'Re', shape: 'square', colorHex: '#F98016', neonColorHex: '#FB923C' },
+  { semitone: 3, syllable: 'Me', shape: 'triangle-down', colorHex: '#F5D432', neonColorHex: '#FDE047' },
+  { semitone: 4, syllable: 'Mi', shape: 'triangle-up', colorHex: '#F5D432', neonColorHex: '#FDE047' },
+  { semitone: 5, syllable: 'Fa', shape: 'semicircle-left', colorHex: '#43A440', neonColorHex: '#4ADE80' },
+  { semitone: 6, syllable: 'Fi', shape: 'cross', colorHex: '#141414', neonColorHex: '#38BDF8' },
+  { semitone: 7, syllable: 'So', shape: 'semicircle-right', colorHex: '#0032A4', neonColorHex: '#60A5FA' },
+  { semitone: 8, syllable: 'Le', shape: 'triangle-down', colorHex: '#5300A4', neonColorHex: '#C084FC' },
+  { semitone: 9, syllable: 'La', shape: 'triangle-up', colorHex: '#5300A4', neonColorHex: '#C084FC' },
+  { semitone: 10, syllable: 'Te', shape: 'diamond', colorHex: '#F158A4', neonColorHex: '#F472B6' },
+  { semitone: 11, syllable: 'Ti', shape: 'square', colorHex: '#F158A4', neonColorHex: '#F472B6' },
 ];
 
 /**

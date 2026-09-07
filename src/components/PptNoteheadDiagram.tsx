@@ -4,6 +4,7 @@ import { PPT_NOTEHEAD_SPECS, PptNoteheadShape } from '../core/ppt-constants';
 interface NoteheadVectorProps {
   shape: PptNoteheadShape;
   colorHex: string;
+  neonColorHex?: string;
   size?: number;
   isBlackKey?: boolean;
   className?: string;
@@ -12,13 +13,15 @@ interface NoteheadVectorProps {
 export const NoteheadVector: React.FC<NoteheadVectorProps> = ({
   shape,
   colorHex,
+  neonColorHex,
   size = 36,
   isBlackKey = false,
   className = '',
 }) => {
   const isFi = colorHex.toLowerCase() === '#141414';
-  const fillColor = isFi ? '#141414' : colorHex;
-  const outlineColor = isBlackKey ? '#090d16' : (isFi ? '#ffffff' : '#ffffff');
+  const neon = neonColorHex || '#C084FC';
+  const fillColor = isBlackKey ? '#090d16' : (isFi ? '#141414' : colorHex);
+  const outlineColor = isBlackKey ? neon : (isFi ? '#ffffff' : '#ffffff');
   const outlineWidth = isBlackKey ? 2.5 : 2.0;
 
   const renderShape = () => {
@@ -136,7 +139,7 @@ export const NoteheadVector: React.FC<NoteheadVectorProps> = ({
     >
       {renderShape()}
       {isBlackKey && (
-        <circle cx="0" cy="0" r="4.2" fill="#090d16" />
+        <circle cx="0" cy="0" r="3.6" fill={neon} />
       )}
     </svg>
   );
@@ -293,6 +296,7 @@ export const PptNoteheadDiagram: React.FC = () => {
                   <NoteheadVector
                     shape={spec.shape}
                     colorHex={spec.colorHex}
+                    neonColorHex={spec.neonColorHex}
                     size={28}
                     isBlackKey={showBlackKeyStyle}
                   />
@@ -317,6 +321,7 @@ export const PptNoteheadDiagram: React.FC = () => {
               <NoteheadVector
                 shape={activeSpec.shape}
                 colorHex={activeSpec.colorHex}
+                neonColorHex={activeSpec.neonColorHex}
                 size={42}
                 isBlackKey={showBlackKeyStyle}
               />
@@ -353,20 +358,20 @@ export const PptNoteheadDiagram: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
           <div className="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 flex items-center gap-3">
             <div className="p-1.5 rounded bg-slate-950 border border-slate-800">
-              <NoteheadVector shape="circle" colorHex="#E13610" size={26} isBlackKey={false} />
+              <NoteheadVector shape="circle" colorHex="#E13610" neonColorHex="#FF4D4D" size={26} isBlackKey={false} />
             </div>
             <div className="text-[11px]">
               <strong className="text-white block">White Piano Key</strong>
-              <span className="text-slate-400">Pure white boundary outline (`#ffffff`).</span>
+              <span className="text-slate-400">Solid Solfège fill with crisp white boundary outline (`#ffffff`).</span>
             </div>
           </div>
           <div className="bg-slate-900/70 p-2.5 rounded-lg border border-slate-800 flex items-center gap-3">
             <div className="p-1.5 rounded bg-slate-950 border border-slate-800">
-              <NoteheadVector shape="circle" colorHex="#E13610" size={26} isBlackKey={true} />
+              <NoteheadVector shape="circle" colorHex="#E13610" neonColorHex="#FF4D4D" size={26} isBlackKey={true} />
             </div>
             <div className="text-[11px]">
               <strong className="text-white block">Black Piano Key</strong>
-              <span className="text-slate-400">Black boundary outline with solid black centre dot (`#090d16`).</span>
+              <span className="text-slate-400">Deep obsidian body (`#090d16`) with luminous neon Solfège outline and radiant centre pip.</span>
             </div>
           </div>
         </div>
