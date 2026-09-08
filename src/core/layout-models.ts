@@ -232,7 +232,7 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
         id: 'container-sig-bottom',
         type: 'container',
         direction: 'row',
-        flex: 1,
+        flex: 1.5,
         gap: 8,
         children: [
           {
@@ -240,6 +240,7 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
             type: 'cell',
             module: 'triangles',
             flex: 1,
+            minSize: 90,
             title: 'Piano Triangles',
           },
           {
@@ -247,6 +248,7 @@ export const PRESET_SIGNATURE: LayoutDefinition = {
             type: 'cell',
             module: 'overtones',
             flex: 1,
+            minSize: 90,
             title: 'Overtone Waves',
             configOverrides: {
               showDissonanceCurve: true,

@@ -3572,3 +3572,38 @@ test('CosmeticsEngine: getActiveShockwaves prioritises freshest and highest alph
   assert.ok(xPositions.includes(777), 'Vibrant shockwave at 777 must be prioritised');
   assert.ok(xPositions.includes(999), 'Vibrant shockwave at 999 must be prioritised');
 });
+
+test('Layout Models: PRESET_SIGNATURE preserves prominent desktop orbital weight and defensive minSize', () => {
+  const root = PRESET_SIGNATURE.root;
+  assert.strictEqual(root.type, 'container');
+  assert.strictEqual(root.children.length, 2);
+
+  // Orbital clock maintains prominent desktop weighting
+  const clockCell = root.children[0];
+  assert.strictEqual(clockCell.type, 'cell');
+  assert.strictEqual((clockCell as any).module, 'orbital');
+  assert.strictEqual((clockCell as any).flex, 3, 'Orbital clock must maintain prominent weight 3 on desktop');
+
+  // Bottom container provides balanced space for companion cells
+  const bottomContainer = root.children[1];
+  assert.strictEqual(bottomContainer.type, 'container');
+  assert.strictEqual((bottomContainer as any).flex, 1.5, 'Bottom container flex must be 1.5');
+  assert.strictEqual((bottomContainer as any).children.length, 2);
+
+  const trianglesCell = (bottomContainer as any).children[0];
+  const overtonesCell = (bottomContainer as any).children[1];
+  assert.strictEqual(trianglesCell.minSize, 90, 'Triangles cell must have minSize 90 to prevent squeeze-out');
+  assert.strictEqual(overtonesCell.minSize, 90, 'Overtones cell must have minSize 90 to prevent squeeze-out');
+
+  // URL slug round-trip
+  const slug = encodeLayoutToSlug(PRESET_SIGNATURE, false);
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded);
+  assert.strictEqual(decoded.layout.id, 'signature');
+  const decodedCells = getAllCellNodes(decoded.layout.root);
+  assert.strictEqual(decodedCells.length, 3);
+  assert.strictEqual(decodedCells[0].flex, 3);
+  assert.strictEqual(decodedCells[1].minSize, 90);
+  assert.strictEqual(decodedCells[2].minSize, 90);
+});
+

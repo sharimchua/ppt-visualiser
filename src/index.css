@@ -34,3 +34,29 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.6);
 }
+
+/* Responsive Multi-Cell Layout Engine */
+.layout-flex-node {
+  /* Default desktop: full configured flex weight */
+  --weight-spread: 1;
+  flex-grow: calc(1 + (var(--node-flex, 1) - 1) * var(--weight-spread, 1));
+  flex-shrink: 1;
+  flex-basis: 0%;
+}
+
+/* Compact viewports / tablet breakpoints or constrained viewport height */
+@media (max-width: 768px), (max-height: 640px) {
+  .layout-flex-node {
+    /* Smoothly moderate imbalanced weights (e.g. flex 3 becomes ~1.9, flex 2 becomes ~1.45) */
+    --weight-spread: 0.45;
+  }
+}
+
+/* Mobile viewports (< 640px) or very low height (< 520px) */
+@media (max-width: 640px), (max-height: 520px) {
+  .layout-flex-node {
+    /* Compress weights to prevent squeezing out stacked companion cells */
+    --weight-spread: 0.2;
+  }
+}
+

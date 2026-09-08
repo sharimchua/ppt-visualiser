@@ -33,15 +33,14 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
   onDuplicateCell,
 }) => {
   if (node.type === 'cell') {
+    const minH = node.minSize ? Math.max(node.minSize, 96) : 96;
     return (
       <div
-        className="relative flex-1 min-w-0 min-h-0"
+        className="layout-flex-node relative min-w-0 min-h-0"
         style={{
-          flexGrow: node.flex ?? 1,
-          flexShrink: 1,
-          flexBasis: 0,
+          ['--node-flex' as any]: node.flex ?? 1,
           minWidth: node.minSize ? `${node.minSize}px` : undefined,
-          minHeight: node.minSize ? `${node.minSize}px` : undefined,
+          minHeight: `${minH}px`,
         }}
       >
         <CellViewport
@@ -64,13 +63,11 @@ export const FlexLayoutRenderer: React.FC<FlexLayoutRendererProps> = ({
   const isRow = node.direction === 'row';
   return (
     <div
-      className={`relative w-full h-full flex min-w-0 min-h-0 ${
+      className={`layout-flex-node relative w-full h-full flex min-w-0 min-h-0 ${
         isRow ? 'flex-col sm:flex-row' : 'flex-col'
       }`}
       style={{
-        flexGrow: node.flex ?? 1,
-        flexShrink: 1,
-        flexBasis: 0,
+        ['--node-flex' as any]: node.flex ?? 1,
         gap: `${node.gap ?? 8}px`,
       }}
     >
