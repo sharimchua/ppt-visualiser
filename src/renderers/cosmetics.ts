@@ -95,17 +95,33 @@ export class CosmeticsEngine {
   private grainJitterX: number = 0;
   private grainJitterY: number = 0;
 
+  public static readonly MAX_GPU_PARTICLES = 2048;
+
   private particles: KineticParticle[] = [];
   private shockwaves: ShockwaveRing[] = [];
   private ghosts: PhosphorGhost[] = [];
   private scanlinePatternMap: Map<number, CanvasPattern | null> = new Map();
 
-  // Preallocated GPU particle buffer: 512 particles * 8 floats
+  // Preallocated GPU particle buffer: 2048 particles * 8 floats
   // [x, y, radius, alpha, r, g, b, coreRatio] (zero per-frame GC allocations)
-  private gpuParticleBuffer = new Float32Array(512 * 8);
+  private gpuParticleBuffer = new Float32Array(CosmeticsEngine.MAX_GPU_PARTICLES * 8);
 
   constructor() {
     this.initGrain();
+  }
+
+  /**
+   * Ensures particle pool capacity does not exceed the GPU point sprite buffer ceiling.
+   * Evicts the oldest/lowest-alpha particles when incoming bursts exceed buffer capacity,
+   * guaranteeing that newly struck notes always receive immediate rendering priority with zero starvation.
+   */
+  private ensureParticleCapacity(needed: number): void {
+    const max = CosmeticsEngine.MAX_GPU_PARTICLES;
+    const overflow = (this.particles.length + needed) - max;
+    if (overflow > 0) {
+      const pruneCount = Math.min(this.particles.length, overflow);
+      this.particles.splice(0, pruneCount);
+    }
   }
 
   /**
@@ -193,6 +209,7 @@ export class CosmeticsEngine {
     radialAngle: number = 0
   ) {
     const totalCount = Math.max(2, Math.round(baseCount * volumeMultiplier * (0.6 + velocity * 0.8)));
+    this.ensureParticleCapacity(totalCount);
 
     // Origin position offset along radial angle or ring
     const originX = originDistance > 0 ? cx + originDistance * Math.cos(radialAngle) : cx;
@@ -241,6 +258,7 @@ export class CosmeticsEngine {
     gravityMultiplier: number = 1.0
   ): void {
     const totalCount = Math.max(2, Math.round(count * (0.6 + velocity * 0.8)));
+    this.ensureParticleCapacity(totalCount);
 
     for (let i = 0; i < totalCount; i++) {
       // Fan cone around baseAngle
@@ -285,6 +303,7 @@ export class CosmeticsEngine {
 
     // Dynamic droplet count: scales expressively with note velocity
     const totalCount = Math.max(3, Math.round(count * (0.35 + Math.pow(clampedVel, 1.1) * 0.95)));
+    this.ensureParticleCapacity(totalCount);
 
     // Ejection impulse strongly governed by note velocity:
     // Soft touches produce a gentle, bubbling lift; hard strikes erupt into a high-energy geyser
@@ -371,6 +390,7 @@ export class CosmeticsEngine {
 
     // 3. Solfège harmonic dissipation particles spraying westward (-X) and vertically
     const particleCount = 12;
+    this.ensureParticleCapacity(particleCount);
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.PI + (Math.random() - 0.5) * (Math.PI * 0.7); // Wide westward fan
       const speed = Math.random() * 3.2 + 1.0;
@@ -473,6 +493,7 @@ export class CosmeticsEngine {
 
     // 3. Spawns kinetic orbital particles with angular momentum
     const particleCount = 28;
+    this.ensureParticleCapacity(particleCount);
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
       const speed = Math.random() * 3.5 + 1.8;
@@ -587,7 +608,7 @@ export class CosmeticsEngine {
    * for zero-allocation WebGL point sprite upload.
    */
   public getParticleGpuData(): { buffer: Float32Array; count: number } {
-    const count = Math.min(512, this.particles.length);
+    const count = Math.min(CosmeticsEngine.MAX_GPU_PARTICLES, this.particles.length);
     for (let i = 0; i < count; i++) {
       const p = this.particles[i];
       const baseIdx = i * 8;
@@ -609,10 +630,15 @@ export class CosmeticsEngine {
    * Retrieves active shockwaves formatted for GPU fragment shader rendering.
    */
   public getActiveShockwaves(): Array<{ x: number; y: number; radius: number; alpha: number; colorHex: string }> {
-    const count = Math.min(4, this.shockwaves.length);
+    // Prioritise highest-alpha / freshest shockwaves if polyphonic density exceeds fragment shader limit
+    let candidates = this.shockwaves;
+    if (this.shockwaves.length > 4) {
+      candidates = [...this.shockwaves].sort((a, b) => b.alpha - a.alpha);
+    }
+    const count = Math.min(4, candidates.length);
     const list: Array<{ x: number; y: number; radius: number; alpha: number; colorHex: string }> = [];
     for (let i = 0; i < count; i++) {
-      const sw = this.shockwaves[i];
+      const sw = candidates[i];
       list.push({
         x: sw.x,
         y: sw.y,

@@ -685,17 +685,18 @@ export class RenderCoordinator {
             effConfig
           );
 
-          // Spray east (+X): angle 0, cone spread Math.PI * 0.65
+          // Spray east (+X): angle 0, cone spread Math.PI * 0.75 (~135 deg fan)
+          const volumeMult = this.config.particleVolume ?? 1.0;
           this.cosmeticsEngine.spawnDirectionalSparks(
             playhead.x,
             playhead.y,
             spec.colorHex,
             velocity,
             0,
-            Math.PI * 0.65,
-            Math.round(18 * this.config.particleIntensity),
+            Math.PI * 0.75,
+            Math.round(18 * this.config.particleIntensity * volumeMult),
+            1.0,
             this.config.particleSize,
-            this.config.particleVolume,
             this.config.particleGravity
           );
         } else if (cell.module === 'triangles') {

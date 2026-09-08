@@ -3171,7 +3171,7 @@ test('GPU Offloading & Zero-Thrashing Bounding Rect Cache', () => {
   const { buffer, count } = cosmetics.getParticleGpuData();
   assert.ok(count >= 10);
   assert.ok(buffer instanceof Float32Array);
-  assert.strictEqual(buffer.length, 512 * 8);
+  assert.strictEqual(buffer.length, CosmeticsEngine.MAX_GPU_PARTICLES * 8);
   // Verify first particle x, y, radius, alpha
   assert.strictEqual(buffer[0], 100);
   assert.strictEqual(buffer[1], 100);
@@ -3244,7 +3244,7 @@ test('CosmeticsEngine: spawnFluidDroplets physics and upward ballistic projectil
 
   // Verify particles stream into GPU buffer
   assert.ok(buffer instanceof Float32Array);
-  assert.strictEqual(buffer.length, 512 * 8);
+  assert.strictEqual(buffer.length, CosmeticsEngine.MAX_GPU_PARTICLES * 8);
 
   // Update physics step to verify ballistic gravity arc (downward acceleration)
   cosmetics.update();
@@ -3509,4 +3509,66 @@ test('Note Activation Shockwaves: Smooth Expansion and Hann Cosine Dissolve with
   // Shockwave must be gracefully pruned only when alpha has completed its dissolution
   const activeFinal = cosmetics.getActiveShockwaves();
   assert.strictEqual(activeFinal.length, 0, 'Shockwave should be pruned gracefully after duration completes');
+});
+
+test('CosmeticsEngine: 2048 GPU particle capacity and FIFO starvation prevention during rapid note bursts', () => {
+  const cosmetics = new CosmeticsEngine();
+
+  // Verify initial buffer contract (2048 point sprites * 8 floats)
+  const initialGpu = cosmetics.getParticleGpuData();
+  assert.strictEqual(initialGpu.buffer.length, CosmeticsEngine.MAX_GPU_PARTICLES * 8);
+  assert.strictEqual(initialGpu.count, 0);
+
+  // Simulate a rapid burst of 150 consecutive high-velocity note strikes
+  // Each strike spawns ~20-25 particles across multiple modules (totaling ~3,500 particles)
+  for (let strike = 0; strike < 150; strike++) {
+    cosmetics.spawnNoteSparks(100, 100, '#E13610', 0.95, 20);
+  }
+
+  // Verify that active particle count is safely bounded by MAX_GPU_PARTICLES (2048)
+  const cappedGpu = cosmetics.getParticleGpuData();
+  assert.strictEqual(cappedGpu.count, CosmeticsEngine.MAX_GPU_PARTICLES);
+
+  // Now spawn a distinctive Staff Stream directional spark burst with unique coordinates and colour
+  const uniqueX = 888;
+  const uniqueY = 444;
+  const uniqueColour = '#38BDF8';
+  cosmetics.spawnDirectionalSparks(uniqueX, uniqueY, uniqueColour, 0.9, 0, Math.PI * 0.75, 20, 1.0, 1.2, 0.15);
+
+  // Verify that fresh directional sparks immediately appear in the GPU buffer (zero starvation)
+  const updatedGpu = cosmetics.getParticleGpuData();
+  assert.strictEqual(updatedGpu.count, CosmeticsEngine.MAX_GPU_PARTICLES);
+
+  // The last particle in the buffer must be from our newly spawned directional burst
+  const lastBaseIdx = (updatedGpu.count - 1) * 8;
+  assert.strictEqual(updatedGpu.buffer[lastBaseIdx + 0], uniqueX, 'Newly spawned particle X must be present at buffer end');
+  assert.strictEqual(updatedGpu.buffer[lastBaseIdx + 1], uniqueY, 'Newly spawned particle Y must be present at buffer end');
+  assert.strictEqual(updatedGpu.buffer[lastBaseIdx + 3], 1.0, 'Newly spawned particle alpha must be 1.0');
+});
+
+test('CosmeticsEngine: getActiveShockwaves prioritises freshest and highest alpha wavefronts when polyphony > 4', () => {
+  const cosmetics = new CosmeticsEngine();
+
+  // Spawn 6 shockwaves sequentially
+  cosmetics.spawnShockwave(100, 100, '#E13610', 80, 1.0, 1.0, 500);
+  cosmetics.spawnShockwave(120, 120, '#E13610', 80, 1.0, 1.0, 500);
+  cosmetics.spawnShockwave(140, 140, '#E13610', 80, 1.0, 1.0, 500);
+  cosmetics.spawnShockwave(160, 160, '#E13610', 80, 1.0, 1.0, 500);
+
+  // Advance simulation so earlier shockwaves decay in alpha
+  for (let i = 0; i < 15; i++) {
+    cosmetics.update(16.66);
+  }
+
+  // Spawn 2 new vibrant shockwaves with alpha ~0.88 at distinct locations
+  cosmetics.spawnShockwave(777, 777, '#38BDF8', 90, 1.0, 1.0, 600);
+  cosmetics.spawnShockwave(999, 999, '#F5D432', 90, 1.0, 1.0, 600);
+
+  const activeSw = cosmetics.getActiveShockwaves();
+  assert.strictEqual(activeSw.length, 4, 'GPU shader must receive exactly 4 shockwaves');
+
+  // The newly spawned high-alpha shockwaves must be prioritised in the top 4 candidates
+  const xPositions = activeSw.map((sw) => sw.x);
+  assert.ok(xPositions.includes(777), 'Vibrant shockwave at 777 must be prioritised');
+  assert.ok(xPositions.includes(999), 'Vibrant shockwave at 999 must be prioritised');
 });
