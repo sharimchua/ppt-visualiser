@@ -152,6 +152,42 @@ export function computeSatbVoiceLeading(
   return pairs;
 }
 
+/**
+ * Resolves the active Solfège semitone degree (0..11) for a stream item,
+ * honouring the item's recorded context (semitone / tonic) or reconstructing
+ * it from timeline tonic shift markers so historical noteheads never change
+ * retrospectively upon manual or automatic tonic modulation.
+ */
+export function resolveItemSemitoneFromTonic(
+  item: StreamItem,
+  currentTonic: number,
+  tonicMarkers: TonicShiftMarker[] = []
+): number {
+  if (item.semitone !== undefined) {
+    return ((item.semitone % 12) + 12) % 12;
+  }
+  const pc = item.pitchClass ?? (item.midi % 12);
+  if (item.tonic !== undefined) {
+    return ((pc - item.tonic) % 12 + 12) % 12;
+  }
+  // Reconstruct tonic context from timeline tonic shift markers
+  if (tonicMarkers.length > 0) {
+    let effectiveTonic: number | null = null;
+    for (let i = tonicMarkers.length - 1; i >= 0; i--) {
+      const marker = tonicMarkers[i];
+      if (item.timestamp >= marker.timestamp) {
+        effectiveTonic = marker.newTonic;
+        break;
+      }
+    }
+    if (effectiveTonic === null) {
+      effectiveTonic = tonicMarkers[0].oldTonic;
+    }
+    return ((pc - effectiveTonic) % 12 + 12) % 12;
+  }
+  return ((pc - currentTonic) % 12 + 12) % 12;
+}
+
 // Standard staff line/space step positions from bottom line (Line 1 = 0, Space 1 = 0.5, Line 2 = 1.0, ..., Line 5 = 4.0)
 export const TREBLE_KEY_SIG_SHARPS = [4.0, 2.5, 4.5, 3.0, 1.5, 3.5, 2.0]; // F5, C5, G5, D5, A4, E5, B4
 export const TREBLE_KEY_SIG_FLATS  = [2.0, 3.5, 1.5, 3.0, 1.0, 2.5, 0.5]; // Bb4, Eb5, Ab4, Db5, Gb4, Cb5, Fb4
@@ -923,8 +959,8 @@ export class StaffStreamRenderer {
         // Draw ledger lines
         this.drawLedgerLines(ctx, noteX, note.diatonicStep, geom, isGrand, noteSize);
 
-        // Draw notehead
-        const semitoneFromTonic = ((item.pitchClass - config.tonic) % 12 + 12) % 12;
+        // Draw notehead (consistent Solfège head for played notes in their tonic context)
+        const semitoneFromTonic = resolveItemSemitoneFromTonic(item, config.tonic, tonicMarkers);
         const showAccidental = !config.showKeySignature && note.accidental !== 0;
         const isBlackKey = isBlackPianoKey(item.pitchClass);
 
@@ -1126,7 +1162,7 @@ export class StaffStreamRenderer {
 
         // Render PPT Notehead: in continuous mode, no accidentals are rendered
         const pc = item.pitchClass ?? (item.midi % 12);
-        const semitoneFromTonic = ((pc - config.tonic) % 12 + 12) % 12;
+        const semitoneFromTonic = resolveItemSemitoneFromTonic(item, config.tonic, tonicMarkers);
         const isBlackKey = isBlackPianoKey(pc);
 
         if (squishX < 0.98) {

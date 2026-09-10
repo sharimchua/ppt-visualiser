@@ -50,6 +50,8 @@ export interface StreamItem {
   pianoTriangle: PianoTriangleInfo;
   glyphType: GlyphType;
   rotation: GlyphRotation;
+  tonic?: number; // Tonic context when note was played (0..11)
+  semitone?: number; // Semitone offset from tonic when note was played (0..11)
 }
 
 export interface TonicShiftMarker {

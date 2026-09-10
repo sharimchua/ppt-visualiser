@@ -88,8 +88,9 @@ import {
   BASS_KEY_SIG_SHARPS,
   BASS_KEY_SIG_FLATS,
   StaffStreamRenderer,
+  resolveItemSemitoneFromTonic,
 } from '../renderers/staff-stream-canvas';
-import { StreamItem } from './types';
+import { StreamItem, TonicShiftMarker } from './types';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -3605,5 +3606,171 @@ test('Layout Models: PRESET_SIGNATURE preserves prominent desktop orbital weight
   assert.strictEqual(decodedCells[0].flex, 3);
   assert.strictEqual(decodedCells[1].minSize, 90);
   assert.strictEqual(decodedCells[2].minSize, 90);
+});
+
+test('Staff Stream Solfege Noteheads: resolveItemSemitoneFromTonic preserves context and timeline modulation consistency', () => {
+  const baseItem: StreamItem = {
+    id: 'item-c4',
+    midi: 60,
+    pitchClass: 0,
+    octave: 4,
+    velocity: 0.8,
+    timestamp: 5.0,
+    colorHex: '#E13610',
+    solfege: 'Do',
+    pitchName: 'C',
+    interval: 'P1',
+    pianoTriangle: { triangle: 'R', point: 3 },
+    glyphType: 'base',
+    rotation: 0,
+  };
+
+  // 1. When item has explicit semitone recorded (e.g. Do = 0 under initial tonic C)
+  const itemWithSemitone: StreamItem = { ...baseItem, semitone: 0, tonic: 0 };
+  // Even if active tonic modulates to G (7), E (4), etc., semitone remains 0 (Do)
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemWithSemitone, 7, []), 0, 'Explicit semitone must be preserved regardless of active tonic');
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemWithSemitone, 4, []), 0);
+
+  // 2. When item has explicit tonic recorded without semitone
+  const itemWithTonicOnly: StreamItem = { ...baseItem, tonic: 0 };
+  // Pitch class 0 (C) with recorded tonic 0 (C) -> semitone 0
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemWithTonicOnly, 7, []), 0, 'Item with recorded tonic must evaluate against its recorded tonic');
+
+  // 3. Reconstructing from timeline tonicMarkers when item lacks recorded tonic/semitone
+  const markers: TonicShiftMarker[] = [
+    { id: 'm1', oldTonic: 0, newTonic: 7, timestamp: 10.0, isAuto: false }, // C -> G at t=10s
+    { id: 'm2', oldTonic: 7, newTonic: 2, timestamp: 20.0, isAuto: true },  // G -> D at t=20s
+  ];
+
+  // Note played at t=5s (before m1): tonic was oldTonic of m1 = 0 (C). Pitch C(0) -> semitone 0 (Do)
+  const itemEarly: StreamItem = { ...baseItem, timestamp: 5.0 };
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemEarly, 2, markers), 0, 'Note before first marker must use earliest oldTonic');
+
+  // Note played at t=15s (between m1 and m2): tonic was newTonic of m1 = 7 (G). Pitch C(0) -> (0 - 7 + 12)%12 = 5 (Fa)
+  const itemMiddle: StreamItem = { ...baseItem, timestamp: 15.0 };
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemMiddle, 2, markers), 5, 'Note between markers must use preceding marker newTonic');
+
+  // Note played at t=25s (after m2): tonic was newTonic of m2 = 2 (D). Pitch C(0) -> (0 - 2 + 12)%12 = 10 (Te)
+  const itemLate: StreamItem = { ...baseItem, timestamp: 25.0 };
+  assert.strictEqual(resolveItemSemitoneFromTonic(itemLate, 2, markers), 10, 'Note after latest marker must use latest newTonic');
+
+  // 4. Fallback to active tonic when no markers or recorded context exist
+  assert.strictEqual(resolveItemSemitoneFromTonic(baseItem, 7, []), 5, 'Fallback without markers uses active tonic');
+});
+
+test('Staff Stream Solfege Noteheads: Historical played notes preserve notehead shape and colour across manual and automatic tonic changes', () => {
+  const coordinator = new RenderCoordinator({
+    ...DEFAULT_CONFIG,
+    tonic: 0, // Initial tonic: C (0)
+    streamMode: 'continuous',
+    staffStreamMode: 'continuous',
+  });
+
+  // 1. Strike note C4 (MIDI 60) under tonic C (0). C is Do (semitone 0).
+  coordinator.triggerNoteOn(60, 0.8);
+  assert.strictEqual(coordinator.streamItems.length, 1);
+  const note1 = coordinator.streamItems[0];
+  assert.strictEqual(note1.tonic, 0, 'Note 1 must record tonic C (0)');
+  assert.strictEqual(note1.semitone, 0, 'Note 1 must record semitone 0 (Do)');
+  assert.strictEqual(note1.colorHex, '#E13610', 'Note 1 must have Do colour #E13610');
+  assert.strictEqual(note1.solfege, 'Do');
+
+  // 2. Modulate tonic manually from C (0) to G (7)
+  coordinator.setConfig({
+    ...coordinator.getConfig(),
+    tonic: 7,
+  });
+
+  // Check that note 1 did NOT change retrospectively!
+  assert.strictEqual(note1.tonic, 0, 'Note 1 recorded tonic must remain 0');
+  assert.strictEqual(note1.semitone, 0, 'Note 1 recorded semitone must remain 0 (Do)');
+  assert.strictEqual(
+    resolveItemSemitoneFromTonic(note1, coordinator.getConfig().tonic, coordinator.tonicShiftMarkers),
+    0,
+    'Note 1 must resolve to semitone 0 (Do, circle, red) and not retrospectively mutate to Fa'
+  );
+
+  // 3. Strike note C4 (MIDI 60) again under new tonic G (7). Under G, C is Fa (semitone 5).
+  coordinator.triggerNoteOn(60, 0.8);
+  assert.strictEqual(coordinator.streamItems.length, 2);
+  const note2 = coordinator.streamItems[1];
+  assert.strictEqual(note2.tonic, 7, 'Note 2 must record new tonic G (7)');
+  assert.strictEqual(note2.semitone, 5, 'Note 2 must record semitone 5 (Fa)');
+  assert.strictEqual(note2.colorHex, '#43A440', 'Note 2 must have Fa colour #43A440');
+  assert.strictEqual(note2.solfege, 'Fa');
+
+  // Verify PPT notehead specifications:
+  // Note 1 (Do) -> Circle, Red (#E13610)
+  const spec1 = getPptNoteheadSpec(note1.semitone!);
+  assert.strictEqual(spec1.shape, 'circle');
+  assert.strictEqual(spec1.syllable, 'Do');
+
+  // Note 2 (Fa) -> Semicircle Left, Green (#43A440)
+  const spec2 = getPptNoteheadSpec(note2.semitone!);
+  assert.strictEqual(spec2.shape, 'semicircle-left');
+  assert.strictEqual(spec2.syllable, 'Fa');
+
+  // 4. Render through StaffStreamRenderer and verify drawing routines execute cleanly without error
+  const renderer = new StaffStreamRenderer();
+  const capturedFills: string[] = [];
+  const capturedShapes: string[] = [];
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    scale: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: () => { capturedShapes.push('arc'); },
+    rect: () => { capturedShapes.push('rect'); },
+    roundRect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    bezierCurveTo: () => { capturedShapes.push('bezier'); },
+    strokeRect: () => {},
+    fillRect: () => {},
+    clip: () => {},
+    fill: () => {},
+    stroke: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    set strokeStyle(_val: string) {},
+    set fillStyle(val: string) { capturedFills.push(val); },
+    get fillStyle() { return capturedFills[capturedFills.length - 1] || ''; },
+    lineWidth: 1,
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  // Render continuous mode
+  assert.doesNotThrow(() => {
+    renderer.render(
+      mockCtx,
+      0,
+      0,
+      800,
+      400,
+      coordinator.streamItems,
+      coordinator.getConfig(),
+      performance.now(),
+      coordinator.tonicShiftMarkers
+    );
+  }, 'StaffStreamRenderer continuous mode must render mixed-tonic stream without error');
+
+  // Render fixed queue mode
+  assert.doesNotThrow(() => {
+    renderer.render(
+      mockCtx,
+      0,
+      0,
+      800,
+      400,
+      coordinator.streamItems,
+      { ...coordinator.getConfig(), staffStreamMode: 'fixed' },
+      performance.now(),
+      coordinator.tonicShiftMarkers
+    );
+  }, 'StaffStreamRenderer fixed queue mode must render mixed-tonic stream without error');
+
+  coordinator.destroy();
 });
 

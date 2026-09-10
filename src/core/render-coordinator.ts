@@ -794,6 +794,8 @@ export class RenderCoordinator {
       pianoTriangle: ptInfo,
       glyphType: spec.glyphType,
       rotation: spec.rotation,
+      tonic: this.config.tonic,
+      semitone: res.semitone,
     };
 
     const nowSec = now / 1000;
