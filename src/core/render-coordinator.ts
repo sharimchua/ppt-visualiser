@@ -29,6 +29,9 @@ import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
 import { StaffStreamRenderer } from '../renderers/staff-stream-canvas';
 import { OvertonesRenderer } from '../renderers/overtones-canvas';
+import { RhythmOrbitRenderer } from '../renderers/rhythm-orbit-canvas';
+import { RhythmDebugRenderer } from '../renderers/rhythm-debug-canvas';
+import { RhythmEngine, RhythmAlignmentResult } from './rhythm-engine';
 import {
   WebGLPostProcessingPipeline,
   PostProcessingLight,
@@ -78,6 +81,10 @@ export class RenderCoordinator {
   public readonly streamRenderer: StreamRenderer;
   public readonly staffStreamRenderer: StaffStreamRenderer;
   public readonly overtonesRenderer: OvertonesRenderer;
+  public readonly rhythmOrbitRenderer: RhythmOrbitRenderer;
+  public readonly rhythmDebugRenderer: RhythmDebugRenderer;
+  public readonly rhythmEngine: RhythmEngine;
+  private latestRhythmAlignment: RhythmAlignmentResult | null = null;
 
   // WebGL Post-Processing Pipeline
   private postProcessingCanvas: HTMLCanvasElement | null = null;
@@ -158,6 +165,9 @@ export class RenderCoordinator {
     this.streamRenderer = new StreamRenderer();
     this.staffStreamRenderer = new StaffStreamRenderer();
     this.overtonesRenderer = new OvertonesRenderer();
+    this.rhythmOrbitRenderer = new RhythmOrbitRenderer();
+    this.rhythmDebugRenderer = new RhythmDebugRenderer();
+    this.rhythmEngine = new RhythmEngine(initialConfig.rhythmManualBpm ?? 120);
 
     // Propagate initial focusMode setting to engines
     const focusMode = initialConfig.focusModeEnabled ?? true;
@@ -327,6 +337,8 @@ export class RenderCoordinator {
     this.pitchClockRenderer.resetRevealsAndActivity();
     this.staffStreamRenderer.reset();
     this.scaleTracker.reset();
+    this.rhythmEngine.reset();
+    this.latestRhythmAlignment = null;
     for (const listener of this.activeNotesListeners) {
       listener(this.activeNotes);
     }
@@ -577,6 +589,9 @@ export class RenderCoordinator {
     // Remove from decaying notes if retriggered
     this.decayingNotes.delete(midi);
 
+    // Ingest onset into rhythm engine for tempo autodetection and orbit tracking
+    this.rhythmEngine.recordOnset(midi, velocity, now / 1000, this.config);
+
     // Spawn cosmetic particles using exact tone circle coordinates if available
     let sparkX: number;
     let sparkY: number;
@@ -774,6 +789,39 @@ export class RenderCoordinator {
               );
             }
           }
+        } else if (cell.module === 'rhythm-orbit') {
+          const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
+          const cellLeft = cellRect.left - overlayRect.left;
+          const cellTop = cellRect.top - overlayRect.top;
+          const coord = this.rhythmOrbitRenderer.getCoordinatesForMidi(midi);
+
+          if (coord) {
+            const rx = cellLeft + coord.x;
+            const ry = cellTop + coord.y;
+            if (sparksOn) {
+              this.cosmeticsEngine.spawnNoteSparks(
+                rx,
+                ry,
+                spec.colorHex,
+                velocity,
+                Math.round(14 * this.config.particleIntensity),
+                this.config.particleSize,
+                this.config.particleVolume,
+                this.config.particleGravity
+              );
+            }
+            if (shockwavesOn) {
+              this.cosmeticsEngine.spawnShockwave(
+                rx,
+                ry,
+                spec.colorHex,
+                35 + velocity * 20,
+                shockwaveRadiusMult,
+                shockwaveSpeedMult,
+                shockwaveDecayDuration
+              );
+            }
+          }
         }
       }
     }
@@ -913,6 +961,37 @@ export class RenderCoordinator {
       }
     }
 
+    // 2b. Tick rhythm engine and trigger kinetic tempo modulations
+    const rhythmAlign = this.rhythmEngine.update(now, this.config);
+    this.latestRhythmAlignment = rhythmAlign;
+    if (rhythmAlign.shouldShift && rhythmAlign.newBpm && rhythmAlign.shiftType) {
+      this.rhythmOrbitRenderer.triggerTempoShift(
+        rhythmAlign.currentBpm,
+        rhythmAlign.newBpm,
+        rhythmAlign.shiftType
+      );
+      // Spawn kinetic shockwave from rhythm orbit cell centre if arbitrary shift
+      if (rhythmAlign.shiftType === 'arbitrary' && (this.config.shockwavesEnabled !== false)) {
+        const targetRect = this.cachedTargetRect;
+        for (const cell of this.cellCanvases.values()) {
+          if (cell.module === 'rhythm-orbit' && cell.cachedRect && targetRect) {
+            const rx = (cell.cachedRect.left - targetRect.left) + cell.cachedRect.width / 2;
+            const ry = (cell.cachedRect.top - targetRect.top) + cell.cachedRect.height / 2;
+            this.cosmeticsEngine.spawnShockwave(
+              rx,
+              ry,
+              '#e13610',
+              Math.min(cell.cachedRect.width, cell.cachedRect.height) * 0.45,
+              1.2,
+              1.2,
+              800
+            );
+            break;
+          }
+        }
+      }
+    }
+
     // 3. Render all registered cell canvases in coordinated lockstep
     for (const cell of this.cellCanvases.values()) {
       const { canvas, ctx, module, configOverrides } = cell;
@@ -996,6 +1075,26 @@ export class RenderCoordinator {
             }
           }
         }
+      } else if (module === 'rhythm-orbit') {
+        this.rhythmOrbitRenderer.render(
+          ctx,
+          width,
+          height,
+          this.rhythmEngine,
+          effectiveConfig,
+          time,
+          this.latestRhythmAlignment ?? undefined
+        );
+      } else if (module === 'rhythm-debug') {
+        this.rhythmDebugRenderer.render(
+          ctx,
+          width,
+          height,
+          this.rhythmEngine,
+          effectiveConfig,
+          time,
+          this.latestRhythmAlignment ?? undefined
+        );
       } else if (module === 'staff-stream') {
         this.staffStreamRenderer.render(
           ctx,

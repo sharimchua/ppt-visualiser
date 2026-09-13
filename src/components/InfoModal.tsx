@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Info,
   Activity,
+  Timer,
   Play,
 } from 'lucide-react';
 import { PitchClockDiagram } from './PitchClockDiagram';
@@ -291,6 +292,16 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                   <p className="text-xs text-slate-300">
                     Horizontal right-to-left staff notation featuring PPT geometric noteheads, Solfège colours, dynamic clef selection, key signatures, and voice leading lines.
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    Rhythm Orbit
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    12-position polar rhythm clock with scanning hand, dynamic/fixed concentric pitch tracks, real-time tempo autodetection, and dual-tier metric modulation kinetics.
                   </p>
                 </div>
               </div>
@@ -663,6 +674,44 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                 </div>
               </div>
+
+              {/* Concept 11: Rhythm Orbit Polar Clock & Tempo Autodetection */}
+              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Timer className="w-5 h-5 text-rose-400 shrink-0" />
+                    <span>11. Rhythm Orbit Polar Clock &amp; Tempo Autodetection</span>
+                  </h3>
+                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800/60 self-start sm:self-auto">
+                    Polar Rhythm &bull; Dual Hysteresis
+                  </span>
+                </div>
+
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  The <strong>Rhythm Orbit</strong> visualiser translates musical time and rhythm into a 12-position polar clock using Prime Period Theory&apos;s Solfège chromatic hierarchy. 12 o&apos;clock (<em>Do</em>) anchors the downbeat pulse, while 6 o&apos;clock (<em>Fi</em>) represents the halfway 8th-note offbeat.
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-rose-400 block">Subdivision Mapping</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      16th-note subdivisions land cleanly on cardinal positions (Do, Me, Fi, La), while triplets land on Do, Mi, and Le. Grace notes and crush syncopations occupy micro-offset positions (Ra/Ti and Fa/So).
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-rose-400 block">Concentric Pitch Tracks</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Notes are assigned across concentric rings from lowest (outer tracks) to highest (inner tracks), operating dynamically (expanding up to 8 tracks) or across fixed instrument ranges.
+                    </p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800/80 space-y-1">
+                    <span className="font-semibold text-rose-400 block">Dual-Threshold Autodetection</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                      Evaluates inter-onset intervals with dual hysteresis: duple modulations (double/half-time) adjust rapidly with gentle ripple kinetics, whereas arbitrary tempo shifts accumulate evidence with a tuner-style needle offset from Do.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </section>
 
             {/* Section Divider: Customise */}
@@ -696,7 +745,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Edit Mode & Resizing</span>
-                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves, or Staff Stream), duplicate cells, or drag border dividers to resize flex ratios.</p>
+                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Rhythm Orbit, Piano Triangles, Note Stream, Overtone Waves, or Staff Stream), duplicate cells, or drag border dividers to resize flex ratios.</p>
                   </div>
                 </div>
               </div>

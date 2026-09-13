@@ -51,6 +51,7 @@ import {
   PRESET_MONUMENT,
   PRESET_SIGNATURE,
   PRESET_HARMONIC,
+  PRESET_RHYTHM_DEBUG,
   PRESET_LAYOUTS,
   splitCellInTree,
   removeCellFromTree,
@@ -91,6 +92,20 @@ import {
   resolveItemSemitoneFromTonic,
 } from '../renderers/staff-stream-canvas';
 import { StreamItem, TonicShiftMarker } from './types';
+import {
+  RhythmEngine,
+  quantiseRhythmPhase,
+  resolveTempoAwareNearestSpoke,
+  isDupleRatio,
+  RHYTHM_POSITION_WEIGHTS,
+  foldBpmToTactusRange,
+  quantiseIntervalToMusicalStep,
+  MUSICAL_INTERVAL_STEPS,
+  classifyMetre,
+  fitStreamToGrid,
+} from './rhythm-engine';
+import { RhythmOrbitRenderer } from '../renderers/rhythm-orbit-canvas';
+import { RhythmDebugRenderer } from '../renderers/rhythm-debug-canvas';
 
 test('Default Configuration: "Do is D" default tonic', () => {
   assert.strictEqual(DEFAULT_CONFIG.tonic, 2, 'Default tonic must be D (pitch class 2)');
@@ -1596,6 +1611,920 @@ test('RenderCoordinator: Decoupled note lifecycle, subscriptions, and session re
 
   unsubActive();
   coordinator.destroy();
+});
+
+// ============================================================================
+// RHYTHM ORBIT CELL VISUALISER & RHYTHM ENGINE TESTS
+// ============================================================================
+
+test('Rhythm Orbit: Quantisation mathematics and 12-position circle mapping', () => {
+  // Solfège position weights verification
+  assert.strictEqual(RHYTHM_POSITION_WEIGHTS[0], 1.50, 'Downbeat (0) must have cardinal weight 1.50');
+  assert.strictEqual(RHYTHM_POSITION_WEIGHTS[6], 1.40, 'Offbeat (6) must have secondary weight 1.40');
+
+  // 1. Exact downbeat (Phase 0.0) -> Position 0 (Do, 12 o'clock)
+  const downbeat = quantiseRhythmPhase(0.0, 'strict');
+  assert.strictEqual(downbeat.nearestPosition, 0, 'Phase 0.0 must map to position 0 (Do / 12 o\'clock downbeat)');
+  assert.strictEqual(downbeat.quantisedPosition, 0);
+
+  // 2. 16th-note subdivisions: 1/4 beat -> Position 3 (Me, 3 o'clock)
+  const sixteenth1 = quantiseRhythmPhase(0.25, 'strict');
+  assert.strictEqual(sixteenth1.nearestPosition, 3, '1/4 beat (16th note) must map to position 3 (Me / 3 o\'clock)');
+
+  // 3. Halfway 8th-note offbeat: 1/2 beat -> Position 6 (Fi, 6 o'clock)
+  const offbeat = quantiseRhythmPhase(0.5, 'strict');
+  assert.strictEqual(offbeat.nearestPosition, 6, '1/2 beat (8th offbeat) must map to position 6 (Fi / 6 o\'clock nadir)');
+
+  // 4. 16th-note subdivision 3: 3/4 beat -> Position 9 (La, 9 o'clock)
+  const sixteenth3 = quantiseRhythmPhase(0.75, 'strict');
+  assert.strictEqual(sixteenth3.nearestPosition, 9, '3/4 beat (16th note) must map to position 9 (La / 9 o\'clock)');
+
+  // 5. Triplet subdivisions: 1/3 beat -> Position 4 (Mi, 4 o'clock)
+  const triplet1 = quantiseRhythmPhase(1 / 3, 'strict');
+  assert.strictEqual(triplet1.nearestPosition, 4, '1/3 beat (triplet 1) must map to position 4 (Mi / 4 o\'clock)');
+
+  // 6. Triplet subdivision 2: 2/3 beat -> Position 8 (Le, 8 o'clock)
+  const triplet2 = quantiseRhythmPhase(2 / 3, 'strict');
+  assert.strictEqual(triplet2.nearestPosition, 8, '2/3 beat (triplet 2) must map to position 8 (Le / 8 o\'clock)');
+
+  // 7. Subtle mode soft snapping: human micro-timing deviation (e.g. phase 0.23 -> raw 2.76, snapped 65% towards 3.0)
+  const subtle = quantiseRhythmPhase(0.23, 'subtle');
+  assert.strictEqual(subtle.nearestPosition, 3);
+  assert.ok(subtle.quantisedPosition > 2.76 && subtle.quantisedPosition < 3.0, 'Subtle mode must smoothly blend towards nearest grid');
+
+  // 8. None mode: exact unquantised position preserved
+  const raw = quantiseRhythmPhase(0.23, 'none');
+  assert.strictEqual(raw.nearestPosition, 3);
+  assert.ok(Math.abs(raw.quantisedPosition - 0.23 * 12) < 1e-9, 'None mode must preserve exact raw position');
+});
+
+test('Rhythm Orbit: Duple ratio detection for powers of 2', () => {
+  // Duple targets: 2x (double time), 0.5x (half time), 4x, 0.25x
+  assert.strictEqual(isDupleRatio(2.0), true, '2.0x is a duple modulation');
+  assert.strictEqual(isDupleRatio(0.5), true, '0.5x is a duple modulation');
+  assert.strictEqual(isDupleRatio(4.0), true, '4.0x is a duple modulation');
+  assert.strictEqual(isDupleRatio(0.25), true, '0.25x is a duple modulation');
+
+  // Slightly imperfect duple within 7% tolerance
+  assert.strictEqual(isDupleRatio(1.98), true, '1.98x should be recognised as duple double-time');
+  assert.strictEqual(isDupleRatio(0.52), true, '0.52x should be recognised as duple half-time');
+
+  // Non-duple ratios
+  assert.strictEqual(isDupleRatio(1.33), false, '1.33x (triplet 4:3) is not duple');
+  assert.strictEqual(isDupleRatio(1.5), false, '1.5x (dotted 3:2) is not duple');
+  assert.strictEqual(isDupleRatio(1.15), false, '1.15x arbitrary tempo drift is not duple');
+});
+
+test('Rhythm Orbit: RhythmEngine onset recording and concentric track allocation', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmTrackMode: 'dynamic' as const };
+
+  // Play 4 notes ascending: MIDI 36 (C2), 48 (C3), 60 (C4), 72 (C5)
+  engine.recordOnset(36, 0.8, 1.0, config);
+  engine.recordOnset(48, 0.8, 1.25, config);
+  engine.recordOnset(60, 0.8, 1.5, config);
+  engine.recordOnset(72, 0.8, 1.75, config);
+
+  const onsets = engine.getOnsets();
+  assert.strictEqual(onsets.length, 4);
+
+  // Lowest note (36) must be assigned to track 0 (outermost)
+  const lowest = onsets.find((n) => n.midi === 36);
+  assert.ok(lowest);
+  assert.strictEqual(lowest.trackIndex, 0, 'Lowest note must be assigned to outer track 0');
+
+  // Highest note (72) must be assigned to the innermost track
+  const highest = onsets.find((n) => n.midi === 72);
+  assert.ok(highest);
+  assert.strictEqual(highest.trackIndex, 3, 'Highest note must be assigned to innermost track 3');
+
+  // Test fixed track mode
+  const fixedConfig = {
+    ...DEFAULT_CONFIG,
+    rhythmTrackMode: 'fixed' as const,
+    rhythmTrackCount: 4,
+    keyboardLowestMidi: 21,
+    keyboardHighestMidi: 108,
+  };
+
+  engine.recordOnset(24, 0.8, 2.0, fixedConfig); // Very low note -> track 0
+  engine.recordOnset(100, 0.8, 2.25, fixedConfig); // Very high note -> track 3
+
+  const fixedOnsets = engine.getOnsets();
+  const lowNote = fixedOnsets.find((n) => n.midi === 24);
+  const highNote = fixedOnsets.find((n) => n.midi === 100);
+
+  assert.strictEqual(lowNote?.trackIndex, 0, 'Fixed mode: Low note maps to track 0');
+  assert.strictEqual(highNote?.trackIndex, 3, 'Fixed mode: High note maps to highest track 3');
+});
+
+test('Rhythm Orbit: Dual hysteresis thresholds for tempo adjustment', () => {
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // 1. Duple modulation: Transition from 120 BPM to 60 BPM (half-time within 60..120 range)
+  const engineDuple = new RhythmEngine(120);
+  engineDuple.recordOnset(60, 0.85, 1.0, config);
+  engineDuple.recordOnset(60, 0.85, 1.5, config);
+  engineDuple.recordOnset(60, 0.85, 2.0, config);
+  engineDuple.update(2100, config);
+  assert.strictEqual(engineDuple.getCurrentBpm(), 120);
+
+  // Transition into half-time strokes: 60 BPM (1000ms intervals)
+  let t1 = 3.0;
+  for (let i = 0; i < 6; i++) {
+    engineDuple.recordOnset(60, 0.85, t1, config);
+    t1 += 1.0;
+  }
+
+  // Update at 100ms after onset burst: duple modulation debounce is 500ms
+  const earlyDuple = engineDuple.update(t1 * 1000 + 100, config);
+  assert.strictEqual(earlyDuple.shouldShift, false, 'Duple shift should not commit prematurely before debounce');
+  assert.ok(earlyDuple.tunerOffset < 0, 'Tuner offset must indicate deceleration (-) towards 60 BPM');
+
+  // Update at 700ms after debounce started: duple modulation should commit
+  const commitDuple = engineDuple.update(t1 * 1000 + 700, config);
+  assert.strictEqual(commitDuple.shouldShift, true, 'Duple modulation should commit after debounce expires');
+  assert.strictEqual(commitDuple.shiftType, 'duple', 'Committed shift must be duple');
+  assert.strictEqual(commitDuple.newBpm, 60, 'Committed BPM should be 60');
+
+  // 2. Arbitrary modulation: Transition from 70 BPM to 100 BPM (non-duple)
+  const engineArb = new RhythmEngine(70);
+  engineArb.recordOnset(60, 0.85, 1.0, config);
+  engineArb.recordOnset(60, 0.85, 1.857, config);
+  engineArb.update(1900, config);
+
+  // Transition into 100 BPM strokes (600ms intervals)
+  let t2 = 2.457;
+  for (let i = 0; i < 8; i++) {
+    engineArb.recordOnset(60, 0.85, t2, config);
+    t2 += 0.60;
+  }
+
+  // Update at 100ms: arbitrary debounce is 1200ms
+  const earlyArb = engineArb.update(t2 * 1000 + 100, config);
+  assert.strictEqual(earlyArb.shouldShift, false, 'Arbitrary shift should not commit prematurely before debounce');
+  assert.ok(earlyArb.tunerOffset > 0, 'Tuner offset must indicate acceleration (+) towards 100 BPM');
+
+  // Update at 1400ms: arbitrary shift should commit
+  const commitArb = engineArb.update(t2 * 1000 + 1400, config);
+  assert.strictEqual(commitArb.shouldShift, true, 'Arbitrary modulation should commit after debounce expires');
+  assert.strictEqual(commitArb.shiftType, 'arbitrary', 'Committed shift must be arbitrary');
+  assert.strictEqual(commitArb.newBpm, 100, 'Committed BPM should be 100');
+});
+
+test('Rhythm Orbit: Idle pulse deceleration when notes stop', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // Lone note 1 does not start pulse (awaiting beat 2 to establish interval)
+  engine.recordOnset(60, 0.8, 1.0, config);
+  const loneRes = engine.update(1100, config);
+  assert.strictEqual(loneRes.isPulseActive, false, 'Playing single note must not start tempo pulse');
+
+  // Note 2 arrives 0.5s later (120 BPM) -> activates pulse!
+  engine.recordOnset(64, 0.8, 1.5, config);
+  const activeRes = engine.update(1600, config);
+  assert.strictEqual(activeRes.isPulseActive, true, 'Pulse must be active after second note establishes tempo');
+
+  // Advance time by 5 seconds of silence
+  const idleRes = engine.update(7000, config);
+  assert.strictEqual(idleRes.isPulseActive, false, 'Pulse must decelerate to idle when no notes arrive');
+});
+
+test('Rhythm Orbit: Even beat detection turns each onset into Do downbeat', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true, rhythmQuantisation: 'subtle' as const };
+
+  // 1. Play Note 1: lone note must NOT start tempo
+  const note1 = engine.recordOnset(60, 0.85, 1.0, config);
+  assert.strictEqual(note1.quantisedPosition, 0, 'First note must land on Do (12 o\'clock)');
+  const update1 = engine.update(1050, config);
+  assert.strictEqual(update1.isPulseActive, false, 'Playing just one note must not start pulse (no IOI)');
+
+  // 2. Play Note 2 at 1.75s (750ms interval = 80 BPM)
+  const note2 = engine.recordOnset(64, 0.85, 1.75, config);
+  assert.strictEqual(note2.nearestPosition, 0, 'Second note on beat must land on Do (12 o\'clock)');
+  const update2 = engine.update(1800, config);
+  assert.strictEqual(update2.isPulseActive, true, 'Pulse must activate upon second note');
+  assert.strictEqual(engine.getCurrentBpm(), 80, 'Initial tempo must be established from first IOI (80 BPM)');
+
+  // 3. Play Note 3 at 2.50s (750ms interval = even beat)
+  engine.recordOnset(67, 0.85, 2.50, config);
+
+  // 4. Play Note 4 at 3.25s (750ms interval = even beat)
+  engine.recordOnset(72, 0.85, 3.25, config);
+
+  // 5. Update engine and verify all onsets in the window turned into Do as downbeats!
+  engine.update(3400, config);
+  const onsets = engine.getOnsets();
+  assert.strictEqual(onsets.length, 4, 'All 4 notes must be present in window');
+
+  for (const onset of onsets) {
+    assert.strictEqual(
+      onset.nearestPosition,
+      0,
+      `Onset MIDI ${onset.midi} at ${onset.timestamp}s must turn into Do (nearest position 0)`
+    );
+  }
+  assert.strictEqual(engine.getCurrentBpm(), 80, 'Engine must detect and hold 80 BPM');
+});
+
+test('Rhythm Orbit: Configuration sanitisation and defaults', () => {
+  const sanitized = sanitizeConfig({
+    rhythmTrackMode: 'invalid-mode' as any,
+    rhythmTrackCount: 15,
+    rhythmManualBpm: 350,
+    rhythmQuantisation: 'corrupted' as any,
+    rhythmNoteWindowSize: 99,
+  });
+
+  assert.strictEqual(sanitized.rhythmTrackMode, 'dynamic', 'Invalid track mode must fall back to dynamic');
+  assert.strictEqual(sanitized.rhythmTrackCount, 8, 'Track count must be clamped to max 8');
+  assert.strictEqual(sanitized.rhythmManualBpm, 240, 'Manual BPM must be clamped to max 240');
+  assert.strictEqual(sanitized.rhythmQuantisation, 'subtle', 'Corrupted quantisation must fall back to subtle');
+  assert.strictEqual(sanitized.rhythmNoteWindowSize, 64, 'Window size must be clamped to max 64');
+});
+
+test('Rhythm Orbit: Layout Models splitCellInTree and addCellToTree integration', () => {
+  const root = {
+    id: 'root',
+    type: 'container' as const,
+    direction: 'row' as const,
+    children: [
+      {
+        id: 'cell-clock',
+        type: 'cell' as const,
+        module: 'orbital' as const,
+        flex: 1,
+        title: 'Pitch Clock',
+      },
+    ],
+  };
+
+  // Split cell with rhythm-orbit
+  const splitRes = splitCellInTree(root, 'cell-clock', 'row', 'rhythm-orbit');
+  const addedCell = splitRes.children[1] as any;
+  assert.strictEqual(addedCell.module, 'rhythm-orbit', 'New cell module must be rhythm-orbit');
+  assert.strictEqual(addedCell.title, 'Rhythm Orbit', 'New cell title must be Rhythm Orbit');
+
+  // Add cell to tree
+  const addedRes = addCellToTree(root, 'row', 'rhythm-orbit');
+  const cells = getAllCellNodes(addedRes);
+  assert.ok(cells.some((c) => c.module === 'rhythm-orbit' && c.title === 'Rhythm Orbit'));
+});
+
+test('Rhythm Orbit: URL layout slug round-trip encoding and decoding', () => {
+  const layout = {
+    id: 'layout-rhythm',
+    name: 'Rhythm Master',
+    root: {
+      id: 'root-rhythm',
+      type: 'container' as const,
+      direction: 'column' as const,
+      children: [
+        {
+          id: 'cell-rhythm',
+          type: 'cell' as const,
+          module: 'rhythm-orbit' as const,
+          flex: 2,
+          title: 'Rhythm Orbit',
+        },
+      ],
+    },
+  };
+
+  const slug = encodeLayoutToSlug(layout as any);
+  assert.ok(slug.length > 0, 'Layout slug must encode successfully');
+
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded, 'Layout slug must decode successfully');
+  assert.strictEqual((decoded?.layout.root.children[0] as any).module, 'rhythm-orbit');
+});
+
+test('Rhythm Orbit: RhythmOrbitRenderer canvas drawing execution', () => {
+  const renderer = new RhythmOrbitRenderer();
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG };
+
+  // Feed a couple notes
+  engine.recordOnset(60, 0.8, 1.0, config);
+  engine.recordOnset(64, 0.7, 1.25, config);
+
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    scale: () => {},
+    rotate: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: () => {},
+    rect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    setLineDash: () => {},
+    set strokeStyle(_val: any) {},
+    set fillStyle(_val: any) {},
+    lineWidth: 1,
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  // Test rendering execution without exceptions
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 600, 600, engine, config, 1500);
+  }, 'RhythmOrbitRenderer.render must execute cleanly without error');
+
+  // Test duple and arbitrary tempo shift triggers
+  assert.doesNotThrow(() => {
+    renderer.triggerTempoShift(120, 240, 'duple');
+    renderer.render(mockCtx, 600, 600, engine, config, 1600);
+  }, 'Duple tempo shift animation must execute cleanly');
+
+  assert.doesNotThrow(() => {
+    renderer.triggerTempoShift(120, 137, 'arbitrary');
+    renderer.render(mockCtx, 600, 600, engine, config, 1700);
+  }, 'Arbitrary tempo shift animation must execute cleanly');
+
+  // Query coordinate
+  const coord = renderer.getCoordinatesForMidi(60);
+  assert.ok(coord !== null, 'Renderer must report on-screen coordinates for active notes');
+});
+
+test('Rhythm Orbit: 60-120 BPM auto-tempo anchoring and octave folding', () => {
+  // 1. Verify foldBpmToTactusRange folds octaves into [60, 120] range
+  assert.strictEqual(foldBpmToTactusRange(160), 80, '160 BPM folds to 80 BPM');
+  assert.strictEqual(foldBpmToTactusRange(240), 120, '240 BPM folds to 120 BPM');
+  assert.strictEqual(foldBpmToTactusRange(40), 80, '40 BPM folds to 80 BPM');
+  assert.strictEqual(foldBpmToTactusRange(80), 80, '80 BPM remains 80 BPM');
+  assert.strictEqual(foldBpmToTactusRange(110), 110, '110 BPM remains 110 BPM');
+
+  // 2. Initial tempo establishment folding from rapid strokes (e.g. 375ms interval = 160 BPM folded to 80 BPM)
+  const engine1 = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  engine1.recordOnset(60, 0.8, 1.0, config);
+  engine1.recordOnset(64, 0.8, 1.375, config); // 375ms IOI = 160 BPM folded to 80 BPM!
+  assert.strictEqual(engine1.getCurrentBpm(), 80, 'Rapid tapping at 375ms IOI must fold to 80 BPM tactus');
+
+  // 3. Initial tempo establishment folding from slow strokes (e.g. 1.5s interval = 40 BPM folded to 80 BPM)
+  const engine2 = new RhythmEngine(120);
+  engine2.recordOnset(60, 0.8, 1.0, config);
+  engine2.recordOnset(64, 0.8, 2.5, config); // 1.5s IOI = 40 BPM folded to 80 BPM!
+  assert.strictEqual(engine2.getCurrentBpm(), 80, 'Slow tapping at 1.5s IOI must fold to 80 BPM tactus');
+});
+
+test('Rhythm Orbit: Even subdivision distribution & discrete visual quantisation', () => {
+  const engine = new RhythmEngine(80);
+  const config = {
+    ...DEFAULT_CONFIG,
+    rhythmAutoTempoEnabled: true,
+    rhythmQuantisation: 'subtle' as const,
+  };
+
+  // Play even 8th notes at 80 BPM (375ms intervals)
+  for (let i = 0; i < 6; i++) {
+    engine.recordOnset(60 + i, 0.85, 1.0 + i * 0.375, config);
+  }
+
+  // Update engine: should hold 80 BPM without registering wild tempo shifts
+  const updateRes = engine.update(3500, config);
+  assert.strictEqual(engine.getCurrentBpm(), 80, 'Engine must hold 80 BPM on even 8th notes');
+  assert.strictEqual(updateRes.shouldShift, false, 'Must not trigger tempo shift on clean 8th notes');
+
+  // Onsets must be distributed cleanly across prime-family slots
+  const onsets = engine.getOnsets();
+  assert.strictEqual(onsets.length, 6);
+  assert.strictEqual(onsets[0].nearestPosition, 0, 'Onset 0 on slot 0 (cycle start downbeat)');
+  const streams = engine.getStreams();
+  assert.ok(streams.length > 0, 'Must establish active stream');
+  assert.ok(
+    streams[0].detectedMetre.family === 'du' || streams[0].detectedMetre.family === 'dutri',
+    'Stream metre must be Du or DuTri for even 8th notes'
+  );
+  assert.ok(streams[0].detectedMetre.slots % 2 === 0, 'Slot count must be even');
+
+  // Test discrete visual snapping in renderer
+  const renderer = new RhythmOrbitRenderer();
+  let drawnPips: { x: number; y: number }[] = [];
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    translate: () => {},
+    scale: () => {},
+    rotate: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: (x: number, y: number) => {
+      drawnPips.push({ x, y });
+    },
+    rect: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillText: () => {},
+    strokeText: () => {},
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    setLineDash: () => {},
+    set strokeStyle(_val: any) {},
+    set fillStyle(_val: any) {},
+    lineWidth: 1,
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  renderer.render(mockCtx, 600, 600, engine, config, 3500);
+
+  // Coordinate for note on Fi (spoke 6, 6 o'clock nadir) should have x ≈ cx (300) and y > cy (300)
+  const fiCoord = renderer.getCoordinatesForMidi(61);
+  assert.ok(fiCoord !== null, 'Fi note must have valid canvas coordinates');
+  assert.ok(Math.abs(fiCoord.x - 300) < 1.0, `Fi note X coordinate must align with 6 o'clock vertical spoke (x ≈ 300, got ${fiCoord.x})`);
+  assert.ok(fiCoord.y > 300, `Fi note Y coordinate must be below centre (y > 300, got ${fiCoord.y})`);
+
+  // Coordinate for note on Do (spoke 0, 12 o'clock zenith) should have x ≈ cx (300) and y < cy (300)
+  const doCoord = renderer.getCoordinatesForMidi(60);
+  assert.ok(doCoord !== null, 'Do note must have valid canvas coordinates');
+  assert.ok(Math.abs(doCoord.x - 300) < 1.0, `Do note X coordinate must align with 12 o'clock vertical spoke (x ≈ 300, got ${doCoord.x})`);
+  assert.ok(doCoord.y < 300, `Do note Y coordinate must be above centre (y < 300, got ${doCoord.y})`);
+});
+
+test('Rhythm Orbit: Tempo-aware tolerance prevents false adjacent spoke inference and full-window averaging stabilizes tempo', () => {
+  // 1. Tempo-aware tolerance: at 120 BPM (500ms period), +/- 35ms human microtiming jitter
+  // corresponds to 0.84 spokes. A simple Math.round would incorrectly infer Ra (1) or Ti (11).
+  // Tempo-aware resolveTempoAwareNearestSpoke must keep them on Do (0).
+  const late35msPhaseAt120 = 0.035 / 0.50; // 0.070 of a beat -> spoke 0.84
+  const early35msPhaseAt120 = -0.035 / 0.50; // -0.070 of a beat -> spoke 11.16
+
+  const lateQuant = quantiseRhythmPhase(late35msPhaseAt120, 'strict', 120);
+  const earlyQuant = quantiseRhythmPhase(early35msPhaseAt120, 'strict', 120);
+
+  assert.strictEqual(lateQuant.nearestPosition, 0, '+35ms jitter at 120 BPM must map to Do (0), not Ra (1)');
+  assert.strictEqual(earlyQuant.nearestPosition, 0, '-35ms jitter at 120 BPM must map to Do (0), not Ti (11)');
+  assert.strictEqual(resolveTempoAwareNearestSpoke(0.84, 120), 0, 'Spoke 0.84 at 120 BPM resolves to Do (0)');
+  assert.strictEqual(resolveTempoAwareNearestSpoke(11.16, 120), 0, 'Spoke 11.16 at 120 BPM resolves to Do (0)');
+
+  // At 60 BPM (1000ms period), +35ms jitter corresponds to spoke 0.42 -> must also map to Do (0)
+  const late35msPhaseAt60 = 0.035 / 1.0;
+  const quant60 = quantiseRhythmPhase(late35msPhaseAt60, 'strict', 60);
+  assert.strictEqual(quant60.nearestPosition, 0, '+35ms jitter at 60 BPM must map to Do (0)');
+
+  // 2. Full-window averaging: playing steady 120 BPM beats with alternating +/- 30ms human timing variations
+  // must NOT cause candidate tempos or active BPM to swing dramatically.
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true, rhythmQuantisation: 'strict' as const };
+
+  // Establish steady 120 BPM tempo with subsequent human microtiming variations (+/- 15ms to 20ms)
+  const jitters = [0.000, 0.000, -0.015, 0.020, -0.020, 0.015, -0.010];
+  let t = 1.0;
+  for (let i = 0; i < jitters.length; i++) {
+    engine.recordOnset(60, 0.85, t + jitters[i], config);
+    t += 0.50;
+  }
+
+  // Evaluate candidate tempos: full-window average IOI must identify 118-120 BPM, not extreme single-interval spikes
+  const evalRes = engine.evaluateCandidateTempos(t, config);
+  assert.ok(
+    evalRes.bestBpm >= 116 && evalRes.bestBpm <= 122,
+    `Full-window IOI average must hold steady near 120 BPM (got ${evalRes.bestBpm})`
+  );
+
+  // All onsets in window must remain snapped to Do (0) without drifting to Ra (1) or Ti (11)
+  const onsets = engine.getOnsets();
+  for (const onset of onsets) {
+    assert.strictEqual(
+      onset.nearestPosition,
+      0,
+      `Onset at ${onset.timestamp.toFixed(3)}s must snap to Do (0), not adjacent spokes`
+    );
+  }
+});
+
+test('Rhythm Orbit: Chord stroke flattening clusters simultaneous notes into one stroke', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // Play a first note to anchor the downbeat
+  engine.recordOnset(60, 0.8, 1.0, config);
+
+  // Play a second distinct note 500ms later (quarter note at 120 BPM)
+  engine.recordOnset(60, 0.85, 1.5, config);
+
+  // Play a 4-note chord within the 65ms chord window (simulating rolled chord)
+  engine.recordOnset(48, 0.9, 2.0, config);     // Root C3
+  engine.recordOnset(52, 0.85, 2.015, config);   // E3 (+15ms)
+  engine.recordOnset(55, 0.80, 2.035, config);   // G3 (+35ms)
+  engine.recordOnset(60, 0.75, 2.060, config);   // C4 (+60ms, still within 65ms window)
+
+  // The engine should have 3 strokes: 1st note, 2nd note, and the chord cluster
+  const strokes = engine.getStrokes();
+  assert.strictEqual(strokes.length, 3, 'Must produce 3 strokes: 2 singles + 1 chord cluster');
+  assert.strictEqual(strokes[2].notes.length, 4, 'Chord stroke must contain all 4 notes');
+
+  // All notes in the chord stroke must share the same nearest position
+  const chordPos = strokes[2].nearestPosition;
+  for (const note of strokes[2].notes) {
+    assert.strictEqual(note.nearestPosition, chordPos,
+      `All chord notes must share position ${chordPos}, got ${note.nearestPosition} for MIDI ${note.midi}`);
+  }
+
+  // Total onsets must include all individual notes (6)
+  const onsets = engine.getOnsets();
+  assert.strictEqual(onsets.length, 6, 'Total onset count must include all 6 individual notes');
+
+  // getDistinctOnsetTimes should return stroke timestamps only (3)
+  const distinctTimes = engine.getDistinctOnsetTimes();
+  assert.strictEqual(distinctTimes.length, 3, 'Distinct onset times must equal stroke count (3)');
+
+  // Note arriving 100ms after the chord start (outside 65ms window) must create a new stroke
+  engine.recordOnset(64, 0.70, 2.100, config);
+  assert.strictEqual(engine.getStrokes().length, 4, 'Note outside chord window must create new stroke');
+});
+
+test('Rhythm Orbit: Phrase pause restarts downbeat at Do and rubato plays through', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // Establish tempo: 2 notes at 500ms (120 BPM)
+  engine.recordOnset(60, 0.85, 1.0, config);
+  engine.recordOnset(60, 0.85, 1.5, config);
+  assert.strictEqual(engine.getCurrentBpm(), 120, 'Tempo established at 120 BPM');
+
+  // Play a third note at 500ms interval
+  engine.recordOnset(60, 0.85, 2.0, config);
+  const strokesBeforePause = engine.getStrokes();
+  assert.strictEqual(strokesBeforePause[2].nearestPosition, 0, 'Third note on Do (full beat)');
+
+  // Long pause: 3.0 seconds later (well above the 1.4s pause threshold)
+  engine.recordOnset(60, 0.85, 5.0, config);
+  const strokesAfterPause = engine.getStrokes();
+  const restartStroke = strokesAfterPause[strokesAfterPause.length - 1];
+  assert.strictEqual(restartStroke.nearestPosition, 0, 'After long pause, note must restart on Do (0)');
+
+  // Now play through without pausing at 500ms intervals — should NOT trigger pause restart
+  engine.recordOnset(60, 0.85, 5.5, config);
+  engine.recordOnset(60, 0.85, 6.0, config);
+
+  const allStrokes = engine.getStrokes();
+  const lastTwo = allStrokes.slice(-2);
+  assert.strictEqual(lastTwo[0].nearestPosition, 2, 'Continuation note 1 on slot 2 (halfway through 4-slot cycle)');
+  assert.strictEqual(lastTwo[1].nearestPosition, 0, 'Continuation note 2 on slot 0 (cycle restart)');
+
+  // Verify the pulse is active throughout
+  const updateRes = engine.update(6100, config);
+  assert.strictEqual(updateRes.isPulseActive, true, 'Pulse must remain active during continuous play');
+});
+
+test('Rhythm Orbit: Relative subdivision stepping preserves accurate spoke positions', () => {
+  const engine = new RhythmEngine(80);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // At 80 BPM, beat period = 0.75s
+  // Quarter note = 750ms (12 spokes), 8th note = 375ms (6 spokes)
+
+  // Note 1: anchor on Do(0)
+  engine.recordOnset(60, 0.85, 1.0, config);
+
+  // Note 2 (375ms later): 8th note → 6 spokes → Fi(6)
+  engine.recordOnset(60, 0.85, 1.375, config);
+
+  // Note 3 (375ms later): 8th note → 6 spokes → Do(0) again
+  engine.recordOnset(60, 0.85, 1.75, config);
+
+  // Note 4 (750ms later): quarter note → 12 spokes → Do(0)
+  engine.recordOnset(60, 0.85, 2.5, config);
+
+  // Note 5 (250ms later): triplet 8th → 4 spokes → Mi(4)
+  engine.recordOnset(60, 0.85, 2.75, config);
+
+  const strokes = engine.getStrokes();
+  assert.strictEqual(strokes.length, 5, 'Must have 5 distinct strokes');
+  assert.strictEqual(strokes[0].nearestPosition, 0, 'Stroke 0 must anchor at slot 0 (cycle start)');
+  const streams = engine.getStreams();
+  assert.ok(streams.length > 0, 'Stream must be established');
+  assert.ok(streams[0].detectedMetre.slots > 0, 'Stream must detect valid slot count');
+
+  // Verify quantiseIntervalToMusicalStep unit behaviour directly
+  const beatPeriod = 0.75;
+
+  // Quarter note: 750ms at 0.75s period → 12 spokes
+  const q = quantiseIntervalToMusicalStep(0.75, beatPeriod);
+  assert.strictEqual(q.step, 12, 'Quarter note must quantise to step 12');
+  assert.strictEqual(q.spokeDiff, 0, 'Quarter note spokeDiff must be 0 (full rotation)');
+
+  // 8th note: 375ms at 0.75s period → 6 spokes
+  const e = quantiseIntervalToMusicalStep(0.375, beatPeriod);
+  assert.strictEqual(e.step, 6, '8th note must quantise to step 6');
+  assert.strictEqual(e.spokeDiff, 6, '8th note spokeDiff must be 6');
+
+  // Triplet 8th: 250ms at 0.75s period → 4 spokes
+  const t = quantiseIntervalToMusicalStep(0.25, beatPeriod);
+  assert.strictEqual(t.step, 4, 'Triplet 8th must quantise to step 4');
+  assert.strictEqual(t.spokeDiff, 4, 'Triplet 8th spokeDiff must be 4');
+
+  // Dotted quarter: 1125ms at 0.75s period → 18 spokes
+  const dq = quantiseIntervalToMusicalStep(1.125, beatPeriod);
+  assert.strictEqual(dq.step, 18, 'Dotted quarter must quantise to step 18');
+  assert.strictEqual(dq.spokeDiff, 6, 'Dotted quarter spokeDiff must be 6 (18 mod 12)');
+
+  // Half note: 1500ms at 0.75s period → 24 spokes
+  const h = quantiseIntervalToMusicalStep(1.5, beatPeriod);
+  assert.strictEqual(h.step, 24, 'Half note must quantise to step 24');
+  assert.strictEqual(h.spokeDiff, 0, 'Half note spokeDiff must be 0 (24 mod 12)');
+
+  // Verify MUSICAL_INTERVAL_STEPS contains expected canonical values
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(2), 'Steps must include sextuplet (2)');
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(3), 'Steps must include 16th note (3)');
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(4), 'Steps must include triplet 8th (4)');
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(6), 'Steps must include 8th note (6)');
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(12), 'Steps must include quarter note (12)');
+  assert.ok(MUSICAL_INTERVAL_STEPS.includes(24), 'Steps must include half note (24)');
+});
+
+test('Rhythm Orbit: Auditory stream segregation by register proximity & harmonic resilience', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // Bass voice plays C2 (36) twice, then harmony shifts to F2 (41) twice (5 semitones away, within capture radius 14)
+  engine.recordOnset(36, 0.8, 1.0, config);
+  engine.recordOnset(36, 0.8, 1.5, config);
+  engine.recordOnset(41, 0.8, 2.0, config); // F2 root change
+  engine.recordOnset(41, 0.8, 2.5, config);
+
+  // High melody voice plays C5 (72) twice (31 semitones away from bass centroid, well beyond capture radius)
+  engine.recordOnset(72, 0.7, 1.0, config);
+  engine.recordOnset(72, 0.7, 1.5, config);
+
+  const streams = engine.getStreams();
+  assert.strictEqual(streams.length, 2, 'Must segregate into exactly 2 streams (bass stream and melody stream)');
+
+  const bassStream = streams.find((s) => s.centroidMidi < 50);
+  const trebleStream = streams.find((s) => s.centroidMidi > 60);
+
+  assert.ok(bassStream, 'Bass stream must exist');
+  assert.ok(trebleStream, 'Treble melody stream must exist');
+
+  // All 4 bass notes (including the F2 root shift) must belong to the bass stream!
+  assert.strictEqual(bassStream.strokes.length, 4, 'All 4 bass notes must be clustered into bass stream despite F2 harmonic change');
+  assert.strictEqual(trebleStream.strokes.length, 2, 'Melody strokes must be clustered into treble stream');
+
+  // Concentric track indices: bass is outer (lower track index), treble is inner (higher track index)
+  assert.ok(bassStream.trackIndex <= trebleStream.trackIndex, 'Bass stream must be placed on an outer or equal track to treble');
+});
+
+test('Rhythm Orbit: Polyrhythmic metre detection and convergence pulse', () => {
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+
+  // Bass stream (C2 = 36): 3 beats of 1.0s over 3.0 seconds (period = 3.0s, Tri metre with 3 slots, accented on beats 1 and 4)
+  engine.recordOnset(36, 0.95, 1.0, config);
+  engine.recordOnset(36, 0.65, 2.0, config);
+  engine.recordOnset(36, 0.65, 3.0, config);
+  engine.recordOnset(36, 0.95, 4.0, config);
+
+  // Treble stream (C5 = 72): 4 beats of 0.75s over 3.0 seconds (period = 3.0s, Du metre with 4 slots, accented on beats 1 and 5)
+  engine.recordOnset(72, 0.90, 1.0, config);
+  engine.recordOnset(72, 0.65, 1.75, config);
+  engine.recordOnset(72, 0.65, 2.5, config);
+  engine.recordOnset(72, 0.65, 3.25, config);
+  engine.recordOnset(72, 0.90, 4.0, config);
+
+  const streams = engine.getStreams();
+  assert.strictEqual(streams.length, 2, 'Must have 2 distinct streams');
+
+  const bassStream = streams.find((s) => s.centroidMidi < 50);
+  const trebleStream = streams.find((s) => s.centroidMidi > 60);
+
+  assert.ok(bassStream, 'Bass stream must be present');
+  assert.ok(trebleStream, 'Treble stream must be present');
+
+  // Bass detects Tri (3 slots), Treble detects Du (4 slots)
+  assert.strictEqual(bassStream.detectedMetre.slots, 3, 'Bass must detect 3 slots (Tri family)');
+  assert.strictEqual(bassStream.detectedMetre.family, 'tri', 'Bass family must be Tri');
+  assert.strictEqual(trebleStream.detectedMetre.slots, 4, 'Treble must detect 4 slots (Du family)');
+  assert.strictEqual(trebleStream.detectedMetre.family, 'du', 'Treble family must be Du');
+
+  // Test convergence at t = 4000ms (1.0s anchor coincidence)
+  const alignRes = engine.update(4000, config);
+  assert.ok(alignRes.streams.length === 2, 'Alignment output must include both streams');
+  assert.ok(typeof alignRes.convergenceOccurred === 'boolean', 'convergenceOccurred flag must be boolean');
+});
+
+test('Rhythm Orbit: Statistical window grid fitting and prime-family classification with outlier resilience', () => {
+  // 1. Prime Family Classification taxonomy verification
+  assert.strictEqual(classifyMetre(2), 'du');
+  assert.strictEqual(classifyMetre(4), 'du');
+  assert.strictEqual(classifyMetre(8), 'du');
+  assert.strictEqual(classifyMetre(16), 'du');
+  assert.strictEqual(classifyMetre(3), 'tri');
+  assert.strictEqual(classifyMetre(9), 'tri');
+  assert.strictEqual(classifyMetre(6), 'dutri');
+  assert.strictEqual(classifyMetre(12), 'dutri');
+  assert.strictEqual(classifyMetre(5), 'qui');
+  assert.strictEqual(classifyMetre(10), 'qui');
+  assert.strictEqual(classifyMetre(7), 'sep');
+  assert.strictEqual(classifyMetre(14), 'sep');
+
+  // 2. Outlier Resilience: 7 clean quarter notes at 120 BPM (0.5s interval), plus 1 sloppy mistimed note at t = 1.72s
+  // Clean notes: 1.0, 1.5, [1.72 outlier], 2.0, 2.5, 3.0, 3.5, 4.0
+  const strokes = [
+    { id: '1', timestamp: 1.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '1', midi: 60, velocity: 0.8, timestamp: 1.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '2', timestamp: 1.5, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '2', midi: 60, velocity: 0.8, timestamp: 1.5, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '3', timestamp: 1.72, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '3', midi: 60, velocity: 0.8, timestamp: 1.72, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] }, // Mistimed outlier!
+    { id: '4', timestamp: 2.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '4', midi: 60, velocity: 0.8, timestamp: 2.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '5', timestamp: 2.5, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '5', midi: 60, velocity: 0.8, timestamp: 2.5, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '6', timestamp: 3.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '6', midi: 60, velocity: 0.8, timestamp: 3.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '7', timestamp: 3.5, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '7', midi: 60, velocity: 0.8, timestamp: 3.5, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '8', timestamp: 4.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '8', midi: 60, velocity: 0.8, timestamp: 4.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+  ];
+
+  const fit = fitStreamToGrid(strokes, 120);
+
+  // The statistical consensus of the 7 on-grid strokes must outvote the single 1.72s outlier!
+  assert.strictEqual(fit.bestMetre.family, 'du', 'Statistical grid must identify Du family despite outlier');
+  assert.strictEqual(fit.bestMetre.slots % 2, 0, 'Must select even duple slots');
+  assert.ok(fit.fitness > 0.7, 'Fitness must remain high (> 0.70) because 7 of 8 notes fit the grid perfectly');
+});
+
+test('Rhythm Orbit: Candidate metre evaluations and probability ranking in fitStreamToGrid', () => {
+  // 3 beats of 1.0s interval (3/4 Triple metre at 60 BPM)
+  const strokes = [
+    { id: '1', timestamp: 1.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '1', midi: 60, velocity: 0.9, timestamp: 1.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '2', timestamp: 2.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '2', midi: 60, velocity: 0.7, timestamp: 2.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '3', timestamp: 3.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '3', midi: 60, velocity: 0.7, timestamp: 3.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+    { id: '4', timestamp: 4.0, nearestPosition: 0, quantisedPosition: 0, notes: [{ id: '4', midi: 60, velocity: 0.9, timestamp: 4.0, quantisedPosition: 0, nearestPosition: 0, trackIndex: 0 }] },
+  ];
+
+  const fit = fitStreamToGrid(strokes, 60);
+
+  assert.ok(Array.isArray(fit.candidateEvaluations), 'fitStreamToGrid must return candidateEvaluations array');
+  assert.ok(fit.candidateEvaluations.length >= 5, 'Must evaluate at least 5 candidate configurations');
+
+  // Normalised probabilities must sum to ~1.0
+  const probSum = fit.candidateEvaluations.reduce((sum, c) => sum + c.normalizedProbability, 0);
+  assert.ok(probSum >= 0.98 && probSum <= 1.02, `Normalised probabilities must sum to ~1.0 (got ${probSum})`);
+
+  // First candidate must be highest score
+  const topCandidate = fit.candidateEvaluations[0];
+  assert.strictEqual(topCandidate.slots, fit.bestMetre.slots, 'Top candidate slots must match bestMetre slots');
+  assert.strictEqual(topCandidate.family, fit.bestMetre.family, 'Top candidate family must match bestMetre family');
+  assert.ok(topCandidate.normalizedProbability > 0.15, 'Winning candidate must have significant probability');
+
+  // Verify engine accessor
+  const engine = new RhythmEngine(60);
+  const config = { ...DEFAULT_CONFIG, rhythmAutoTempoEnabled: true };
+  engine.recordOnset(60, 0.9, 1.0, config);
+  engine.recordOnset(60, 0.7, 2.0, config);
+  engine.recordOnset(60, 0.7, 3.0, config);
+  engine.recordOnset(60, 0.9, 4.0, config);
+
+  const streams = engine.getStreams();
+  assert.ok(streams.length >= 1, 'Engine must have recorded stream');
+  const streamEvals = engine.getCandidateMetresForStream(streams[0].id);
+  assert.ok(streamEvals.length >= 1, 'getCandidateMetresForStream must return evaluations');
+});
+
+test('Rhythm Orbit: RhythmDebugRenderer canvas telemetry execution', () => {
+  const renderer = new RhythmDebugRenderer();
+  const engine = new RhythmEngine(120);
+  const config = { ...DEFAULT_CONFIG };
+
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    clearRect: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    arc: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    measureText: (_t: string) => ({ width: 50 }),
+    set strokeStyle(_val: any) {},
+    set fillStyle(_val: any) {},
+    set font(_val: any) {},
+    set textAlign(_val: any) {},
+    lineWidth: 1,
+  } as unknown as CanvasRenderingContext2D;
+
+  // 1. Render in awaiting state (0 notes)
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 800, 500, engine, config, 1000);
+  }, 'RhythmDebugRenderer must render awaiting state without throwing');
+
+  // 2. Feed concurrent notes in bass and treble to trigger stream segregation & polyrhythms
+  engine.recordOnset(36, 0.9, 1.0, config);
+  engine.recordOnset(36, 0.9, 2.0, config);
+  engine.recordOnset(36, 0.9, 3.0, config);
+
+  engine.recordOnset(72, 0.8, 1.0, config);
+  engine.recordOnset(72, 0.8, 1.75, config);
+  engine.recordOnset(72, 0.8, 2.5, config);
+  engine.recordOnset(72, 0.8, 3.25, config);
+
+  // 3. Render active streams dashboard (wide horizontal layout)
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 800, 500, engine, config, 2000);
+  }, 'RhythmDebugRenderer must render active streams in wide layout without throwing');
+
+  // 4. Render active streams dashboard (narrow vertical stacked layout)
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 400, 700, engine, config, 2000);
+  }, 'RhythmDebugRenderer must render active streams in compact layout without throwing');
+});
+
+test('Rhythm Orbit: PRESET_RHYTHM_DEBUG layout tree and slug serialization', () => {
+  assert.ok(PRESET_RHYTHM_DEBUG, 'PRESET_RHYTHM_DEBUG must be defined');
+  assert.strictEqual(PRESET_LAYOUTS['rhythm-debug'], PRESET_RHYTHM_DEBUG);
+
+  const cells = getAllCellNodes(PRESET_RHYTHM_DEBUG.root);
+  assert.strictEqual(cells.length, 2, 'Rhythm Debug layout must have 2 cells');
+  assert.strictEqual(cells[0].module, 'rhythm-orbit', 'First cell must be rhythm-orbit');
+  assert.strictEqual(cells[1].module, 'rhythm-debug', 'Second cell must be rhythm-debug');
+
+  // Round-trip URL slug encoding and decoding
+  const slug = encodeLayoutToSlug(PRESET_RHYTHM_DEBUG, false);
+  assert.ok(typeof slug === 'string' && slug.length > 0, 'Slug must be non-empty string');
+
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded !== null, 'Decoded slug must not be null');
+  assert.strictEqual(decoded.layout.id, 'rhythm-debug');
+  const decodedCells = getAllCellNodes(decoded.layout.root);
+  assert.strictEqual(decodedCells.length, 2);
+  assert.strictEqual(decodedCells[0].module, 'rhythm-orbit');
+  assert.strictEqual(decodedCells[1].module, 'rhythm-debug');
+});
+
+test('Rhythm Orbit: Phase-lock anchor continuity maintains stable downbeat and playhead during continuous arpeggiation and buffer eviction', () => {
+  const engine = new RhythmEngine(120);
+  const config = {
+    ...DEFAULT_CONFIG,
+    rhythmAutoTempoEnabled: true,
+    rhythmNoteWindowSize: 24,
+  };
+
+  // Arpeggiate a C major 7th chord: C3 (48), E3 (52), G3 (55), B3 (59)
+  // Each note played cleanly on an even quarter-note beat (500ms at 120 BPM)
+  const patternPitches = [48, 52, 55, 59]; // C, E, G, B
+  const totalNotes = 60; // 15 full bars of 4/4 time (well beyond 24-note window limit)
+
+  let previousPhase = -1;
+  let phaseWraps = 0;
+
+  for (let i = 0; i < totalNotes; i++) {
+    const pitch = patternPitches[i % 4];
+    const timestamp = 1.0 + i * 0.5;
+
+    const onset = engine.recordOnset(pitch, 0.85, timestamp, config);
+    const alignment = engine.update(timestamp * 1000 + 10, config);
+
+    // After first bar (note 4 onwards), verify metre and slot stability
+    if (i >= 4) {
+      const stream = engine.getStreams()[0];
+      assert.ok(stream, 'Stream must remain active');
+      assert.strictEqual(stream.detectedMetre.family, 'du', `Note ${i}: Metre must remain Du`);
+      assert.strictEqual(stream.detectedMetre.slots, 4, `Note ${i}: Slot count must remain 4`);
+
+      // C3 must ALWAYS land on slot 0 (Do / 12 o'clock)!
+      // E3 must ALWAYS land on slot 1 (3 o'clock)!
+      // G3 must ALWAYS land on slot 2 (6 o'clock)!
+      // B3 must ALWAYS land on slot 3 (9 o'clock)!
+      const expectedSlot = i % 4;
+      assert.strictEqual(
+        onset.nearestPosition,
+        expectedSlot,
+        `Note ${i} (pitch ${pitch}) must map to slot ${expectedSlot} (got ${onset.nearestPosition})`
+      );
+
+      // Verify scanning hand phase continuity:
+      const currentPhase = alignment.streams[0]?.pulsePhase ?? 0;
+      if (previousPhase >= 0) {
+        if (currentPhase < previousPhase) {
+          phaseWraps++;
+        }
+      }
+      previousPhase = currentPhase;
+    }
+  }
+
+  // Verify stream compaction occurred
+  const stream = engine.getStreams()[0];
+  assert.ok(stream.compactedContext, 'Compacted context must be present after buffer evictions');
+  assert.ok(stream.compactedContext.totalEvictedStrokes > 20, 'At least 20 strokes must be compacted');
+  assert.ok(stream.compactedContext.historicalDownbeatHits > 5, 'Downbeat hits must be tracked in compaction');
+
+  // Verify that FIFO buffer stayed within capacity
+  assert.ok(engine.getStrokes().length <= 24, 'Stroke buffer must be capped at rhythmNoteWindowSize');
+  assert.ok(engine.getOnsets().length <= 24, 'Onset buffer must be capped at rhythmNoteWindowSize');
 });
 
 test('WebGLPostProcessingPipeline: Headless fallback and mock GL execution', () => {

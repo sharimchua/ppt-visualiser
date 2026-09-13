@@ -14,6 +14,8 @@ import {
   Triangle,
   Activity,
   Music,
+  Timer,
+  BarChart2,
   ArrowRight,
   ArrowLeft,
   ArrowDown,
@@ -155,6 +157,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
           ? 'Overtone Waves'
           : nextModule === 'staff-stream'
           ? 'Staff Stream'
+          : nextModule === 'rhythm-orbit'
+          ? 'Rhythm Orbit'
           : 'Note Stream',
       configOverrides:
         nextModule === 'stream'
@@ -193,6 +197,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
             {cell.module === 'triangles' && <Triangle className="w-2.5 h-2.5 text-red-400 mr-1 fill-red-500/40" />}
             {cell.module === 'overtones' && <Activity className="w-2.5 h-2.5 text-cyan-400 mr-1" />}
             {cell.module === 'staff-stream' && <Music className="w-2.5 h-2.5 text-orange-400 mr-1" />}
+            {cell.module === 'rhythm-orbit' && <Timer className="w-2.5 h-2.5 text-rose-400 mr-1" />}
+            {cell.module === 'rhythm-debug' && <BarChart2 className="w-2.5 h-2.5 text-emerald-400 mr-1" />}
             {cell.title ||
               (cell.module === 'orbital'
                 ? 'Orbital'
@@ -202,6 +208,10 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 ? 'Overtones'
                 : cell.module === 'staff-stream'
                 ? 'Staff Stream'
+                : cell.module === 'rhythm-orbit'
+                ? 'Rhythm Orbit'
+                : cell.module === 'rhythm-debug'
+                ? 'Rhythm Debug'
                 : 'Stream')}
           </span>
 
@@ -244,6 +254,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
               className="bg-purple-950/40 hover:bg-purple-900/50 text-[10px] sm:text-[11px] font-semibold text-purple-200 border border-purple-500/60 rounded px-1 sm:px-1.5 py-0.5 focus:outline-none cursor-pointer shrink-0"
             >
               <option value="orbital">🪐 Clock</option>
+              <option value="rhythm-orbit">⏱️ Rhythm Orbit</option>
+              <option value="rhythm-debug">📊 Rhythm Debug</option>
               <option value="stream">🌊 Stream</option>
               <option value="staff-stream">🎼 Staff Stream</option>
               <option value="triangles">▲ Triangles</option>
@@ -1397,6 +1409,287 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                   }
                   className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Rhythm Orbit Options */}
+          {cell.module === 'rhythm-orbit' && (
+            <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+              <label className="text-[11px] text-rose-400 font-medium block uppercase tracking-wider">
+                Rhythm Orbit Parameters
+              </label>
+
+              {/* Track Mode */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Track Mode:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmTrackMode: 'dynamic',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[11px] font-medium transition ${
+                      (effectiveConfig.rhythmTrackMode ?? 'dynamic') === 'dynamic'
+                        ? 'bg-rose-950/60 border-rose-500/70 text-rose-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Dynamic (Max 8)
+                  </button>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmTrackMode: 'fixed',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[11px] font-medium transition ${
+                      effectiveConfig.rhythmTrackMode === 'fixed'
+                        ? 'bg-rose-950/60 border-rose-500/70 text-rose-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Fixed Tracks
+                  </button>
+                </div>
+              </div>
+
+              {/* Fixed Track Count Slider */}
+              {effectiveConfig.rhythmTrackMode === 'fixed' && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-400">Fixed Track Count:</span>
+                    <span className="font-mono text-rose-400">{effectiveConfig.rhythmTrackCount ?? 4} tracks</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    step="1"
+                    value={effectiveConfig.rhythmTrackCount ?? 4}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmTrackCount: parseInt(e.target.value, 10),
+                        },
+                      })
+                    }
+                    className="w-full accent-rose-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                  />
+                </div>
+              )}
+
+              {/* Notehead Style */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Notehead Style:</label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmNoteheadStyle: 'ppt',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[11px] font-medium transition ${
+                      (effectiveConfig.rhythmNoteheadStyle ?? 'ppt') === 'ppt'
+                        ? 'bg-rose-950/60 border-rose-500/70 text-rose-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    PPT Geometric
+                  </button>
+                  <button
+                    onClick={() =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmNoteheadStyle: 'solfege',
+                        },
+                      })
+                    }
+                    className={`py-1 px-2 rounded border text-[11px] font-medium transition ${
+                      effectiveConfig.rhythmNoteheadStyle === 'solfege'
+                        ? 'bg-rose-950/60 border-rose-500/70 text-rose-300'
+                        : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    Uniform Solfège
+                  </button>
+                </div>
+              </div>
+
+              {/* Quantisation Mode */}
+              <div className="space-y-1">
+                <label className="text-[10px] text-slate-400 block font-medium">Quantisation Tolerance:</label>
+                <div className="grid grid-cols-3 gap-1">
+                  {(['none', 'subtle', 'strict'] as const).map((q) => (
+                    <button
+                      key={q}
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            rhythmQuantisation: q,
+                          },
+                        })
+                      }
+                      className={`py-1 px-1.5 rounded border text-[10px] font-medium capitalize transition ${
+                        (effectiveConfig.rhythmQuantisation ?? 'subtle') === q
+                          ? 'bg-rose-950/60 border-rose-500/70 text-rose-300'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Auto-Tempo & Manual BPM */}
+              <div className="flex items-center justify-between pt-1">
+                <div>
+                  <span className="text-[10px] text-slate-300 font-medium block">Auto-Detect Tempo</span>
+                  <span className="text-[9px] text-slate-500 block">IOI beat distribution simplicity scoring</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={effectiveConfig.rhythmAutoTempoEnabled !== false}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        rhythmAutoTempoEnabled: e.target.checked,
+                      },
+                    })
+                  }
+                  className="rounded bg-slate-900 border-slate-700 text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
+                />
+              </div>
+
+              {/* Manual BPM Slider */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400">Tempo (BPM):</span>
+                  <span className="font-mono text-rose-400">{effectiveConfig.rhythmManualBpm ?? 120} BPM</span>
+                </div>
+                <input
+                  type="range"
+                  min="40"
+                  max="240"
+                  step="1"
+                  value={effectiveConfig.rhythmManualBpm ?? 120}
+                  onChange={(e) => {
+                    const bpm = parseInt(e.target.value, 10);
+                    if (coordinator) coordinator.rhythmEngine.setManualBpm(bpm);
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        rhythmManualBpm: bpm,
+                      },
+                    });
+                  }}
+                  className="w-full accent-rose-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                />
+              </div>
+
+              {/* Note Window Size */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center text-[10px]">
+                  <span className="text-slate-400">Timing Note Window:</span>
+                  <span className="font-mono text-rose-400">{effectiveConfig.rhythmNoteWindowSize ?? 24} notes</span>
+                </div>
+                <input
+                  type="range"
+                  min="4"
+                  max="64"
+                  step="1"
+                  value={effectiveConfig.rhythmNoteWindowSize ?? 24}
+                  onChange={(e) =>
+                    onUpdateCell({
+                      ...cell,
+                      configOverrides: {
+                        ...(cell.configOverrides || {}),
+                        rhythmNoteWindowSize: parseInt(e.target.value, 10),
+                      },
+                    })
+                  }
+                  className="w-full accent-rose-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                />
+              </div>
+
+              {/* Toggles: BPM readout, Tuner needle, Downbeat pulses */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-300 font-medium">Centre BPM Readout:</span>
+                  <input
+                    type="checkbox"
+                    checked={effectiveConfig.rhythmShowBpm !== false}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmShowBpm: e.target.checked,
+                        },
+                      })
+                    }
+                    className="rounded bg-slate-900 border-slate-700 text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-300 font-medium">Tuner Shift Gauge (Offset from Do):</span>
+                  <input
+                    type="checkbox"
+                    checked={effectiveConfig.rhythmShowTunerIndicator !== false}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmShowTunerIndicator: e.target.checked,
+                        },
+                      })
+                    }
+                    className="rounded bg-slate-900 border-slate-700 text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-300 font-medium">Downbeat Perimeter Pulses:</span>
+                  <input
+                    type="checkbox"
+                    checked={effectiveConfig.rhythmDownbeatPulses !== false}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          rhythmDownbeatPulses: e.target.checked,
+                        },
+                      })
+                    }
+                    className="rounded bg-slate-900 border-slate-700 text-rose-600 focus:ring-rose-500 w-3.5 h-3.5"
+                  />
+                </div>
               </div>
             </div>
           )}

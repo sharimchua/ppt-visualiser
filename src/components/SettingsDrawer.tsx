@@ -1,5 +1,4 @@
-import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano, Music } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano, Music, Timer } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle, StaffClef } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES, PIANO_RANGE_PRESETS } from '../core/ppt-constants';
@@ -2247,6 +2246,219 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 onChange={(e) => onUpdateConfig({ waveFluidity: parseFloat(e.target.value) })}
                 className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-500"
               />
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION: RHYTHM ORBIT */}
+        <section className="space-y-3">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-200 text-xs uppercase tracking-wider">
+            <Timer className="w-4 h-4 text-rose-400" />
+            <span>Rhythm Orbit Visualiser</span>
+          </div>
+
+          <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
+            {/* Track Mode */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Track Distribution Mode</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onUpdateConfig({ rhythmTrackMode: 'dynamic' })}
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    (config.rhythmTrackMode ?? 'dynamic') === 'dynamic'
+                      ? 'bg-rose-600/30 border-rose-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Dynamic (Up to 8)
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ rhythmTrackMode: 'fixed' })}
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    config.rhythmTrackMode === 'fixed'
+                      ? 'bg-rose-600/30 border-rose-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Fixed Range
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 italic">
+                {config.rhythmTrackMode === 'fixed'
+                  ? 'Allocates notes evenly across a static number of concentric pitch tracks.'
+                  : 'Expands dynamic tracks as new distinct pitches are played in the active timing window.'}
+              </p>
+            </div>
+
+            {/* Fixed Track Count Slider */}
+            {config.rhythmTrackMode === 'fixed' && (
+              <div>
+                <div className="flex justify-between text-slate-300 mb-1">
+                  <span className="font-medium">Fixed Track Count</span>
+                  <span className="font-mono text-rose-400">{config.rhythmTrackCount ?? 4} tracks</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="8"
+                  step="1"
+                  value={config.rhythmTrackCount ?? 4}
+                  onChange={(e) => onUpdateConfig({ rhythmTrackCount: parseInt(e.target.value, 10) })}
+                  className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-rose-500"
+                />
+              </div>
+            )}
+
+            {/* Notehead Style */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Notehead Symbol Taxonomy</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => onUpdateConfig({ rhythmNoteheadStyle: 'ppt' })}
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    (config.rhythmNoteheadStyle ?? 'ppt') === 'ppt'
+                      ? 'bg-rose-600/30 border-rose-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  PPT Geometric
+                </button>
+                <button
+                  onClick={() => onUpdateConfig({ rhythmNoteheadStyle: 'solfege' })}
+                  className={`py-1.5 px-2 rounded border text-center transition ${
+                    config.rhythmNoteheadStyle === 'solfege'
+                      ? 'bg-rose-600/30 border-rose-500 text-white font-medium'
+                      : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Uniform Solfège
+                </button>
+              </div>
+            </div>
+
+            {/* Quantisation Mode */}
+            <div>
+              <label className="block font-medium text-slate-300 mb-1">Quantisation Tolerance</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['none', 'subtle', 'strict'] as const).map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => onUpdateConfig({ rhythmQuantisation: q })}
+                    className={`py-1 px-2 rounded border text-center text-xs capitalize transition ${
+                      (config.rhythmQuantisation ?? 'subtle') === q
+                        ? 'bg-rose-600/30 border-rose-500 text-white font-medium'
+                        : 'bg-slate-800/40 border-slate-700/60 text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1 italic">
+                Subtle mode applies soft snapping towards 12-position divisions while respecting natural performance feel.
+              </p>
+            </div>
+
+            {/* Auto-Tempo Detection */}
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="font-medium block">Real-time Auto-Tempo Detection</span>
+                <span className="text-[10px] text-slate-400 block">Dual-threshold hysteresis (fast duple modulation vs stable non-duple shifts)</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.rhythmAutoTempoEnabled ?? true}
+                  onChange={(e) => onUpdateConfig({ rhythmAutoTempoEnabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
+            </div>
+
+            {/* Manual Base BPM */}
+            <div>
+              <div className="flex justify-between text-slate-300 mb-1">
+                <span className="font-medium">Tempo Base (BPM)</span>
+                <span className="font-mono text-rose-400">{config.rhythmManualBpm ?? 120} BPM</span>
+              </div>
+              <input
+                type="range"
+                min="40"
+                max="240"
+                step="1"
+                value={config.rhythmManualBpm ?? 120}
+                onChange={(e) => onUpdateConfig({ rhythmManualBpm: parseInt(e.target.value, 10) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-rose-500"
+              />
+            </div>
+
+            {/* Note Window Size */}
+            <div>
+              <div className="flex justify-between text-slate-300 mb-1">
+                <span className="font-medium">Timing Note Window</span>
+                <span className="font-mono text-rose-400">{config.rhythmNoteWindowSize ?? 24} notes</span>
+              </div>
+              <input
+                type="range"
+                min="4"
+                max="64"
+                step="1"
+                value={config.rhythmNoteWindowSize ?? 24}
+                onChange={(e) => onUpdateConfig({ rhythmNoteWindowSize: parseInt(e.target.value, 10) })}
+                className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-rose-500"
+              />
+            </div>
+
+            {/* Central BPM Readout */}
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="font-medium block">Central BPM Readout</span>
+                <span className="text-[10px] text-slate-400 block">Display detected tempo in the centre of the orbit</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.rhythmShowBpm ?? true}
+                  onChange={(e) => onUpdateConfig({ rhythmShowBpm: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
+            </div>
+
+            {/* Tuner Indicator Gauge */}
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="font-medium block">Tuner-Style Shift Gauge</span>
+                <span className="text-[10px] text-slate-400 block">Visual needle offset from Do indicating pending tempo drift</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.rhythmShowTunerIndicator ?? true}
+                  onChange={(e) => onUpdateConfig({ rhythmShowTunerIndicator: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
+            </div>
+
+            {/* Downbeat Perimeter Pulses */}
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-slate-800/60">
+              <div>
+                <span className="font-medium block">Downbeat Perimeter Pulses</span>
+                <span className="text-[10px] text-slate-400 block">Radial shockwave ring emission each time the hand crosses 12 o'clock</span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.rhythmDownbeatPulses ?? true}
+                  onChange={(e) => onUpdateConfig({ rhythmDownbeatPulses: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+              </label>
             </div>
           </div>
         </section>

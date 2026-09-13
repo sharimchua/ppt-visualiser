@@ -614,7 +614,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                   <span className="text-purple-400 font-bold">✓</span>
                 </div>
               )}
-              {(['balanced', 'signature', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
+              {(['balanced', 'signature', 'harmonic', 'rhythm-debug', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => {
                 const preset = PRESET_LAYOUTS[mode];
                 const isSelected = !config.activeLayout?.id.startsWith('custom') && config.layoutMode === mode;
                 return (

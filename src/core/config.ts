@@ -88,6 +88,18 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   maxFrequency: 6000,
   overtoneDropletsEnabled: true,
 
+  // Rhythm Orbit
+  rhythmTrackMode: 'dynamic',
+  rhythmTrackCount: 4,
+  rhythmNoteheadStyle: 'ppt',
+  rhythmShowBpm: true,
+  rhythmAutoTempoEnabled: true,
+  rhythmManualBpm: 120,
+  rhythmQuantisation: 'subtle',
+  rhythmNoteWindowSize: 24,
+  rhythmShowTunerIndicator: true,
+  rhythmDownbeatPulses: true,
+
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
   filmGrainEnabled: true,
@@ -380,6 +392,31 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     }
     const validSensitivities = new Set(['fast', 'balanced', 'conservative']);
     if (!validSensitivities.has(merged.autoTonicSensitivity)) merged.autoTonicSensitivity = 'balanced';
+
+    // Sanitise Rhythm Orbit parameters
+    merged.rhythmTrackMode = merged.rhythmTrackMode === 'fixed' ? 'fixed' : 'dynamic';
+    merged.rhythmTrackCount =
+      typeof merged.rhythmTrackCount === 'number'
+        ? Math.max(1, Math.min(8, Math.round(merged.rhythmTrackCount)))
+        : 4;
+    merged.rhythmNoteheadStyle = merged.rhythmNoteheadStyle === 'solfege' ? 'solfege' : 'ppt';
+    merged.rhythmShowBpm = typeof merged.rhythmShowBpm === 'boolean' ? merged.rhythmShowBpm : true;
+    merged.rhythmAutoTempoEnabled =
+      typeof merged.rhythmAutoTempoEnabled === 'boolean' ? merged.rhythmAutoTempoEnabled : true;
+    merged.rhythmManualBpm =
+      typeof merged.rhythmManualBpm === 'number'
+        ? Math.max(40, Math.min(240, Math.round(merged.rhythmManualBpm)))
+        : 120;
+    const validQuantisations = new Set(['none', 'subtle', 'strict']);
+    if (!validQuantisations.has(merged.rhythmQuantisation)) merged.rhythmQuantisation = 'subtle';
+    merged.rhythmNoteWindowSize =
+      typeof merged.rhythmNoteWindowSize === 'number'
+        ? Math.max(4, Math.min(64, Math.round(merged.rhythmNoteWindowSize)))
+        : 24;
+    merged.rhythmShowTunerIndicator =
+      typeof merged.rhythmShowTunerIndicator === 'boolean' ? merged.rhythmShowTunerIndicator : true;
+    merged.rhythmDownbeatPulses =
+      typeof merged.rhythmDownbeatPulses === 'boolean' ? merged.rhythmDownbeatPulses : true;
 
     merged.focusModeEnabled = typeof merged.focusModeEnabled === 'boolean' ? merged.focusModeEnabled : true;
 

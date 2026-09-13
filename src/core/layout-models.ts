@@ -348,6 +348,35 @@ export const PRESET_HARMONIC: LayoutDefinition = {
   },
 };
 
+export const PRESET_RHYTHM_DEBUG: LayoutDefinition = {
+  id: 'rhythm-debug',
+  name: 'Rhythm Studio & Debug',
+  description: 'Rhythm Orbit polar cycle visualiser with real-time stream segregation & prime-family probability telemetry',
+  root: {
+    id: 'root-rhythm-debug',
+    type: 'container',
+    direction: 'row',
+    gap: 8,
+    children: [
+      {
+        id: 'cell-rhythm-orbit-main',
+        type: 'cell',
+        module: 'rhythm-orbit',
+        flex: 1.2,
+        title: 'Rhythm Orbit',
+      },
+      {
+        id: 'cell-rhythm-debug-telemetry',
+        type: 'cell',
+        module: 'rhythm-debug',
+        flex: 1.8,
+        minSize: 220,
+        title: 'Rhythm Engine Telemetry',
+      },
+    ],
+  },
+};
+
 export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'balanced': PRESET_BALANCED,
   'monument': PRESET_MONUMENT,
@@ -357,6 +386,7 @@ export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'orbital-focus': PRESET_ORBITAL_FOCUS,
   'signature': PRESET_SIGNATURE,
   'harmonic': PRESET_HARMONIC,
+  'rhythm-debug': PRESET_RHYTHM_DEBUG,
 };
 
 /**
@@ -460,6 +490,8 @@ export function splitCellInTree(
             ? 'Overtone Waves'
             : newModule === 'staff-stream'
             ? 'Staff Stream'
+            : newModule === 'rhythm-orbit'
+            ? 'Rhythm Orbit'
             : 'Note Stream',
         configOverrides:
           newModule === 'stream'
@@ -661,6 +693,8 @@ export function addCellToTree(
         ? 'Overtone Waves'
         : module === 'staff-stream'
         ? 'Staff Stream'
+        : module === 'rhythm-orbit'
+        ? 'Rhythm Orbit'
         : 'Note Stream',
     configOverrides:
       module === 'stream'

@@ -67,7 +67,7 @@ export type StreamOrientation = 'horizontal' | 'vertical';
 export type StreamDirection = 'rtl' | 'ltr' | 'ttb' | 'btt';
 export type PresentationFormat = 'glyphs' | 'pianoTriangles' | 'syllables' | 'pitchNames' | 'triPitches';
 export type BackgroundTheme = 'studio-obsidian' | 'cosmic-abyss' | 'carbon-grid' | 'velvet-dark';
-export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature' | 'harmonic';
+export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature' | 'harmonic' | 'rhythm-debug';
 export type SynthWaveform = 'warm-poly' | 'sine' | 'triangle' | 'sawtooth';
 export type ToneRevealMode = 'played' | 'all';
 export type RegisterWeightMode = 'organic' | 'discovered' | 'fixed8';
@@ -94,7 +94,7 @@ export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
 
 // --- FLEXBOX LAYOUT ARCHITECTURE ---
 export type LayoutFlexDirection = 'row' | 'column';
-export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones' | 'staff-stream';
+export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones' | 'staff-stream' | 'rhythm-orbit' | 'rhythm-debug';
 
 export type StaffSize = 'single' | 'grand';
 export type StaffClef =
@@ -179,12 +179,29 @@ export interface OvertonesModuleConfig {
   overtoneDropletsEnabled?: boolean; // default: true (fluid droplet particle ejection from fundamental crests)
 }
 
+export type RhythmQuantisationMode = 'none' | 'subtle' | 'strict';
+export type RhythmNoteheadStyle = 'ppt' | 'solfege';
+
+export interface RhythmOrbitModuleConfig {
+  rhythmTrackMode: 'dynamic' | 'fixed'; // default: 'dynamic'
+  rhythmTrackCount: number; // 1..8 (default: 4 for fixed)
+  rhythmNoteheadStyle: RhythmNoteheadStyle; // default: 'ppt'
+  rhythmShowBpm: boolean; // default: true
+  rhythmAutoTempoEnabled: boolean; // default: true
+  rhythmManualBpm: number; // 40..240 (default: 120)
+  rhythmQuantisation: RhythmQuantisationMode; // default: 'subtle'
+  rhythmNoteWindowSize: number; // 4..64 notes (default: 24)
+  rhythmShowTunerIndicator: boolean; // default: true (tuner needle offset from Do)
+  rhythmDownbeatPulses: boolean; // default: true (pulses from perimeter ring at downbeat)
+}
+
 export type ModuleCellConfig =
   | OrbitalModuleConfig
   | StreamModuleConfig
   | StaffStreamModuleConfig
   | PianoTrianglesModuleConfig
-  | OvertonesModuleConfig;
+  | OvertonesModuleConfig
+  | RhythmOrbitModuleConfig;
 
 export interface LayoutCellNode {
   id: string;
@@ -198,7 +215,8 @@ export interface LayoutCellNode {
       StreamModuleConfig &
       StaffStreamModuleConfig &
       PianoTrianglesModuleConfig &
-      OvertonesModuleConfig
+      OvertonesModuleConfig &
+      RhythmOrbitModuleConfig
   >;
 }
 
@@ -286,7 +304,8 @@ export interface VisualiserConfig
     StreamModuleConfig,
     StaffStreamModuleConfig,
     PianoTrianglesModuleConfig,
-    OvertonesModuleConfig {
+    OvertonesModuleConfig,
+    RhythmOrbitModuleConfig {
   layoutMode: LayoutMode;
   activeLayout: LayoutDefinition;
 }
