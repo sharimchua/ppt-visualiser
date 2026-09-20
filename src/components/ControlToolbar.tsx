@@ -56,6 +56,8 @@ interface ControlToolbarProps {
   isEditMode?: boolean;
   onToggleEditMode?: () => void;
   onOpenInfoModal?: () => void;
+  onRequestMidiPermission?: () => void;
+  onOpenVirtualKeyboard?: () => void;
 }
 
 const TONIC_PITCHES = [
@@ -92,6 +94,8 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
   isEditMode = false,
   onToggleEditMode,
   onOpenInfoModal,
+  onRequestMidiPermission,
+  onOpenVirtualKeyboard,
 }) {
   const [showTonicMenu, setShowTonicMenu] = useState(false);
   const [showMidiMenu, setShowMidiMenu] = useState(false);
@@ -123,6 +127,17 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
   const isCustomTrack = customTracks.some((t) => t.id === selectedTrackId);
 
   const currentTonic = TONIC_PITCHES.find((t) => t.value === config.tonic) || TONIC_PITCHES[2];
+
+  const handleMidiClick = () => {
+    if (deviceState.permissionStatus === 'prompt') {
+      onRequestMidiPermission?.();
+    } else {
+      setShowMidiMenu(true);
+      if (deviceState.permissionStatus !== 'denied') {
+        midiManagerInstance.requestAccess();
+      }
+    }
+  };
 
   const formatTime = (sec: number) => {
     const mins = Math.floor(sec / 60);
@@ -287,17 +302,16 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
-                    midiManagerInstance.requestAccess();
-                    setShowMidiMenu(true);
+                    handleMidiClick();
                   }}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
                 >
                   <div className="flex items-center gap-2">
-                    <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                    <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : deviceState.permissionStatus === 'denied' ? 'text-amber-400' : 'text-slate-400'}`} />
                     <span>MIDI Hardware</span>
                   </div>
-                  <span className={`text-[10px] font-mono px-1 rounded ${deviceState.isConnected ? 'bg-emerald-950 text-emerald-300' : 'text-slate-500'}`}>
-                    {deviceState.isConnected ? `${deviceState.inputs.length} In` : 'Off'}
+                  <span className={`text-[10px] font-mono px-1 rounded ${deviceState.isConnected ? 'bg-emerald-950 text-emerald-300' : deviceState.permissionStatus === 'denied' ? 'bg-amber-950 text-amber-300' : 'text-slate-500'}`}>
+                    {deviceState.isConnected ? `${deviceState.inputs.length} In` : deviceState.permissionStatus === 'denied' ? 'Blocked' : 'Off'}
                   </span>
                 </button>
 
@@ -560,10 +574,7 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
         */}
         {deviceState.isConnected ? (
           <button
-            onClick={() => {
-              midiManagerInstance.requestAccess();
-              setShowMidiMenu(true);
-            }}
+            onClick={() => setShowMidiMenu(true)}
             className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border bg-emerald-950/70 border-emerald-700/80 text-emerald-300 hover:bg-emerald-900/80 transition cursor-pointer"
             title={`${deviceState.inputs.length} MIDI Device(s) connected. Click to configure.`}
           >
@@ -572,15 +583,20 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
           </button>
         ) : (
           <button
-            onClick={() => {
-              midiManagerInstance.requestAccess();
-              setShowMidiMenu(true);
-            }}
-            className="hidden 2xl:flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-700/60 transition cursor-pointer"
-            title="Connect MIDI hardware controller"
+            onClick={handleMidiClick}
+            className={`hidden 2xl:flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-mono border transition cursor-pointer ${
+              deviceState.permissionStatus === 'denied'
+                ? 'bg-amber-950/50 border-amber-800/60 text-amber-300 hover:bg-amber-900/60'
+                : 'bg-slate-800/60 border-slate-700/60 text-slate-300 hover:bg-slate-700/60'
+            }`}
+            title={
+              deviceState.permissionStatus === 'denied'
+                ? 'MIDI access blocked in browser settings'
+                : 'Connect MIDI hardware keyboard'
+            }
           >
-            <Radio className="w-3.5 h-3.5 text-slate-400" />
-            <span>Connect MIDI</span>
+            <Radio className={`w-3.5 h-3.5 ${deviceState.permissionStatus === 'denied' ? 'text-amber-400' : 'text-slate-400'}`} />
+            <span>{deviceState.permissionStatus === 'denied' ? 'MIDI Blocked' : 'Connect MIDI'}</span>
           </button>
         )}
 
@@ -679,17 +695,16 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
               <button
                 onClick={() => {
                   setShowMoreMenu(false);
-                  midiManagerInstance.requestAccess();
-                  setShowMidiMenu(true);
+                  handleMidiClick();
                 }}
                 className="w-full flex items-center justify-between px-2 py-1.5 rounded bg-slate-800/60 hover:bg-slate-700/80 text-slate-200 transition"
               >
                 <div className="flex items-center gap-2">
-                  <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : 'text-slate-400'}`} />
+                  <Radio className={`w-3.5 h-3.5 ${deviceState.isConnected ? 'text-emerald-400 animate-pulse' : deviceState.permissionStatus === 'denied' ? 'text-amber-400' : 'text-slate-400'}`} />
                   <span>MIDI Hardware</span>
                 </div>
-                <span className={`text-[10px] font-mono px-1 rounded ${deviceState.isConnected ? 'bg-emerald-950 text-emerald-300' : 'text-slate-500'}`}>
-                  {deviceState.isConnected ? `${deviceState.inputs.length} In` : 'Off'}
+                <span className={`text-[10px] font-mono px-1 rounded ${deviceState.isConnected ? 'bg-emerald-950 text-emerald-300' : deviceState.permissionStatus === 'denied' ? 'bg-amber-950 text-amber-300' : 'text-slate-500'}`}>
+                  {deviceState.isConnected ? `${deviceState.inputs.length} In` : deviceState.permissionStatus === 'denied' ? 'Blocked' : 'Off'}
                 </span>
               </button>
 
@@ -823,16 +838,56 @@ export const ControlToolbar = memo<ControlToolbarProps>(function ControlToolbar(
               </button>
             </div>
 
-            {deviceState.inputs.length === 0 ? (
+            {deviceState.permissionStatus === 'denied' ? (
+              <div className="text-slate-400 space-y-2.5 py-1">
+                <div className="bg-amber-950/40 border border-amber-800/60 rounded-lg p-2.5 space-y-1.5 text-amber-200">
+                  <p className="font-semibold text-xs flex items-center gap-1.5">
+                    <span>⚠️</span> MIDI Access Blocked
+                  </p>
+                  <p className="text-[11px] leading-relaxed text-amber-300/90">
+                    Your browser blocked MIDI permissions. To re-enable:
+                  </p>
+                  <ol className="list-decimal list-inside text-[11px] space-y-1 text-slate-300">
+                    <li>Click the site settings / padlock icon in your address bar</li>
+                    <li>Set <strong>MIDI devices</strong> to <strong>Allow</strong></li>
+                    <li>Reload the page or click below to retry</li>
+                  </ol>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      onOpenVirtualKeyboard?.();
+                      setShowMidiMenu(false);
+                    }}
+                    className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg font-medium transition text-center shadow text-[11px]"
+                  >
+                    On-Screen Piano
+                  </button>
+                  <button
+                    onClick={() => midiManagerInstance.requestAccess()}
+                    className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition text-center shadow text-[11px]"
+                  >
+                    Retry Connection
+                  </button>
+                </div>
+              </div>
+            ) : deviceState.inputs.length === 0 ? (
               <div className="text-slate-400 space-y-2.5 py-1">
                 <p className="text-[11px] leading-relaxed">
                   No hardware MIDI devices detected yet. Plug in your USB MIDI keyboard and click below:
                 </p>
                 <button
-                  onClick={() => midiManagerInstance.requestAccess()}
+                  onClick={() => {
+                    if (deviceState.permissionStatus === 'prompt') {
+                      setShowMidiMenu(false);
+                      onRequestMidiPermission?.();
+                    } else {
+                      midiManagerInstance.requestAccess();
+                    }
+                  }}
                   className="w-full py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium transition text-center shadow"
                 >
-                  Rescan / Request MIDI Access
+                  {deviceState.permissionStatus === 'prompt' ? 'Connect MIDI Keyboard' : 'Rescan MIDI Devices'}
                 </button>
               </div>
             ) : (

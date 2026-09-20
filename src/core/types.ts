@@ -291,10 +291,13 @@ export interface VisualiserConfig
   activeLayout: LayoutDefinition;
 }
 
+export type MidiPermissionStatus = 'granted' | 'prompt' | 'denied' | 'unsupported';
+
 export interface MidiDeviceState {
   inputs: Array<{ id: string; name: string; manufacturer?: string }>;
   selectedInputId: string | null;
   isConnected: boolean;
+  permissionStatus: MidiPermissionStatus;
 }
 
 export interface MidiPlaybackState {

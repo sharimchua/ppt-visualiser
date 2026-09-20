@@ -11,7 +11,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - `src/core/scale-alignment.ts` — Real-time key/scale detection, 12 diatonic mode definitions, and hysteresis debouncing.
 - `src/core/layout-models.ts` — Flex tree manipulation, cell splitting, tree pruning, presets (including Harmonic Waves), and URL-safe Base64 slug serialisation.
 - `src/core/render-coordinator.ts` — Decoupled event bus managing note lifecycles, active note sets, Staff Stream session resets, and particle physics outside React.
-- `src/core/midi-manager.ts` — Web MIDI hardware access and device state tracking.
+- `src/core/midi-manager.ts` — Web MIDI hardware access, Permissions API state tracking (`granted`, `prompt`, `denied`, `unsupported`), silent background reconnection for previously authorised sessions, and focused device state tracking.
 - `src/core/midi-file-player.ts` — Standard MIDI file playback engine, transport controls, and demo track loader.
 - `src/core/custom-midi-store.ts` — Local storage persistence, quota eviction, and event subscriptions for uploaded user MIDI tracks.
 - `src/core/audio-synth.ts` — Web Audio API polyphonic sound synthesiser with envelope shaping.
@@ -33,6 +33,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - **Cosmetics Viewport Origin Alignment**: Particle spark physics and bloom light fallbacks must always calculate coordinate space relative to the active module's canvas bounding rect (`orbitalCellCanvas`) rather than the global viewport window centre, ensuring initial dynamic effects start exactly at node centres.
 - **Continuous Stream Buffer Retention**: When continuous streaming is active across any module (`streamMode === 'continuous'`, `staffStreamMode === 'continuous'`, or cell overrides via `isContinuousStreamingActive()`), `RenderCoordinator` retains up to 10,000 notes and dynamically computes timestamp age pruning based on active scroll speeds ($\ge 120\text{s}$) across wide displays. Fixed queue mode safely reserves up to 512 items accommodating multi-note chord clusters. Stream items record their strike-time tonic and Solfège semitone context, ensuring historical stream noteheads retain immutable Solfège heads across subsequent tonic modulations.
 - **Pure Tree Operations**: Operations in `layout-models.ts` (`splitCellInTree`, `removeCellFromTree`, `duplicateCellInTree`, `encodeLayoutToSlug`, `decodeLayoutFromSlug`) must remain pure and immutably return updated tree structures.
+- **Web MIDI Permission Lifecycle**: `MidiManager` never triggers unprompted `requestMIDIAccess()` pop-up dialogues on initial page load or ambient pointerdown events when permission is `'prompt'`. It evaluates permission state via `navigator.permissions.query({ name: 'midi', sysex: false })`. If already `'granted'`, it connects silently. If `'prompt'`, requests are deferred until explicit user gesture from the UI. If `'denied'`, error states are reported to allow graceful on-screen virtual keyboard fallback.
 
 ## Work Guidance
 
