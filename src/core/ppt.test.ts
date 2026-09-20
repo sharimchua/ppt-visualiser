@@ -2676,6 +2676,43 @@ test('Real-time Focus Mode: MidiManager ignores background MIDI and releases hel
   midiManagerInstance.setFocusMode(true);
 });
 
+test('Web MIDI Permissions: MidiManager tracks permission status and notifies subscribers', async () => {
+  let latestStatus = midiManagerInstance.state.permissionStatus;
+  const unsubState = midiManagerInstance.onStateChange((state) => {
+    latestStatus = state.permissionStatus;
+  });
+
+  // 1. Initial state is defined
+  assert.ok(['granted', 'prompt', 'denied', 'unsupported'].includes(latestStatus), 'Initial permission status must be valid');
+
+  // 2. Setting prompt status
+  midiManagerInstance.setPermissionStatusForTesting('prompt');
+  assert.strictEqual(midiManagerInstance.state.permissionStatus, 'prompt');
+  assert.strictEqual(latestStatus, 'prompt');
+
+  // 3. Transition to denied status notifies state listeners
+  midiManagerInstance.setPermissionStatusForTesting('denied');
+  assert.strictEqual(midiManagerInstance.state.permissionStatus, 'denied');
+  assert.strictEqual(latestStatus, 'denied');
+
+  // 4. Transition to granted status
+  midiManagerInstance.setPermissionStatusForTesting('granted');
+  assert.strictEqual(midiManagerInstance.state.permissionStatus, 'granted');
+  assert.strictEqual(latestStatus, 'granted');
+
+  // 5. Calling requestAccess in Node.js headless environment cleanly marks unsupported or denied without throwing
+  const result = await midiManagerInstance.requestAccess();
+  assert.strictEqual(result, false, 'requestAccess must return false in headless environment without navigator.requestMIDIAccess');
+  assert.ok(
+    midiManagerInstance.state.permissionStatus === 'unsupported' || midiManagerInstance.state.permissionStatus === 'denied',
+    'Permission status must be unsupported or denied when navigator.requestMIDIAccess is unavailable'
+  );
+
+  // Cleanup
+  unsubState();
+  midiManagerInstance.setPermissionStatusForTesting(null);
+});
+
 test('Real-time Focus Mode: AudioSynth silences voices and rejects notes when unfocused', () => {
   synthInstance.setFocusMode(true);
   synthInstance.setFocusedForTesting(false);

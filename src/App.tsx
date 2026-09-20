@@ -19,6 +19,7 @@ import { VisualiserViewport } from './components/VisualiserViewport';
 import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { InfoModal } from './components/InfoModal';
+import { MidiPermissionModal } from './components/MidiPermissionModal';
 import { Piano } from 'lucide-react';
 import {
   decodeLayoutFromSlug,
@@ -67,6 +68,7 @@ export const App: React.FC = () => {
   const [playbackState, setPlaybackState] = useState<MidiPlaybackState>(midiPlayerInstance.getState());
   const [deviceState, setDeviceState] = useState<MidiDeviceState>(midiManagerInstance.state);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isMidiModalOpen, setIsMidiModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isMouseIdle, setIsMouseIdle] = useState(false);
   const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
@@ -154,18 +156,9 @@ export const App: React.FC = () => {
     const unsubPlayback = midiPlayerInstance.onStateChange(setPlaybackState);
     const unsubDevice = midiManagerInstance.onStateChange(setDeviceState);
 
-    // Prompt/ensure Web MIDI is initialised on user gesture if browser requires it
-    const handleFirstGesture = () => {
-      if (!midiManagerInstance.state.isConnected) {
-        midiManagerInstance.requestAccess();
-      }
-    };
-    window.addEventListener('pointerdown', handleFirstGesture, { once: true });
-
     return () => {
       unsubPlayback();
       unsubDevice();
-      window.removeEventListener('pointerdown', handleFirstGesture);
     };
   }, []);
 
@@ -363,6 +356,8 @@ export const App: React.FC = () => {
           onToggleSettings={() => setIsSettingsOpen(!isSettingsOpen)}
           onResetState={handleResetSessionState}
           onOpenInfoModal={() => setIsInfoModalOpen(true)}
+          onRequestMidiPermission={() => setIsMidiModalOpen(true)}
+          onOpenVirtualKeyboard={() => updateConfig({ showVirtualKeyboard: true })}
         />
       </div>
 
@@ -435,6 +430,13 @@ export const App: React.FC = () => {
         isOpen={isInfoModalOpen}
         onClose={handleCloseInfoModal}
         onPlayDemo={handlePlayDemoFromModal}
+      />
+
+      {/* MIDI Permission Explainer Modal */}
+      <MidiPermissionModal
+        isOpen={isMidiModalOpen}
+        onClose={() => setIsMidiModalOpen(false)}
+        onUseVirtualKeyboard={() => updateConfig({ showVirtualKeyboard: true })}
       />
     </div>
   );

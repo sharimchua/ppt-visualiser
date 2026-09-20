@@ -1,4 +1,4 @@
-import { MidiDeviceState } from './types';
+import { MidiDeviceState, MidiPermissionStatus } from './types';
 
 export type NoteOnCallback = (midi: number, velocity: number) => void;
 export type NoteOffCallback = (midi: number) => void;
@@ -13,11 +13,13 @@ export class MidiManager {
   private focusModeEnabled: boolean = true;
   private heldMidiNotes: Set<number> = new Set();
   private mockFocusedState: boolean | null = null;
+  private mockPermissionStatus: MidiPermissionStatus | null = null;
 
   public state: MidiDeviceState = {
     inputs: [],
     selectedInputId: 'all', // Listen to all inputs by default
     isConnected: false,
+    permissionStatus: 'prompt',
   };
 
   private boundMessageHandler = (event: Event) => {
@@ -40,8 +42,63 @@ export class MidiManager {
       document.addEventListener('visibilitychange', this.handleFocusChange);
     }
 
-    // Attempt non-blocking request on startup
-    this.requestAccess();
+    // Initialise permission state and connect silently only if already granted
+    this.initialisePermissionState();
+  }
+
+  public async checkPermissionStatus(): Promise<MidiPermissionStatus> {
+    if (this.mockPermissionStatus !== null) {
+      return this.mockPermissionStatus;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.requestMIDIAccess) {
+      return 'unsupported';
+    }
+
+    if (!navigator.permissions || !navigator.permissions.query) {
+      return 'prompt';
+    }
+
+    try {
+      const status = await navigator.permissions.query({ name: 'midi' as PermissionName, sysex: false } as any);
+      const state = (status.state as MidiPermissionStatus) || 'prompt';
+
+      status.onchange = () => {
+        const nextState = (status.state as MidiPermissionStatus) || 'prompt';
+        this.setPermissionStatus(nextState);
+        if (nextState === 'granted' && !this.midiAccess) {
+          this.requestAccess();
+        }
+      };
+
+      return state;
+    } catch {
+      return 'prompt';
+    }
+  }
+
+  public async initialisePermissionState() {
+    const status = await this.checkPermissionStatus();
+    this.state.permissionStatus = status;
+    this.notifyState();
+
+    // If permission was already granted previously, connect silently with zero user friction
+    if (status === 'granted') {
+      await this.requestAccess();
+    }
+  }
+
+  public setPermissionStatusForTesting(status: MidiPermissionStatus | null) {
+    this.mockPermissionStatus = status;
+    if (status !== null) {
+      this.state.permissionStatus = status;
+      this.notifyState();
+    }
+  }
+
+  public setPermissionStatus(status: MidiPermissionStatus) {
+    this.state.permissionStatus = status;
+    this.notifyState();
   }
 
   public isWindowFocused(): boolean {
@@ -76,6 +133,7 @@ export class MidiManager {
     if (typeof navigator === 'undefined' || !navigator.requestMIDIAccess) {
       console.warn('[Web MIDI] navigator.requestMIDIAccess not supported in this browser.');
       this.state.isConnected = false;
+      this.state.permissionStatus = 'unsupported';
       this.notifyState();
       return false;
     }
@@ -83,6 +141,7 @@ export class MidiManager {
     try {
       this.midiAccess = await navigator.requestMIDIAccess({ sysex: false });
       console.log('[Web MIDI] Access granted. Inputs found:', this.midiAccess.inputs.size);
+      this.state.permissionStatus = 'granted';
 
       this.updateInputs();
 
@@ -96,6 +155,7 @@ export class MidiManager {
     } catch (err) {
       console.warn('[Web MIDI] Access failed or permission denied:', err);
       this.state.isConnected = false;
+      this.state.permissionStatus = 'denied';
       this.notifyState();
       return false;
     }
