@@ -4,13 +4,71 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>PPT Visualiser — Prime Period Theory Music Visualiser</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>PPT Visualiser — Kinetic Multi-Octave Music Visualiser | Midlife Muso</title>
+    <meta name="description" content="Real-time Web MIDI and polyphonic music visualiser grounded in Prime Period Theory and Uniform Solfège. Explore concentric pitch clocks, piano triangles, and chord webbing." />
+    <meta name="author" content="Sharim Chua — Midlife Muso" />
+    <link rel="canonical" href="https://visualiser.midlifemuso.com/" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Midlife Muso" />
+    <meta property="og:locale" content="en_AU" />
+    <meta property="og:url" content="https://visualiser.midlifemuso.com/" />
+    <meta property="og:title" content="PPT Visualiser — Kinetic Multi-Octave Music Visualiser | Midlife Muso" />
+    <meta property="og:description" content="Real-time Web MIDI and polyphonic music visualiser grounded in Prime Period Theory and Uniform Solfège." />
+    <meta property="og:image" content="https://midlifemuso.com/images/apps/ppt-visualiser.webp" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="PPT Visualiser — Kinetic Multi-Octave Music Visualiser | Midlife Muso" />
+    <meta name="twitter:description" content="Real-time Web MIDI and polyphonic music visualiser grounded in Prime Period Theory and Uniform Solfège." />
+    <meta name="twitter:image" content="https://midlifemuso.com/images/apps/ppt-visualiser.webp" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+    <!-- Google Analytics 4 (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-FXS2Y4S4RT"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-FXS2Y4S4RT');
+    </script>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "PPT Visualiser",
+        "url": "https://visualiser.midlifemuso.com/",
+        "description": "A real-time music visualiser grounded in Prime Period Theory and Uniform Solfège with concentric pitch clocks, tetrachordal piano triangles, and Web MIDI.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "isAccessibleForFree": true,
+        "image": "https://midlifemuso.com/images/apps/ppt-visualiser.webp",
+        "author": {
+          "@type": "Person",
+          "name": "Sharim Chua",
+          "url": "https://midlifemuso.com/about-me/"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Midlife Muso",
+          "url": "https://midlifemuso.com/"
+        }
+      }
+    </script>
   </head>
   <body class="bg-[#0b0d13] text-slate-100 overflow-hidden select-none m-0 p-0 font-sans antialiased">
     <div id="root"></div>
+    <noscript>
+      <main style="padding:2rem;max-width:42rem;margin:0 auto;font-family:Inter,sans-serif;">
+        <h1>PPT Visualiser — Prime Period Theory Music Visualiser</h1>
+        <p>A real-time music visualiser by Midlife Muso rendering MIDI and playback across concentric pitch clocks, piano triangles, and chord webbing. Enable JavaScript to launch the app, or visit <a href="https://midlifemuso.com/apps/">Midlife Muso Apps</a>.</p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
