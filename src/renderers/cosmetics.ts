@@ -297,7 +297,8 @@ export class CosmeticsEngine {
     count: number = 24,
     sizeMultiplier: number = 1.0,
     speedMultiplier: number = 1.0,
-    gravity: number = 0.22
+    gravity: number = 0.22,
+    baseAngle: number = -Math.PI / 2
   ): void {
     const clampedVel = Math.max(0.12, Math.min(1.0, velocity));
 
@@ -313,7 +314,7 @@ export class CosmeticsEngine {
       // Differentiate between central high-velocity plume droplets and peripheral splash mist
       const isCoreJet = Math.random() < 0.55;
       const coneSpread = isCoreJet ? 0.36 : (0.75 + (1.0 - clampedVel) * 0.25);
-      const angle = -Math.PI / 2 + (Math.random() - 0.5) * coneSpread;
+      const angle = baseAngle + (Math.random() - 0.5) * coneSpread;
 
       const speedVariation = isCoreJet ? (Math.random() * 3.8 + 4.2) : (Math.random() * 3.2 + 2.0);
       const speed = speedVariation * speedMultiplier * ejectionPower;

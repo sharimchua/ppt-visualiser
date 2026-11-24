@@ -348,6 +348,64 @@ export const PRESET_HARMONIC: LayoutDefinition = {
   },
 };
 
+export const PRESET_HARMONIC_SPIRAL: LayoutDefinition = {
+  id: 'harmonic-spiral',
+  name: 'Harmonic Spiral',
+  description: 'Continuous logarithmic Harmonic Spiral with outer dissonance corona paired with linear Overtone Waves',
+  root: {
+    id: 'root-harmonic-spiral',
+    type: 'container',
+    direction: 'column',
+    gap: 8,
+    children: [
+      {
+        id: 'cell-spiral-overtones',
+        type: 'cell',
+        module: 'spiral-overtones',
+        flex: 3.5,
+        title: 'Harmonic Spiral',
+        configOverrides: {
+          showDissonanceCurve: true,
+          showOvertoneLabels: true,
+          showSpiralChordGeometry: false,
+          showSpokeResonance: true,
+          spiralRangeMode: 'adaptive',
+          fluidSpeed: 1.0,
+        },
+      },
+      {
+        id: 'cell-overtones-spiral-ref',
+        type: 'cell',
+        module: 'overtones',
+        flex: 1,
+        minSize: 110,
+        title: 'Overtone Waves',
+        configOverrides: {
+          showDissonanceCurve: true,
+          showOvertoneLabels: true,
+          fluidSpeed: 1.0,
+        },
+      },
+    ],
+  },
+  aesthetics: {
+    backgroundTheme: 'carbon-grid',
+    filmGrainIntensity: 0.35,
+    filmGrainSize: 3,
+    filmGrainContrast: 0.45,
+    particleIntensity: 0.9,
+    glowBloom: 0.8,
+    motionTrails: 0.6,
+    ghostingIntensity: 0.3,
+    lightBleedIntensity: 0.45,
+    scanlineIntensity: 0.4,
+    scanlineDensity: 2,
+    crtVignette: 0.3,
+    lensFlareIntensity: 0.55,
+    lensFlareStyle: 'cinematic',
+  },
+};
+
 export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'balanced': PRESET_BALANCED,
   'monument': PRESET_MONUMENT,
@@ -357,7 +415,24 @@ export const PRESET_LAYOUTS: Record<LayoutMode, LayoutDefinition> = {
   'orbital-focus': PRESET_ORBITAL_FOCUS,
   'signature': PRESET_SIGNATURE,
   'harmonic': PRESET_HARMONIC,
+  'harmonic-spiral': PRESET_HARMONIC_SPIRAL,
 };
+
+const DEFAULT_MODULE_TITLES: Record<VisualiserModuleType, string> = {
+  orbital: 'Pitch Clock',
+  triangles: 'Piano Triangles',
+  overtones: 'Overtone Waves',
+  'spiral-overtones': 'Harmonic Spiral',
+  'staff-stream': 'Staff Stream',
+  stream: 'Note Stream',
+};
+
+/**
+ * Returns the canonical display title for a given visualiser cell module type.
+ */
+export function getDefaultModuleTitle(module: VisualiserModuleType): string {
+  return DEFAULT_MODULE_TITLES[module] ?? 'Note Stream';
+}
 
 /**
  * Traverses layout tree and returns an array of all leaf cell nodes.
@@ -451,16 +526,7 @@ export function splitCellInTree(
         type: 'cell',
         module: newModule,
         flex: 1,
-        title:
-          newModule === 'orbital'
-            ? 'Pitch Clock'
-            : newModule === 'triangles'
-            ? 'Piano Triangles'
-            : newModule === 'overtones'
-            ? 'Overtone Waves'
-            : newModule === 'staff-stream'
-            ? 'Staff Stream'
-            : 'Note Stream',
+        title: getDefaultModuleTitle(newModule),
         configOverrides:
           newModule === 'stream'
             ? {
@@ -652,16 +718,7 @@ export function addCellToTree(
     type: 'cell',
     module,
     flex: 1,
-    title:
-      module === 'orbital'
-        ? 'Pitch Clock'
-        : module === 'triangles'
-        ? 'Piano Triangles'
-        : module === 'overtones'
-        ? 'Overtone Waves'
-        : module === 'staff-stream'
-        ? 'Staff Stream'
-        : 'Note Stream',
+    title: getDefaultModuleTitle(module),
     configOverrides:
       module === 'stream'
         ? {

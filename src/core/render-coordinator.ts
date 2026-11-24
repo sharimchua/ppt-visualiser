@@ -29,6 +29,7 @@ import { PianoTrianglesRenderer } from '../renderers/piano-triangles-canvas';
 import { StreamRenderer } from '../renderers/stream-canvas';
 import { StaffStreamRenderer } from '../renderers/staff-stream-canvas';
 import { OvertonesRenderer } from '../renderers/overtones-canvas';
+import { SpiralOvertonesRenderer } from '../renderers/spiral-overtones-canvas';
 import {
   WebGLPostProcessingPipeline,
   PostProcessingLight,
@@ -78,6 +79,7 @@ export class RenderCoordinator {
   public readonly streamRenderer: StreamRenderer;
   public readonly staffStreamRenderer: StaffStreamRenderer;
   public readonly overtonesRenderer: OvertonesRenderer;
+  public readonly spiralOvertonesRenderer: SpiralOvertonesRenderer;
 
   // WebGL Post-Processing Pipeline
   private postProcessingCanvas: HTMLCanvasElement | null = null;
@@ -114,12 +116,16 @@ export class RenderCoordinator {
 
   // Real-time focus and multi-instance management
   private mockFocusedState: boolean | null = null;
+  private isStageMode: boolean = false;
+  private isDispatchingRemoteNote: boolean = false;
+  public onLocalNoteDispatch?: (event: 'noteOn' | 'noteOff', midi: number, velocity?: number) => void;
 
   // MIDI Unsubscribers
   private unsubMidiOn?: () => void;
   private unsubMidiOff?: () => void;
 
   private handleFocusChange = () => {
+    if (this.isStageMode) return;
     const focused = this.isWindowFocused();
     if (!focused && (this.config.focusModeEnabled ?? true)) {
       this.clearActiveAndDecayingNotes();
@@ -158,6 +164,7 @@ export class RenderCoordinator {
     this.streamRenderer = new StreamRenderer();
     this.staffStreamRenderer = new StaffStreamRenderer();
     this.overtonesRenderer = new OvertonesRenderer();
+    this.spiralOvertonesRenderer = new SpiralOvertonesRenderer();
 
     // Propagate initial focusMode setting to engines
     const focusMode = initialConfig.focusModeEnabled ?? true;
@@ -219,6 +226,35 @@ export class RenderCoordinator {
   public setFocusedForTesting(focused: boolean | null) {
     this.mockFocusedState = focused;
     this.handleFocusChange();
+  }
+
+  public setStageMode(enabled: boolean) {
+    this.isStageMode = enabled;
+    midiManagerInstance.setStageMode(enabled);
+    synthInstance.setStageMode(enabled);
+    midiPlayerInstance.setStageMode(enabled);
+  }
+
+  public getIsStageMode(): boolean {
+    return this.isStageMode;
+  }
+
+  public triggerRemoteNoteOn(midi: number, velocity: number = 0.8) {
+    this.isDispatchingRemoteNote = true;
+    try {
+      this.triggerNoteOn(midi, velocity);
+    } finally {
+      this.isDispatchingRemoteNote = false;
+    }
+  }
+
+  public triggerRemoteNoteOff(midi: number) {
+    this.isDispatchingRemoteNote = true;
+    try {
+      this.triggerNoteOff(midi);
+    } finally {
+      this.isDispatchingRemoteNote = false;
+    }
   }
 
   public clearActiveAndDecayingNotes() {
@@ -537,8 +573,11 @@ export class RenderCoordinator {
   }
 
   public triggerNoteOn = (midi: number, velocity: number = 0.8) => {
-    if ((this.config.focusModeEnabled ?? true) && !this.isWindowFocused()) {
+    if ((this.config.focusModeEnabled ?? true) && !this.isStageMode && !this.isWindowFocused()) {
       return;
+    }
+    if (!this.isDispatchingRemoteNote) {
+      this.onLocalNoteDispatch?.('noteOn', midi, velocity);
     }
     const now = performance.now();
     const pc = ((midi % 12) + 12) % 12;
@@ -774,6 +813,47 @@ export class RenderCoordinator {
               );
             }
           }
+        } else if (cell.module === 'spiral-overtones' && effConfig.overtoneDropletsEnabled !== false) {
+          const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
+          const cellLeft = cellRect.left - overlayRect.left;
+          const cellTop = cellRect.top - overlayRect.top;
+          const w = cell.canvas.width / dpr;
+          const h = cell.canvas.height / dpr;
+          const coords = this.spiralOvertonesRenderer.getFundamentalCoordinatesForMidi(
+            midi,
+            w,
+            h,
+            effConfig,
+            velocity
+          );
+          if (coords) {
+            this.cosmeticsEngine.spawnFluidDroplets(
+              cellLeft + coords.x,
+              cellTop + coords.y,
+              coords.colorHex,
+              velocity,
+              Math.round(22 * this.config.particleIntensity),
+              this.config.particleSize * 1.05,
+              0.85,
+              0.03,
+              coords.angle
+            );
+
+            if (effConfig.sparksEnabled !== false) {
+              this.cosmeticsEngine.spawnDirectionalSparks(
+                cellLeft + coords.x,
+                cellTop + coords.y,
+                coords.colorHex,
+                velocity,
+                coords.angle,
+                Math.PI * 0.55,
+                Math.round(12 * this.config.particleIntensity),
+                0.95 + velocity * 0.8,
+                this.config.particleSize * 0.9,
+                0.04
+              );
+            }
+          }
         }
       }
     }
@@ -837,6 +917,9 @@ export class RenderCoordinator {
   };
 
   public triggerNoteOff = (midi: number) => {
+    if (!this.isDispatchingRemoteNote) {
+      this.onLocalNoteDispatch?.('noteOff', midi);
+    }
     const now = performance.now();
 
     // Release audio synth voice
@@ -990,6 +1073,52 @@ export class RenderCoordinator {
                     this.config.particleSize * 0.85,
                     0.65 + note.velocity * 0.45,
                     0.16
+                  );
+                }
+              }
+            }
+          }
+        }
+      } else if (module === 'spiral-overtones') {
+        this.spiralOvertonesRenderer.render(
+          ctx,
+          width,
+          height,
+          this.activeNotes,
+          this.decayingNotes,
+          effectiveConfig,
+          time
+        );
+
+        const dropletsOn =
+          (effectiveConfig.overtoneDropletsEnabled ?? true) &&
+          effectiveConfig.particleIntensity > 0;
+        if (dropletsOn && this.activeNotes.size > 0 && Math.random() < 0.34) {
+          const targetRect = this.cachedTargetRect;
+          if (cell.cachedRect && targetRect) {
+            const cellLeft = cell.cachedRect.left - targetRect.left;
+            const cellTop = cell.cachedRect.top - targetRect.top;
+            for (const note of this.activeNotes.values()) {
+              const bubbleProb = 0.22 + note.velocity * 0.48;
+              if (note.velocity > 0.05 && Math.random() < bubbleProb) {
+                const coords = this.spiralOvertonesRenderer.getFundamentalCoordinatesForMidi(
+                  note.midi,
+                  width,
+                  height,
+                  effectiveConfig,
+                  note.velocity
+                );
+                if (coords) {
+                  this.cosmeticsEngine.spawnFluidDroplets(
+                    cellLeft + coords.x,
+                    cellTop + coords.y,
+                    coords.colorHex,
+                    note.velocity * 0.4,
+                    Math.random() < note.velocity ? 2 : 1,
+                    this.config.particleSize * 0.8,
+                    0.55 + note.velocity * 0.4,
+                    0.025,
+                    coords.angle
                   );
                 }
               }
@@ -1214,6 +1343,18 @@ export class RenderCoordinator {
                 colorHex: v.colorHex,
               });
             }
+          }
+        } else if (cell.module === 'spiral-overtones' && cell.cachedRect) {
+          const cellLeft = cell.cachedRect.left - targetRect.left;
+          const cellTop = cell.cachedRect.top - targetRect.top;
+          const spiralLights = this.spiralOvertonesRenderer.getActiveLightSources();
+          for (const sl of spiralLights) {
+            lights.push({
+              x: cellLeft + sl.x,
+              y: cellTop + sl.y,
+              velocity: sl.velocity,
+              colorHex: sl.colorHex,
+            });
           }
         }
       }

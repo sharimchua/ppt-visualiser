@@ -20,6 +20,7 @@ import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { SettingsDrawer } from './components/SettingsDrawer';
 import { InfoModal } from './components/InfoModal';
 import { MidiPermissionModal } from './components/MidiPermissionModal';
+import { useStageBridge, isStageEmbedded } from './hooks/useStageBridge';
 import { Piano } from 'lucide-react';
 import {
   decodeLayoutFromSlug,
@@ -74,6 +75,7 @@ export const App: React.FC = () => {
   const [isEditLayoutMode, setIsEditLayoutMode] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
+    if (isStageEmbedded()) return false;
     const dontShow = localStorage.getItem('ppt_dont_show_intro_on_launch_v1') === 'true';
     const hasSeen = localStorage.getItem('ppt_has_seen_intro_modal_v1') === 'true';
     return !dontShow && !hasSeen;
@@ -267,10 +269,13 @@ export const App: React.FC = () => {
     }
   }, [config.activeLayout]);
 
+  const { broadcastResetSession } = useStageBridge({ config, setConfig });
+
   // Reset session state: clears discovered tones, active notes, scale tracker, and note stream
   const handleResetSessionState = useCallback(() => {
     renderCoordinatorInstance.resetSession();
-  }, []);
+    broadcastResetSession();
+  }, [broadcastResetSession]);
 
   // Fullscreen Management
   const toggleFullscreen = useCallback(() => {

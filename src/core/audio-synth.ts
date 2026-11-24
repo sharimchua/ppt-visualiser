@@ -19,9 +19,11 @@ export class AudioSynth {
 
   // Focus and multi-instance lifecycle management
   private focusModeEnabled: boolean = true;
+  private isStageMode: boolean = false;
   private mockFocusedState: boolean | null = null;
 
   private handleFocusChange = () => {
+    if (this.isStageMode) return;
     const focused = this.isWindowFocused();
     if (!focused && this.focusModeEnabled) {
       this.stopAll(true);
@@ -53,6 +55,34 @@ export class AudioSynth {
 
   public getFocusMode(): boolean {
     return this.focusModeEnabled;
+  }
+
+  public setStageMode(enabled: boolean) {
+    this.isStageMode = enabled;
+  }
+
+  public getIsStageMode(): boolean {
+    return this.isStageMode;
+  }
+
+  public getAudioState(): 'running' | 'suspended' | 'closed' {
+    if (!this.ctx) return 'suspended';
+    const state = this.ctx.state as string;
+    if (state === 'running') return 'running';
+    if (state === 'closed') return 'closed';
+    return 'suspended';
+  }
+
+  public async unlock(): Promise<'running' | 'suspended' | 'closed'> {
+    this.initContext();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume();
+      } catch {
+        // Ignore resume rejection without user gesture
+      }
+    }
+    return this.getAudioState();
   }
 
   public setFocusedForTesting(focused: boolean | null) {
@@ -96,7 +126,7 @@ export class AudioSynth {
   }
 
   public noteOn(midi: number, velocity: number = 0.8) {
-    if (this.focusModeEnabled && !this.isWindowFocused()) {
+    if (this.focusModeEnabled && !this.isStageMode && !this.isWindowFocused()) {
       return;
     }
     this.initContext();

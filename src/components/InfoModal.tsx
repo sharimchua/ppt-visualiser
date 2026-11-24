@@ -237,13 +237,13 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
               </p>
             </div>
 
-            {/* Four Distinct Visual Modules */}
+            {/* Six Distinct Visual Modules */}
             <div>
               <h4 className="font-semibold text-white uppercase text-xs tracking-wider mb-3 flex items-center gap-2">
                 <Layers className="w-4 h-4 text-red-400" />
-                Five Distinct Visual Modules
+                Six Distinct Visual Modules
               </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
                   <div className="flex items-center gap-2 text-red-400 font-bold text-xs uppercase">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -281,6 +281,16 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </div>
                   <p className="text-xs text-slate-300">
                     Kinetic fluid wave simulation of the 7-harmonic acoustic overtone series, featuring Uniform Solfège colouring, velocity dynamics, and subterranean Plomp-Levelt dissonance curves.
+                  </p>
+                </div>
+
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-3.5 space-y-2">
+                  <div className="flex items-center gap-2 text-fuchsia-400 font-bold text-xs uppercase">
+                    <div className="w-2 h-2 rounded-full bg-fuchsia-500 animate-pulse" />
+                    Harmonic Spiral
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Continuous logarithmic spiral uniting polar pitch geometry with the 7-harmonic wave spectrum, radial spoke resonance, chord polygons, and an outer collective dissonance corona.
                   </p>
                 </div>
 
@@ -692,11 +702,11 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Layout Presets</span>
-                    <p className="text-slate-400">Choose from ready-made presets in the top header toolbar: <em>Signature Trio</em>, <em>Harmonic Waves</em>, <em>Full Orbital Clock</em>, <em>Dual Split</em>, <em>Focus Stream</em>, or <em>Balanced Tryptych</em>.</p>
+                    <p className="text-slate-400">Choose from ready-made presets in the top header toolbar: <em>Signature Trio</em>, <em>Harmonic Waves</em>, <em>Harmonic Spiral</em>, <em>Full Orbital Clock</em>, <em>Dual Split</em>, <em>Focus Stream</em>, or <em>Balanced Tryptych</em>.</p>
                   </div>
                   <div className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
                     <span className="font-semibold text-white block mb-1">Edit Mode & Resizing</span>
-                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves, or Staff Stream), duplicate cells, or drag border dividers to resize flex ratios.</p>
+                    <p className="text-slate-400">Click <strong>Edit Layout</strong> to split any cell horizontally or vertically, swap modules (Orbital Clock, Piano Triangles, Note Stream, Overtone Waves, Harmonic Spiral, or Staff Stream), duplicate cells, or drag border dividers to resize flex ratios.</p>
                   </div>
                 </div>
               </div>
@@ -713,16 +723,20 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, onPlayDem
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  When viewing an Overtone cell, you can fine-tune the fluid simulation directly in the Settings sidebar or via the cell&apos;s hover settings menu:
+                  When viewing an Overtone Waves or Harmonic Spiral cell, you can fine-tune the fluid simulation directly in the Settings sidebar or via the cell&apos;s settings panel:
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
                   <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
-                    <span className="font-bold text-cyan-400 block">Dissonance Roughness Curve</span>
-                    <p className="text-[10px] text-slate-400">Toggle the subterranean inverted wave displaying Plomp-Levelt acoustic roughness and sensory dissonance.</p>
+                    <span className="font-bold text-cyan-400 block">Dissonance Curve / Corona</span>
+                    <p className="text-[10px] text-slate-400">Toggle the subterranean roughness curve (linear) or the full-spectrum outer dissonance corona (Harmonic Spiral).</p>
                   </div>
                   <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
                     <span className="font-bold text-cyan-400 block">Solfège &amp; Multipliers</span>
                     <p className="text-[10px] text-slate-400">Display pitch syllables and harmonic multiplier badges (1× through 7×) over each partial wave crest.</p>
+                  </div>
+                  <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                    <span className="font-bold text-fuchsia-400 block">Spiral Geometry &amp; Spokes</span>
+                    <p className="text-[10px] text-slate-400">Switch between Adaptive and Full spiral spans, and toggle Pitch-Clock chord hulls or shared spoke resonance beams.</p>
                   </div>
                   <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
                     <span className="font-bold text-cyan-400 block">Fluid Ripple Speed</span>

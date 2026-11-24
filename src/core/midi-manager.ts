@@ -11,6 +11,8 @@ export class MidiManager {
 
   // Focus and multi-instance lifecycle management
   private focusModeEnabled: boolean = true;
+  private isStageMode: boolean = false;
+  private isSuppressed: boolean = false;
   private heldMidiNotes: Set<number> = new Set();
   private mockFocusedState: boolean | null = null;
   private mockPermissionStatus: MidiPermissionStatus | null = null;
@@ -27,6 +29,7 @@ export class MidiManager {
   };
 
   private handleFocusChange = () => {
+    if (this.isStageMode) return;
     const focused = this.isWindowFocused();
     if (!focused && this.focusModeEnabled) {
       this.releaseAllHeldNotes();
@@ -113,6 +116,17 @@ export class MidiManager {
 
   public getFocusMode(): boolean {
     return this.focusModeEnabled;
+  }
+
+  public setStageMode(enabled: boolean) {
+    this.isStageMode = enabled;
+  }
+
+  public setSuppressed(suppressed: boolean) {
+    this.isSuppressed = suppressed;
+    if (suppressed) {
+      this.releaseAllHeldNotes();
+    }
   }
 
   public setFocusedForTesting(focused: boolean | null) {
@@ -207,7 +221,10 @@ export class MidiManager {
   }
 
   private handleMidiMessage(event: MIDIMessageEvent) {
-    if (this.focusModeEnabled && !this.isWindowFocused()) {
+    if (this.isSuppressed) {
+      return;
+    }
+    if (this.focusModeEnabled && !this.isStageMode && !this.isWindowFocused()) {
       // Discard background MIDI events when window does not have focus
       return;
     }
@@ -229,7 +246,7 @@ export class MidiManager {
   }
 
   public triggerNoteOn(midi: number, velocity: number = 0.8) {
-    if (this.focusModeEnabled && !this.isWindowFocused()) {
+    if (this.focusModeEnabled && !this.isStageMode && !this.isWindowFocused()) {
       return;
     }
     this.heldMidiNotes.add(midi);

@@ -9,6 +9,81 @@ import {
 
 export const NUM_PARTIALS = 7;
 
+/**
+ * Constant absolute reference scale for psychoacoustical roughness (prevents auto-normalising calm intervals).
+ */
+export const REFERENCE_DISSONANCE_SCALE = 0.10;
+
+/**
+ * Psychoacoustic interval dissonance weights across the 12 chromatic semitone distances [0..11].
+ * Mirrors canonical Western psychoacoustic consonance rankings (Huron/Sethares/Parncutt).
+ * Ensures Tritones and 2nds produce substantial tension while 3rds/6ths, 5ths, and maj7 chord extensions remain gentle consonances.
+ */
+export const INTERVAL_DISSONANCE_WEIGHTS: readonly number[] = [
+  0.02, // 0: Unison / Octave (pure consonance)
+  1.00, // 1: Minor 2nd (maximum sensory clash)
+  0.65, // 2: Major 2nd (pronounced clash)
+  0.10, // 3: Minor 3rd (warm consonance)
+  0.06, // 4: Major 3rd (sweet consonance)
+  0.08, // 5: Perfect 4th (open consonance)
+  0.95, // 6: Tritone (maximum tonal instability / diabolus in musica)
+  0.02, // 7: Perfect 5th (pure consonance)
+  0.12, // 8: Minor 6th (soft consonance)
+  0.08, // 9: Major 6th (consonant)
+  0.45, // 10: Minor 7th (moderate dominant tension)
+  0.40, // 11: Major 7th (jazz coloration / mild tension in chord)
+];
+
+/**
+ * Converts a 6-digit hex colour string into an RGBA CSS colour string.
+ */
+export function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hex;
+}
+
+/**
+ * Picks a legible dark or white foreground colour based on background hex luminance.
+ */
+export function getContrastingTextColor(hex: string): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 6) {
+    const r = parseInt(clean.substring(0, 2), 16);
+    const g = parseInt(clean.substring(2, 4), 16);
+    const b = parseInt(clean.substring(4, 6), 16);
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 160 ? '#0b0f19' : '#ffffff';
+  }
+  return '#ffffff';
+}
+
+/**
+ * Computes the normalised harmonic partial amplitude ratio (0..1) given velocity and lifecycle progress.
+ */
+export function computePartialAmplitudeRatio(
+  partialNumber: number,
+  velocity: number,
+  attackProgress: number = 1.0,
+  decayProgress: number = 0.0
+): number {
+  const attackEasing = attackProgress < 1.0
+    ? 1 - Math.pow(1 - attackProgress, 3)
+    : 1.0;
+  const decayFade = decayProgress > 0
+    ? Math.max(0, 1 - Math.pow(decayProgress, 1.6))
+    : 1.0;
+  const overtoneDecayRate = 0.56 + 0.37 * Math.max(0, Math.min(1, velocity));
+  const partialDecayPenalty = decayProgress > 0 ? Math.pow(partialNumber, 0.28) * decayProgress : 0;
+  const partialFade = Math.max(0, 1 - partialDecayPenalty);
+  return attackEasing * decayFade * Math.pow(overtoneDecayRate, partialNumber - 1) * partialFade;
+}
+
 export interface OvertonePartial {
   partialNumber: number; // 1..7 (1 = fundamental)
   frequency: number;     // in Hz
@@ -73,23 +148,8 @@ export function computeNotePartials(
   const logMax = Math.log2(maxFreq);
   const logSpan = logMax - logMin;
 
-  // Fundamental base height scaled by velocity and lifecycle easing
-  // Attack ease-out curve with subtle kinetic punch
-  const attackEasing = attackProgress < 1.0
-    ? 1 - Math.pow(1 - attackProgress, 3)
-    : 1.0;
-
-  // Decay fade factor: exponential drop-off
-  const decayFade = decayProgress > 0
-    ? Math.max(0, 1 - Math.pow(decayProgress, 1.6))
-    : 1.0;
-
-  const baseHeight = plotHeight * (0.2 + 0.78 * velocity) * attackEasing * decayFade;
-
-  // Overtone amplitude decay rate governed by velocity:
-  // v = 0.1 -> ~0.59 decay per partial (fast drop-off)
-  // v = 1.0 -> ~0.93 decay per partial (rich, bright harmonics)
-  const overtoneDecayRate = 0.56 + 0.37 * Math.max(0, Math.min(1, velocity));
+  // Fundamental base height scaled by velocity
+  const baseMaxHeight = plotHeight * (0.2 + 0.78 * velocity);
 
   const partials: OvertonePartial[] = [];
 
@@ -107,13 +167,9 @@ export function computeNotePartials(
     const syllable = SOLFEGE_SYLLABLES[semitone];
     const spec = SOLFEGE_SPECS[syllable] || SOLFEGE_SPECS['Do'];
 
-    // Higher partials decay slightly faster during note release
-    const partialDecayPenalty = decayProgress > 0 ? Math.pow(n, 0.28) * decayProgress : 0;
-    const partialFade = Math.max(0, 1 - partialDecayPenalty);
-
-    // Amplitude
-    const ampRatio = Math.pow(overtoneDecayRate, n - 1) * partialFade;
-    const ampPx = baseHeight * ampRatio;
+    // Amplitude scaled by velocity, attack/decay lifecycle, and harmonic roll-off
+    const ampRatio = computePartialAmplitudeRatio(n, velocity, attackProgress, decayProgress);
+    const ampPx = baseMaxHeight * ampRatio;
     const y = plotBottom - ampPx;
     const envelopeWidth = computeRegisterWaveWidth(fn);
 
@@ -156,26 +212,11 @@ export function calculatePlompLevelt(f1: number, a1: number, f2: number, a2: num
  * - English (Australian) spelling maintained throughout.
  */
 export class OvertonesRenderer {
-  // Constant absolute reference scale for psychoacoustical roughness (prevents auto-normalizing calm intervals)
-  public static readonly REFERENCE_DISSONANCE_SCALE = 0.10;
+  // Constant absolute reference scale for psychoacoustical roughness (prevents auto-normalising calm intervals)
+  public static readonly REFERENCE_DISSONANCE_SCALE = REFERENCE_DISSONANCE_SCALE;
 
   // Psychoacoustic interval dissonance weights across the 12 chromatic semitone distances [0..11].
-  // Mirrors canonical Western psychoacoustic consonance rankings (Huron/Sethares/Parncutt).
-  // Ensures Tritones and 2nds produce substantial tension while 3rds/6ths, 5ths, and maj7 chord extensions remain gentle consonances.
-  private static readonly INTERVAL_DISSONANCE_WEIGHTS: readonly number[] = [
-    0.02, // 0: Unison / Octave (pure consonance)
-    1.00, // 1: Minor 2nd (maximum sensory clash)
-    0.65, // 2: Major 2nd (pronounced clash)
-    0.10, // 3: Minor 3rd (warm consonance)
-    0.06, // 4: Major 3rd (sweet consonance)
-    0.08, // 5: Perfect 4th (open consonance)
-    0.95, // 6: Tritone (maximum tonal instability / diabolus in musica)
-    0.02, // 7: Perfect 5th (pure consonance)
-    0.12, // 8: Minor 6th (soft consonance)
-    0.08, // 9: Major 6th (consonant)
-    0.45, // 10: Minor 7th (moderate dominant tension)
-    0.40, // 11: Major 7th (jazz coloration / mild tension in chord)
-  ];
+  private static readonly INTERVAL_DISSONANCE_WEIGHTS: readonly number[] = INTERVAL_DISSONANCE_WEIGHTS;
 
   // Preallocated buffer for continuous fluid surface heightfield (512 bins)
   private readonly numBins = 512;
@@ -955,25 +996,10 @@ export class OvertonesRenderer {
   }
 
   private hexToRgba(hex: string, alpha: number): string {
-    const clean = hex.replace('#', '');
-    if (clean.length === 6) {
-      const r = parseInt(clean.substring(0, 2), 16);
-      const g = parseInt(clean.substring(2, 4), 16);
-      const b = parseInt(clean.substring(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-    return hex;
+    return hexToRgba(hex, alpha);
   }
 
   private getContrastingTextColor(hex: string): string {
-    const clean = hex.replace('#', '');
-    if (clean.length === 6) {
-      const r = parseInt(clean.substring(0, 2), 16);
-      const g = parseInt(clean.substring(2, 4), 16);
-      const b = parseInt(clean.substring(4, 6), 16);
-      const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-      return luma > 160 ? '#0b0f19' : '#ffffff';
-    }
-    return '#ffffff';
+    return getContrastingTextColor(hex);
   }
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano, Music } from 'lucide-react';
+import { X, Sliders, Eye, Sparkles, Volume2, HelpCircle, RotateCcw, Compass, Layers, Tv, Zap, BookOpen, ChevronRight, Activity, Piano, Music, Orbit } from 'lucide-react';
 import { VisualiserConfig, BackgroundTheme, SynthWaveform, ClockLabelType, AutoTonicMode, AutoTonicSensitivity, LayoutMode, LensFlareStyle, StaffClef } from '../core/types';
 import { SCALE_MODE_DEFINITIONS } from '../core/scale-alignment';
 import { SOLFEGE_SYLLABLES, INTERVAL_NAMES, PIANO_RANGE_PRESETS } from '../core/ppt-constants';
@@ -2248,6 +2248,68 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
                 className="w-full h-1.5 bg-slate-800 rounded appearance-none cursor-pointer accent-cyan-500"
               />
             </div>
+
+            {/* Harmonic Spiral Global Defaults */}
+            <div className="pt-2.5 mt-2 border-t border-slate-800/70 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fuchsia-400 uppercase tracking-wider">
+                <Orbit className="w-3.5 h-3.5" />
+                <span>Harmonic Spiral Defaults</span>
+              </div>
+
+              <div className="flex justify-between items-center text-slate-300">
+                <div>
+                  <span className="font-medium block">Spiral Range Mode</span>
+                  <span className="text-[10px] text-slate-400 block">Adaptive zooms to active fundamentals &amp; partials; Full shows entire spectrum</span>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                  {(['adaptive', 'full'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => onUpdateConfig({ spiralRangeMode: mode })}
+                      className={`px-2 py-0.5 rounded border text-[11px] font-semibold capitalize transition ${
+                        (config.spiralRangeMode ?? 'adaptive') === mode
+                          ? 'bg-fuchsia-950/70 border-fuchsia-500/70 text-fuchsia-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      {mode}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center text-slate-300">
+                <div>
+                  <span className="font-medium block">Fundamental Chord Geometry</span>
+                  <span className="text-[10px] text-slate-400 block">Draw Pitch-Clock chord polygons across active spiral anchors</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.showSpiralChordGeometry ?? false}
+                    onChange={(e) => onUpdateConfig({ showSpiralChordGeometry: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-fuchsia-600"></div>
+                </label>
+              </div>
+
+              <div className="flex justify-between items-center text-slate-300">
+                <div>
+                  <span className="font-medium block">Harmonic Spoke Resonance</span>
+                  <span className="text-[10px] text-slate-400 block">Illuminate shared radial corridors where partials align across octaves</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={config.showSpokeResonance ?? true}
+                    onChange={(e) => onUpdateConfig({ showSpokeResonance: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-fuchsia-600"></div>
+                </label>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -2364,7 +2426,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({
           <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800/70 space-y-3">
             <label className="block font-medium text-slate-300">Active Layout Preset</label>
             <div className="grid grid-cols-2 gap-1.5">
-              {(['balanced', 'signature', 'harmonic', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
+              {(['balanced', 'signature', 'harmonic', 'harmonic-spiral', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus'] as LayoutMode[]).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => onUpdateConfig({ layoutMode: mode, activeLayout: PRESET_LAYOUTS[mode] })}

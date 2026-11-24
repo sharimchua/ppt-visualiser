@@ -51,6 +51,7 @@ import {
   PRESET_MONUMENT,
   PRESET_SIGNATURE,
   PRESET_HARMONIC,
+  PRESET_HARMONIC_SPIRAL,
   PRESET_LAYOUTS,
   splitCellInTree,
   removeCellFromTree,
@@ -76,6 +77,19 @@ import {
   calculatePlompLevelt,
   OvertonesRenderer,
 } from '../renderers/overtones-canvas';
+import {
+  freqToOctaveU,
+  octaveUToClockAngleRad,
+  computeSpiralRegisterSigmaU,
+  shortestAngularDeltaDeg,
+  depositCircularGaussian,
+  computeSpiralPartials,
+  computeSpiralRadius,
+  computeLocalTurnSpacing,
+  computeSpiralLayoutGeometry,
+  ADAPTIVE_COMPACTION_GAMMA,
+  SpiralOvertonesRenderer,
+} from '../renderers/spiral-overtones-canvas';
 import { RenderCoordinator } from './render-coordinator';
 import { WebGLPostProcessingPipeline } from '../renderers/webgl-post-processing';
 import { SMUFL_GLYPH_PATHS } from '../renderers/smufl-glyphs';
@@ -3810,4 +3824,305 @@ test('Staff Stream Solfege Noteheads: Historical played notes preserve notehead 
 
   coordinator.destroy();
 });
+
+test('Harmonic Spiral: Continuous octave projection stacks octaves on same spoke & shows JI partial offsets', () => {
+  // Tonic = C (0), lowestMidi = 21 (A0), C1 (MIDI 24) is baseCenterDo
+  const tonic = 0;
+  const lowestMidi = 21;
+  const c4Freq = midiToFrequency(60); // 261.63 Hz (Do4)
+
+  const u1 = freqToOctaveU(c4Freq, tonic, lowestMidi);
+  const u2 = freqToOctaveU(c4Freq * 2, tonic, lowestMidi);
+  const u4 = freqToOctaveU(c4Freq * 4, tonic, lowestMidi);
+  const u3 = freqToOctaveU(c4Freq * 3, tonic, lowestMidi);
+  const u5 = freqToOctaveU(c4Freq * 5, tonic, lowestMidi);
+  const u7 = freqToOctaveU(c4Freq * 7, tonic, lowestMidi);
+
+  // Do sits cleanly at 12 o'clock (-PI/2) across powers of 2
+  const a1 = octaveUToClockAngleRad(u1);
+  const a2 = octaveUToClockAngleRad(u2);
+  const a4 = octaveUToClockAngleRad(u4);
+  assert.ok(Math.abs(a1 - (-Math.PI / 2)) < 1e-6, 'Fundamental Do must align at -PI/2');
+  assert.ok(Math.abs(a2 - a1) < 1e-6, '2x harmonic must share exact radial spoke with 1x');
+  assert.ok(Math.abs(a4 - a1) < 1e-6, '4x harmonic must share exact radial spoke with 1x');
+
+  // Monotonically increasing u (which maps inward on the spiral)
+  assert.ok(u1 < u2 && u2 < u3 && u3 < u4 && u4 < u5 && u5 < u7);
+
+  // Verify Just Intonation acoustic offsets off 12-TET spokes:
+  // 3x is +1.96 cents sharp of So (+7 st); 5x is -13.69 cents flat of Mi (+4 st); 7x is -31.17 cents flat of Te (+10 st)
+  const expectedOffsetCents = (u: number, semitone12: number) => {
+    const fracSt = (((u % 1) + 1) % 1) * 12;
+    return (fracSt - semitone12) * 100;
+  };
+  const offset3x = expectedOffsetCents(u3, 7);
+  const offset5x = expectedOffsetCents(u5, 4);
+  const offset7x = expectedOffsetCents(u7, 10);
+  assert.ok(offset3x > 1.5 && offset3x < 2.5, `3x JI offset (${offset3x.toFixed(2)}¢) must be ~+2¢`);
+  assert.ok(offset5x < -13 && offset5x > -14.5, `5x JI offset (${offset5x.toFixed(2)}¢) must be ~-13.7¢`);
+  assert.ok(offset7x < -30 && offset7x > -32.5, `7x JI offset (${offset7x.toFixed(2)}¢) must be ~-31.2¢`);
+
+  // Verify computeSpiralPartials produces strictly inward radii for ascending harmonics
+  const partials = computeSpiralPartials(60, 0.85, tonic, lowestMidi, 1.0, 6.5, 40, 220, 300, 300);
+  assert.strictEqual(partials.length, NUM_PARTIALS);
+  for (let i = 1; i < partials.length; i++) {
+    assert.ok(partials[i].baseRadius < partials[i - 1].baseRadius, `Partial ${i + 1} must spiral inward from partial ${i}`);
+  }
+
+  // Verify aggressive concave compaction gives outer fundamental turns wider radial lanes than inner partial turns
+  const outerSpacing = computeLocalTurnSpacing(1.2, 1.0, 6.0, 40, 220, ADAPTIVE_COMPACTION_GAMMA);
+  const innerSpacing = computeLocalTurnSpacing(5.2, 1.0, 6.0, 40, 220, ADAPTIVE_COMPACTION_GAMMA);
+  assert.ok(outerSpacing > innerSpacing * 1.8, `Outer spacing (${outerSpacing.toFixed(1)}) must be much wider than inner spacing (${innerSpacing.toFixed(1)})`);
+
+  // Verify computeSpiralRadius stays finite and >= 4 even outside [uMin, uMax] during spring transitions
+  const rBelow = computeSpiralRadius(0.2, 1.0, 6.0, 40, 220, ADAPTIVE_COMPACTION_GAMMA);
+  const rAbove = computeSpiralRadius(8.5, 1.0, 6.0, 40, 220, ADAPTIVE_COMPACTION_GAMMA);
+  assert.ok(Number.isFinite(rBelow) && rBelow >= 4);
+  assert.ok(Number.isFinite(rAbove) && rAbove >= 4);
+
+  // Verify maximised spiral layout geometry utilises >= 70% of usable radius while keeping corona inside bounds
+  const geomWithCorona = computeSpiralLayoutGeometry(600, 600, true);
+  assert.ok(geomWithCorona.spiralOuterR >= 294 * 0.70, `spiralOuterR (${geomWithCorona.spiralOuterR}) must fill outer cell generously`);
+  assert.ok(geomWithCorona.coronaBaseR + geomWithCorona.maxCoronaH <= 300, 'Corona must fit cleanly within 600x600 bounds');
+});
+
+test('Harmonic Spiral: Register-scaled angular sigma is wider in bass than treble', () => {
+  const bassSigma = computeSpiralRegisterSigmaU(midiToFrequency(36)); // C2
+  const midSigma = computeSpiralRegisterSigmaU(midiToFrequency(60));  // C4
+  const trebleSigma = computeSpiralRegisterSigmaU(midiToFrequency(84)); // C6
+
+  assert.ok(bassSigma > midSigma, 'Bass spiral wave envelope must be wider than midrange');
+  assert.ok(midSigma > trebleSigma, 'Midrange spiral wave envelope must be wider than treble');
+  assert.ok(trebleSigma > 0.03 && bassSigma < 0.10);
+});
+
+test('Harmonic Spiral: Renderer executes idle, active, and decaying frames across adaptive & full modes with zero shadowBlur', () => {
+  const renderer = new SpiralOvertonesRenderer();
+  const drawCalls: string[] = [];
+  const shadowValues: number[] = [];
+
+  const mockCtx = {
+    save: () => drawCalls.push('save'),
+    restore: () => drawCalls.push('restore'),
+    beginPath: () => drawCalls.push('beginPath'),
+    closePath: () => drawCalls.push('closePath'),
+    moveTo: () => drawCalls.push('moveTo'),
+    lineTo: () => drawCalls.push('lineTo'),
+    arc: () => drawCalls.push('arc'),
+    stroke: () => drawCalls.push('stroke'),
+    fill: () => drawCalls.push('fill'),
+    fillRect: () => drawCalls.push('fillRect'),
+    strokeRect: () => drawCalls.push('strokeRect'),
+    fillText: () => drawCalls.push('fillText'),
+    setLineDash: () => drawCalls.push('setLineDash'),
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+    set shadowBlur(val: number) { shadowValues.push(val); },
+    get shadowBlur() { return 0; },
+  } as unknown as CanvasRenderingContext2D;
+
+  const activeNotes = new Map<number, ActiveNote>();
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+
+  // 1. Idle frame
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 700, 700, activeNotes, decayingNotes, DEFAULT_CONFIG, 1000);
+  });
+  assert.ok(drawCalls.includes('fillRect') && drawCalls.includes('stroke'), 'Idle frame must draw backdrop and breathing spiral');
+
+  // 2. Active triad (Adaptive mode)
+  drawCalls.length = 0;
+  activeNotes.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.85, startTime: 900, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  activeNotes.set(64, { midi: 64, pitchClass: 4, octave: 4, registerIndex: 3, velocity: 0.80, startTime: 900, colorHex: '#F5D432', solfege: 'Mi', pianoTriangle: { triangle: 'L', point: 1 } });
+  activeNotes.set(67, { midi: 67, pitchClass: 7, octave: 4, registerIndex: 3, velocity: 0.78, startTime: 900, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 1 } });
+
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 700, 700, activeNotes, decayingNotes, { ...DEFAULT_CONFIG, tonic: 0, spiralRangeMode: 'adaptive' }, 1050);
+  });
+  assert.ok(drawCalls.includes('fill') && drawCalls.includes('fillText'), 'Active triad must render filled wave ribbons and badges');
+
+  // 3. Decaying note + Full spectrum mode
+  activeNotes.delete(67);
+  decayingNotes.set(67, {
+    note: { midi: 67, pitchClass: 7, octave: 4, registerIndex: 3, velocity: 0.78, startTime: 900, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 1 } },
+    decayProgress: 0.35,
+  });
+  assert.doesNotThrow(() => {
+    renderer.render(mockCtx, 700, 700, activeNotes, decayingNotes, { ...DEFAULT_CONFIG, tonic: 0, spiralRangeMode: 'full' }, 1100);
+  });
+
+  // Strict zero ctx.shadowBlur verification
+  assert.ok(shadowValues.every((v) => v === 0), 'Harmonic Spiral renderer must never assign non-zero ctx.shadowBlur');
+});
+
+test('Harmonic Spiral: Outer collective dissonance corona calibrates P5 < Tritone < Minor 2nd and preserves tritone poles', () => {
+  // Verify circular helper math first
+  assert.strictEqual(shortestAngularDeltaDeg(350, 10), 20);
+  assert.strictEqual(shortestAngularDeltaDeg(10, 350), -20);
+  const testBins = new Float32Array(360);
+  depositCircularGaussian(testBins, 0, 10, 1.0);
+  assert.ok(testBins[0] > 0.99 && testBins[355] > 0.8 && testBins[5] > 0.8, 'Circular deposit must wrap cleanly across 0/360');
+
+  const renderer = new SpiralOvertonesRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+  const config = { ...DEFAULT_CONFIG, tonic: 0, showDissonanceCurve: true, spiralRangeMode: 'full' as const };
+
+  // 1. Perfect 5th (C4 + G4)
+  const p5 = new Map<number, ActiveNote>();
+  p5.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  p5.set(67, { midi: 67, pitchClass: 7, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 1 } });
+  renderer.render(mockCtx, 800, 800, p5, decayingNotes, config, 1000);
+  const p5Diss = renderer.getPeakDissonance();
+
+  // 2. Tritone (C4 + F#4 => 0 deg and 180 deg)
+  const tt = new Map<number, ActiveNote>();
+  tt.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  tt.set(66, { midi: 66, pitchClass: 6, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#141414', solfege: 'Fi', pianoTriangle: { triangle: 'L', point: 3 } });
+  renderer.render(mockCtx, 800, 800, tt, decayingNotes, config, 1000);
+  const ttDiss = renderer.getPeakDissonance();
+  const corona = renderer.getCoronaBins();
+  const doPole = corona[0];
+  const fiPole = corona[180];
+  const meMidpoint = corona[90];
+
+  assert.ok(doPole > meMidpoint * 3.0, `Tritone corona at Do pole (${doPole.toFixed(4)}) must greatly exceed midpoint Me (${meMidpoint.toFixed(4)})`);
+  assert.ok(fiPole > meMidpoint * 3.0, `Tritone corona at Fi pole (${fiPole.toFixed(4)}) must greatly exceed midpoint Me (${meMidpoint.toFixed(4)})`);
+
+  // 3. Minor 2nd (C4 + C#4)
+  const m2 = new Map<number, ActiveNote>();
+  m2.set(60, { midi: 60, pitchClass: 0, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'R', point: 3 } });
+  m2.set(61, { midi: 61, pitchClass: 1, octave: 4, registerIndex: 3, velocity: 0.8, startTime: 0, colorHex: '#F98016', solfege: 'Ra', pianoTriangle: { triangle: 'D', point: 1 } });
+  renderer.render(mockCtx, 800, 800, m2, decayingNotes, config, 1000);
+  const m2Diss = renderer.getPeakDissonance();
+
+  assert.ok(ttDiss > p5Diss * 3.0, `Tritone corona (${ttDiss.toFixed(4)}) must exceed P5 (${p5Diss.toFixed(4)})`);
+  assert.ok(m2Diss > ttDiss, `Minor 2nd corona (${m2Diss.toFixed(4)}) must exceed Tritone (${ttDiss.toFixed(4)})`);
+});
+
+test('Harmonic Spiral: Fundamental coordinate query and WebGL dynamic light source tracking', () => {
+  const renderer = new SpiralOvertonesRenderer();
+  const mockCtx = {
+    save: () => {},
+    restore: () => {},
+    beginPath: () => {},
+    closePath: () => {},
+    moveTo: () => {},
+    lineTo: () => {},
+    arc: () => {},
+    stroke: () => {},
+    fill: () => {},
+    fillRect: () => {},
+    strokeRect: () => {},
+    fillText: () => {},
+    setLineDash: () => {},
+    createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }),
+  } as unknown as CanvasRenderingContext2D;
+
+  const config = { ...DEFAULT_CONFIG, tonic: 2 }; // Default Do = D
+  const activeNotes = new Map<number, ActiveNote>();
+  activeNotes.set(62, { midi: 62, pitchClass: 2, octave: 4, registerIndex: 3, velocity: 0.9, startTime: 950, colorHex: '#E13610', solfege: 'Do', pianoTriangle: { triangle: 'D', point: 2 } });
+
+  const decayingNotes = new Map<number, { note: ActiveNote; decayProgress: number }>();
+  decayingNotes.set(69, {
+    note: { midi: 69, pitchClass: 9, octave: 4, registerIndex: 3, velocity: 0.7, startTime: 800, colorHex: '#0032A4', solfege: 'So', pianoTriangle: { triangle: 'U', point: 3 } },
+    decayProgress: 0.4,
+  });
+
+  renderer.render(mockCtx, 600, 600, activeNotes, decayingNotes, config, 1000);
+  const lights = renderer.getActiveLightSources();
+  assert.strictEqual(lights.length, 2, 'Active and decaying fundamentals must emit WebGL light sources');
+  assert.ok(lights[0].velocity > lights[1].velocity, 'Active note light must be brighter than decaying note light');
+
+  const coords = renderer.getFundamentalCoordinatesForMidi(62, 600, 600, config, 0.9);
+  assert.ok(coords, 'Coordinates must resolve for D4');
+  assert.strictEqual(coords!.colorHex, '#E13610');
+  assert.ok(Math.abs(coords!.angle - (-Math.PI / 2)) < 1e-6, 'Do (D4) must point straight up (-PI/2)');
+  assert.ok(coords!.x > 250 && coords!.x < 350 && coords!.y < 300, 'Do crest must lie above centre hub');
+});
+
+test('Harmonic Spiral: Layout models, preset slug round-trip, and config sanitisation', () => {
+  assert.strictEqual(PRESET_HARMONIC_SPIRAL.id, 'harmonic-spiral');
+  assert.strictEqual(PRESET_LAYOUTS['harmonic-spiral'], PRESET_HARMONIC_SPIRAL);
+  const presetCells = getAllCellNodes(PRESET_HARMONIC_SPIRAL.root);
+  assert.ok(presetCells.some((c) => c.module === 'spiral-overtones' && c.title === 'Harmonic Spiral'));
+  assert.ok(presetCells.some((c) => c.module === 'overtones'));
+
+  const splitResult = splitCellInTree(PRESET_BALANCED.root, 'cell-clock-main', 'row', 'spiral-overtones');
+  assert.ok(getAllCellNodes(splitResult).some((c) => c.module === 'spiral-overtones' && c.title === 'Harmonic Spiral'));
+
+  const addedResult = addCellToTree(PRESET_BALANCED.root, 'row', 'spiral-overtones');
+  assert.ok(getAllCellNodes(addedResult).some((c) => c.module === 'spiral-overtones' && c.title === 'Harmonic Spiral'));
+
+  const slug = encodeLayoutToSlug(PRESET_HARMONIC_SPIRAL, true);
+  const decoded = decodeLayoutFromSlug(slug);
+  assert.ok(decoded, 'Decoded Harmonic Spiral slug must not be null');
+  assert.strictEqual(decoded!.layout.id, 'harmonic-spiral');
+  assert.ok(getAllCellNodes(decoded!.layout.root).some((c) => c.module === 'spiral-overtones'));
+
+  // Config defaults & sanitisation
+  assert.strictEqual(DEFAULT_CONFIG.showSpiralChordGeometry, false, 'Fundamental chord geometry must be off by default');
+  const spiralPresetCell = presetCells.find((c) => c.module === 'spiral-overtones');
+  assert.strictEqual(spiralPresetCell?.configOverrides?.showSpiralChordGeometry, false, 'PRESET_HARMONIC_SPIRAL must disable chord geometry by default');
+
+  const clean = sanitizeConfig({
+    layoutMode: 'harmonic-spiral',
+    spiralRangeMode: 'full',
+    showSpiralChordGeometry: true,
+    showSpokeResonance: false,
+  });
+  assert.strictEqual(clean.layoutMode, 'harmonic-spiral');
+  assert.strictEqual(clean.spiralRangeMode, 'full');
+  assert.strictEqual(clean.showSpiralChordGeometry, true);
+  assert.strictEqual(clean.showSpokeResonance, false);
+
+  const fallback = sanitizeConfig({
+    spiralRangeMode: 'invalid' as any,
+    showSpiralChordGeometry: 'yes' as any,
+    showSpokeResonance: null as any,
+  });
+  assert.strictEqual(fallback.spiralRangeMode, 'adaptive');
+  assert.strictEqual(fallback.showSpiralChordGeometry, false);
+  assert.strictEqual(fallback.showSpokeResonance, true);
+});
+
+test('CosmeticsEngine: spawnFluidDroplets supports directional baseAngle for radial spiral ejection', () => {
+  const cosmetics = new CosmeticsEngine();
+  // Eject rightward along 0 radians (3 o'clock spoke)
+  cosmetics.spawnFluidDroplets(300, 300, '#F5D432', 0.9, 16, 1.0, 1.0, 0.03, 0);
+  const particles = (cosmetics as any).particles as Array<{ vx: number; vy: number }>;
+  assert.ok(particles.length > 0, 'Must spawn fluid droplets');
+  assert.ok(particles.every((p) => p.vx > 0), 'All droplets ejected along baseAngle=0 must travel rightward (+vx)');
+});
+
+test('Stage Mode: suppresses blur auto-stop and MIDI note release while active', () => {
+  synthInstance.setFocusMode(true);
+  synthInstance.setStageMode(true);
+  assert.strictEqual(synthInstance.getIsStageMode(), true);
+  synthInstance.setFocusedForTesting(false);
+  // Reset state cleanly
+  synthInstance.setStageMode(false);
+  synthInstance.setFocusedForTesting(null);
+  assert.strictEqual(synthInstance.getIsStageMode(), false);
+});
+
+
 

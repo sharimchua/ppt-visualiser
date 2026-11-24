@@ -67,7 +67,7 @@ export type StreamOrientation = 'horizontal' | 'vertical';
 export type StreamDirection = 'rtl' | 'ltr' | 'ttb' | 'btt';
 export type PresentationFormat = 'glyphs' | 'pianoTriangles' | 'syllables' | 'pitchNames' | 'triPitches';
 export type BackgroundTheme = 'studio-obsidian' | 'cosmic-abyss' | 'carbon-grid' | 'velvet-dark';
-export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature' | 'harmonic';
+export type LayoutMode = 'balanced' | 'monument' | 'river' | 'waterfall' | 'dual-stream' | 'orbital-focus' | 'signature' | 'harmonic' | 'harmonic-spiral';
 export type SynthWaveform = 'warm-poly' | 'sine' | 'triangle' | 'sawtooth';
 export type ToneRevealMode = 'played' | 'all';
 export type RegisterWeightMode = 'organic' | 'discovered' | 'fixed8';
@@ -94,7 +94,7 @@ export type AutoTonicSensitivity = 'fast' | 'balanced' | 'conservative';
 
 // --- FLEXBOX LAYOUT ARCHITECTURE ---
 export type LayoutFlexDirection = 'row' | 'column';
-export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones' | 'staff-stream';
+export type VisualiserModuleType = 'orbital' | 'stream' | 'triangles' | 'overtones' | 'spiral-overtones' | 'staff-stream';
 
 export type StaffSize = 'single' | 'grand';
 export type StaffClef =
@@ -179,12 +179,21 @@ export interface OvertonesModuleConfig {
   overtoneDropletsEnabled?: boolean; // default: true (fluid droplet particle ejection from fundamental crests)
 }
 
+export type SpiralRangeMode = 'adaptive' | 'full';
+
+export interface SpiralOvertonesModuleConfig {
+  spiralRangeMode: SpiralRangeMode;
+  showSpiralChordGeometry: boolean;
+  showSpokeResonance: boolean;
+}
+
 export type ModuleCellConfig =
   | OrbitalModuleConfig
   | StreamModuleConfig
   | StaffStreamModuleConfig
   | PianoTrianglesModuleConfig
-  | OvertonesModuleConfig;
+  | OvertonesModuleConfig
+  | SpiralOvertonesModuleConfig;
 
 export interface LayoutCellNode {
   id: string;
@@ -198,7 +207,8 @@ export interface LayoutCellNode {
       StreamModuleConfig &
       StaffStreamModuleConfig &
       PianoTrianglesModuleConfig &
-      OvertonesModuleConfig
+      OvertonesModuleConfig &
+      SpiralOvertonesModuleConfig
   >;
 }
 
@@ -286,7 +296,8 @@ export interface VisualiserConfig
     StreamModuleConfig,
     StaffStreamModuleConfig,
     PianoTrianglesModuleConfig,
-    OvertonesModuleConfig {
+    OvertonesModuleConfig,
+    SpiralOvertonesModuleConfig {
   layoutMode: LayoutMode;
   activeLayout: LayoutDefinition;
 }

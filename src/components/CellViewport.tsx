@@ -9,11 +9,13 @@ import {
   ClockLabelType,
 } from '../core/types';
 import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
+import { getDefaultModuleTitle } from '../core/layout-models';
 import {
   Waves,
   Triangle,
   Activity,
   Music,
+  Orbit,
   ArrowRight,
   ArrowLeft,
   ArrowDown,
@@ -146,16 +148,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
     onUpdateCell({
       ...cell,
       module: nextModule,
-      title:
-        nextModule === 'orbital'
-          ? 'Pitch Clock'
-          : nextModule === 'triangles'
-          ? 'Piano Triangles'
-          : nextModule === 'overtones'
-          ? 'Overtone Waves'
-          : nextModule === 'staff-stream'
-          ? 'Staff Stream'
-          : 'Note Stream',
+      title: getDefaultModuleTitle(nextModule),
       configOverrides:
         nextModule === 'stream'
           ? {
@@ -192,6 +185,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
           <span className="font-mono text-[9px] uppercase tracking-wider text-slate-400 flex items-center">
             {cell.module === 'triangles' && <Triangle className="w-2.5 h-2.5 text-red-400 mr-1 fill-red-500/40" />}
             {cell.module === 'overtones' && <Activity className="w-2.5 h-2.5 text-cyan-400 mr-1" />}
+            {cell.module === 'spiral-overtones' && <Orbit className="w-2.5 h-2.5 text-fuchsia-400 mr-1" />}
             {cell.module === 'staff-stream' && <Music className="w-2.5 h-2.5 text-orange-400 mr-1" />}
             {cell.title ||
               (cell.module === 'orbital'
@@ -200,6 +194,8 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                 ? 'Scale Signature'
                 : cell.module === 'overtones'
                 ? 'Overtones'
+                : cell.module === 'spiral-overtones'
+                ? 'Harmonic Spiral'
                 : cell.module === 'staff-stream'
                 ? 'Staff Stream'
                 : 'Stream')}
@@ -248,6 +244,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
               <option value="staff-stream">🎼 Staff Stream</option>
               <option value="triangles">▲ Triangles</option>
               <option value="overtones">〰️ Overtones</option>
+              <option value="spiral-overtones">🌀 Harmonic Spiral</option>
             </select>
 
             {/* Flex weight adjuster */}
@@ -1299,16 +1296,99 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
             </div>
           )}
 
-          {/* Overtones-Specific Options */}
-          {cell.module === 'overtones' && (
+          {/* Overtones & Harmonic Spiral Options */}
+          {(cell.module === 'overtones' || cell.module === 'spiral-overtones') && (
             <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
-              <label className="text-[11px] text-cyan-400 font-medium block uppercase tracking-wider">
-                Overtone Wave Simulation
+              <label className={`text-[11px] font-medium block uppercase tracking-wider ${
+                cell.module === 'spiral-overtones' ? 'text-fuchsia-400' : 'text-cyan-400'
+              }`}>
+                {cell.module === 'spiral-overtones' ? 'Harmonic Spiral Simulation' : 'Overtone Wave Simulation'}
               </label>
 
-              {/* Dissonance Roughness Curve Toggle */}
+              {/* Spiral-Specific Controls */}
+              {cell.module === 'spiral-overtones' && (
+                <>
+                  {/* Spiral Range Mode */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-300 font-medium">Spiral Range:</span>
+                    <div className="flex items-center gap-1">
+                      {(['adaptive', 'full'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() =>
+                            onUpdateCell({
+                              ...cell,
+                              configOverrides: {
+                                ...(cell.configOverrides || {}),
+                                spiralRangeMode: mode,
+                              },
+                            })
+                          }
+                          className={`px-2 py-0.5 rounded border text-[11px] font-semibold capitalize transition ${
+                            (effectiveConfig.spiralRangeMode ?? 'adaptive') === mode
+                              ? 'bg-fuchsia-950/70 border-fuchsia-500/70 text-fuchsia-300'
+                              : 'bg-slate-900 border-slate-700 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Fundamental Chord Geometry Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-300 font-medium">Fundamental Chord Geometry:</span>
+                    <button
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            showSpiralChordGeometry: !(effectiveConfig.showSpiralChordGeometry ?? false),
+                          },
+                        })
+                      }
+                      className={`px-2.5 py-0.5 rounded border text-xs font-semibold transition ${
+                        effectiveConfig.showSpiralChordGeometry ?? false
+                          ? 'bg-fuchsia-950/60 border-fuchsia-500/70 text-fuchsia-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500'
+                      }`}
+                    >
+                      {(effectiveConfig.showSpiralChordGeometry ?? false) ? 'Active' : 'Hidden'}
+                    </button>
+                  </div>
+
+                  {/* Harmonic Spoke Resonance Toggle */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-slate-300 font-medium">Harmonic Spoke Resonance:</span>
+                    <button
+                      onClick={() =>
+                        onUpdateCell({
+                          ...cell,
+                          configOverrides: {
+                            ...(cell.configOverrides || {}),
+                            showSpokeResonance: !(effectiveConfig.showSpokeResonance ?? true),
+                          },
+                        })
+                      }
+                      className={`px-2.5 py-0.5 rounded border text-xs font-semibold transition ${
+                        effectiveConfig.showSpokeResonance ?? true
+                          ? 'bg-fuchsia-950/60 border-fuchsia-500/70 text-fuchsia-300'
+                          : 'bg-slate-900 border-slate-700 text-slate-500'
+                      }`}
+                    >
+                      {(effectiveConfig.showSpokeResonance ?? true) ? 'Active' : 'Hidden'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Dissonance Roughness Curve / Outer Corona Toggle */}
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-slate-300 font-medium">Dissonance / Roughness Curve:</span>
+                <span className="text-[11px] text-slate-300 font-medium">
+                  {cell.module === 'spiral-overtones' ? 'Outer Dissonance Corona:' : 'Dissonance / Roughness Curve:'}
+                </span>
                 <button
                   onClick={() =>
                     onUpdateCell({
@@ -1355,8 +1435,14 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
               {/* Fluid Droplets Toggle */}
               <div className="flex items-center justify-between pt-1">
                 <div>
-                  <span className="text-[10px] text-slate-300 font-medium block">Fluid Droplets</span>
-                  <span className="text-[9px] text-slate-500 block">Eject liquid droplet particles from fundamental wave crests</span>
+                  <span className="text-[10px] text-slate-300 font-medium block">
+                    {cell.module === 'spiral-overtones' ? 'Radial Fluid Droplets' : 'Fluid Droplets'}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block">
+                    {cell.module === 'spiral-overtones'
+                      ? 'Eject radial droplet particles from spiral wave crests'
+                      : 'Eject liquid droplet particles from fundamental wave crests'}
+                  </span>
                 </div>
                 <input
                   type="checkbox"
@@ -1398,6 +1484,33 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
                   className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
                 />
               </div>
+
+              {/* Wave Fluidity Slider (Harmonic Spiral) */}
+              {cell.module === 'spiral-overtones' && (
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-400">Wave Fluidity:</span>
+                    <span className="font-mono text-fuchsia-400">{Math.round((effectiveConfig.waveFluidity ?? 0.8) * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.0"
+                    max="1.0"
+                    step="0.05"
+                    value={effectiveConfig.waveFluidity ?? 0.8}
+                    onChange={(e) =>
+                      onUpdateCell({
+                        ...cell,
+                        configOverrides: {
+                          ...(cell.configOverrides || {}),
+                          waveFluidity: parseFloat(e.target.value),
+                        },
+                      })
+                    }
+                    className="w-full accent-fuchsia-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg appearance-none"
+                  />
+                </div>
+              )}
             </div>
           )}
 

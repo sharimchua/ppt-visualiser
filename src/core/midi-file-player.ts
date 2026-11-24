@@ -20,6 +20,7 @@ export class MidiFilePlayer {
 
   // Real-time focus and multi-instance management
   private focusModeEnabled: boolean = true;
+  private isStageMode: boolean = false;
   private wasPlayingBeforeBlur: boolean = false;
   private mockFocusedState: boolean | null = null;
 
@@ -31,7 +32,7 @@ export class MidiFilePlayer {
   private lastStateNotifyTime: number = 0;
 
   private handleFocusChange = () => {
-    if (!this.focusModeEnabled) return;
+    if (!this.focusModeEnabled || this.isStageMode) return;
     const focused = this.isWindowFocused();
     if (!focused) {
       if (this.isPlaying) {
@@ -67,6 +68,10 @@ export class MidiFilePlayer {
 
   public setFocusMode(enabled: boolean) {
     this.focusModeEnabled = enabled;
+  }
+
+  public setStageMode(enabled: boolean) {
+    this.isStageMode = enabled;
   }
 
   public getFocusMode(): boolean {

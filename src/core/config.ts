@@ -79,7 +79,7 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   triangleShockwavesEnabled: true,
   triangleLensFlaresEnabled: true,
 
-  // Overtones Waveform
+  // Overtones Waveform & Harmonic Spiral
   showDissonanceCurve: true,
   showOvertoneLabels: true,
   fluidSpeed: 1.0,
@@ -87,6 +87,9 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
   minFrequency: 27.5,
   maxFrequency: 6000,
   overtoneDropletsEnabled: true,
+  spiralRangeMode: 'adaptive',
+  showSpiralChordGeometry: false,
+  showSpokeResonance: true,
 
   // Cosmetics & Aesthetics
   backgroundTheme: 'carbon-grid',
@@ -335,7 +338,7 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     merged.showRadialMovementTrails = typeof merged.showRadialMovementTrails === 'boolean' ? merged.showRadialMovementTrails : true;
 
     // Sanitize layout mode and activeLayout
-    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature', 'harmonic']);
+    const validLayoutModes = new Set(['balanced', 'monument', 'river', 'waterfall', 'dual-stream', 'orbital-focus', 'signature', 'harmonic', 'harmonic-spiral']);
     if (!validLayoutModes.has(merged.layoutMode)) merged.layoutMode = 'signature';
 
     // Sanitize Piano Triangles (Scale Signature)
@@ -344,13 +347,16 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     if (!validVertexLabels.has(merged.vertexLabelType)) merged.vertexLabelType = 'syllables';
     merged.showCenterAnchor = typeof merged.showCenterAnchor === 'boolean' ? merged.showCenterAnchor : true;
 
-    // Sanitize Overtones Waveform
+    // Sanitize Overtones Waveform & Harmonic Spiral
     merged.showDissonanceCurve = typeof merged.showDissonanceCurve === 'boolean' ? merged.showDissonanceCurve : true;
     merged.showOvertoneLabels = typeof merged.showOvertoneLabels === 'boolean' ? merged.showOvertoneLabels : true;
     merged.fluidSpeed = Math.max(0.2, Math.min(3.0, typeof merged.fluidSpeed === 'number' ? merged.fluidSpeed : 1.0));
     merged.waveFluidity = Math.max(0, Math.min(1.0, typeof merged.waveFluidity === 'number' ? merged.waveFluidity : 0.8));
     merged.minFrequency = typeof merged.minFrequency === 'number' && merged.minFrequency > 0 ? merged.minFrequency : 27.5;
     merged.maxFrequency = typeof merged.maxFrequency === 'number' && merged.maxFrequency > (merged.minFrequency || 27.5) ? merged.maxFrequency : 6000;
+    merged.spiralRangeMode = merged.spiralRangeMode === 'full' ? 'full' : 'adaptive';
+    merged.showSpiralChordGeometry = typeof merged.showSpiralChordGeometry === 'boolean' ? merged.showSpiralChordGeometry : false;
+    merged.showSpokeResonance = typeof merged.showSpokeResonance === 'boolean' ? merged.showSpokeResonance : true;
 
     if (!merged.activeLayout || !merged.activeLayout.root) {
       merged.activeLayout = PRESET_LAYOUTS[merged.layoutMode as LayoutMode] || PRESET_SIGNATURE;
