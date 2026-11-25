@@ -224,8 +224,10 @@ export interface LayoutContainerNode {
 export type LayoutNode = LayoutContainerNode | LayoutCellNode;
 
 export type LensFlareStyle = 'anamorphic' | 'starburst' | 'cinematic';
+export type PerformanceProfile = 'max' | 'balanced' | 'eco' | 'none';
 
 export interface AestheticsConfig {
+  performanceProfile?: PerformanceProfile;
   backgroundTheme: BackgroundTheme;
   filmGrainEnabled?: boolean;
   filmGrainIntensity: number; // 0..1

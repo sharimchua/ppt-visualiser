@@ -97,6 +97,7 @@ export class CosmeticsEngine {
 
   public static readonly MAX_GPU_PARTICLES = 2048;
 
+  private maxParticles: number = CosmeticsEngine.MAX_GPU_PARTICLES;
   private particles: KineticParticle[] = [];
   private shockwaves: ShockwaveRing[] = [];
   private ghosts: PhosphorGhost[] = [];
@@ -110,13 +111,27 @@ export class CosmeticsEngine {
     this.initGrain();
   }
 
+  public setMaxParticles(limit: number): void {
+    const clamped = Math.max(0, Math.min(CosmeticsEngine.MAX_GPU_PARTICLES, Math.round(limit)));
+    this.maxParticles = clamped;
+    if (clamped === 0) {
+      this.particles.length = 0;
+    } else if (this.particles.length > clamped) {
+      this.particles.splice(0, this.particles.length - clamped);
+    }
+  }
+
   /**
-   * Ensures particle pool capacity does not exceed the GPU point sprite buffer ceiling.
+   * Ensures particle pool capacity does not exceed the active performance budget.
    * Evicts the oldest/lowest-alpha particles when incoming bursts exceed buffer capacity,
    * guaranteeing that newly struck notes always receive immediate rendering priority with zero starvation.
    */
   private ensureParticleCapacity(needed: number): void {
-    const max = CosmeticsEngine.MAX_GPU_PARTICLES;
+    const max = this.maxParticles;
+    if (max <= 0) {
+      this.particles.length = 0;
+      return;
+    }
     const overflow = (this.particles.length + needed) - max;
     if (overflow > 0) {
       const pruneCount = Math.min(this.particles.length, overflow);
@@ -208,7 +223,11 @@ export class CosmeticsEngine {
     originDistance: number = 0,
     radialAngle: number = 0
   ) {
-    const totalCount = Math.max(2, Math.round(baseCount * volumeMultiplier * (0.6 + velocity * 0.8)));
+    if (this.maxParticles <= 0) return;
+    const totalCount = Math.min(
+      this.maxParticles,
+      Math.max(2, Math.round(baseCount * volumeMultiplier * (0.6 + velocity * 0.8)))
+    );
     this.ensureParticleCapacity(totalCount);
 
     // Origin position offset along radial angle or ring
@@ -257,7 +276,11 @@ export class CosmeticsEngine {
     sizeMultiplier: number = 1.0,
     gravityMultiplier: number = 1.0
   ): void {
-    const totalCount = Math.max(2, Math.round(count * (0.6 + velocity * 0.8)));
+    if (this.maxParticles <= 0) return;
+    const totalCount = Math.min(
+      this.maxParticles,
+      Math.max(2, Math.round(count * (0.6 + velocity * 0.8)))
+    );
     this.ensureParticleCapacity(totalCount);
 
     for (let i = 0; i < totalCount; i++) {
@@ -301,9 +324,13 @@ export class CosmeticsEngine {
     baseAngle: number = -Math.PI / 2
   ): void {
     const clampedVel = Math.max(0.12, Math.min(1.0, velocity));
+    if (this.maxParticles <= 0) return;
 
     // Dynamic droplet count: scales expressively with note velocity
-    const totalCount = Math.max(3, Math.round(count * (0.35 + Math.pow(clampedVel, 1.1) * 0.95)));
+    const totalCount = Math.min(
+      this.maxParticles,
+      Math.max(3, Math.round(count * (0.35 + Math.pow(clampedVel, 1.1) * 0.95)))
+    );
     this.ensureParticleCapacity(totalCount);
 
     // Ejection impulse strongly governed by note velocity:
@@ -604,12 +631,16 @@ export class CosmeticsEngine {
     return this.particles.length > 0 || this.shockwaves.length > 0 || this.ghosts.length > 0 || this.hasActiveTonicHUD();
   }
 
+  public hasActiveEffects(): boolean {
+    return this.hasActiveParticles();
+  }
+
   /**
    * Streams particle coordinates, sizes, colours, and alphas into preallocated Float32Array
    * for zero-allocation WebGL point sprite upload.
    */
   public getParticleGpuData(): { buffer: Float32Array; count: number } {
-    const count = Math.min(CosmeticsEngine.MAX_GPU_PARTICLES, this.particles.length);
+    const count = Math.min(this.maxParticles, CosmeticsEngine.MAX_GPU_PARTICLES, this.particles.length);
     for (let i = 0; i < count; i++) {
       const p = this.particles[i];
       const baseIdx = i * 8;

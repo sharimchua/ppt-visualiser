@@ -352,6 +352,7 @@ export class WebGLPostProcessingPipeline {
   private lightColorsData = new Float32Array(48); // 16 * 3
   private shockwavesData = new Float32Array(16); // 4 * 4
   private shockwaveColorsData = new Float32Array(12); // 4 * 3
+  private isCleared: boolean = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -360,6 +361,14 @@ export class WebGLPostProcessingPipeline {
 
   public get supported(): boolean {
     return this.isSupported;
+  }
+
+  public clearIfNeeded(): void {
+    if (!this.isSupported || !this.gl || this.isCleared) return;
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.gl.clearColor(0.0, 0.0, 0.0, 0.0);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.isCleared = true;
   }
 
   private initGL() {
@@ -501,14 +510,20 @@ export class WebGLPostProcessingPipeline {
     particleCount: number = 0
   ) {
     if (!this.isSupported || !this.gl || !this.program || !this.quadBuffer) return;
-    if (config.webglEnabled === false) return;
+    if (config.webglEnabled === false) {
+      this.clearIfNeeded();
+      return;
+    }
 
     const gl = this.gl;
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const width = this.canvas.width;
     const height = this.canvas.height;
+    const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const cssWidth = this.canvas.clientWidth || width / rawDpr;
+    const dpr = cssWidth > 0 ? width / cssWidth : 1;
 
     if (width <= 0 || height <= 0) return;
+    this.isCleared = false;
 
     gl.viewport(0, 0, width, height);
     gl.clearColor(0.0, 0.0, 0.0, 0.0);

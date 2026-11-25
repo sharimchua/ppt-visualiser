@@ -19,6 +19,7 @@ The `src/core` domain contains the mathematical foundations of Prime Period Theo
 - `src/core/config.ts` — Central configuration defaults, localStorage persistence, and sanitisation (including Staff Stream and 8-note default fixed window length).
 - `src/core/types.ts` — Core TypeScript interfaces and type definitions (including `StaffStreamModuleConfig`, `StaffSize`, `StaffClef`).
 - `src/core/ppt.test.ts` — Automated test suite.
+- `src/core/stage-sync-utils.ts` — Pure Stage config allowlisting/filtering (`pickSyncableConfig`) keeping GPU profile, visual cosmetics, and audio volume device-local.
 
 ## Local Contracts
 

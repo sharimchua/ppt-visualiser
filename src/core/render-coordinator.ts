@@ -1,10 +1,20 @@
 import {
   ActiveNote,
+  PerformanceProfile,
   StreamItem,
   TonicShiftMarker,
   VisualiserConfig,
   VisualiserModuleType,
 } from './types';
+import {
+  getCanvasDprCaps,
+  getDefaultPerformanceProfileForDevice,
+  getMaxParticlesForProfile,
+  isIosDevice,
+  isMobileTouchDevice,
+  isPostProcessingAllowedForProfile,
+  isWebGLAllowedForProfile,
+} from '../renderers/performance-profile';
 import {
   SOLFEGE_SYLLABLES,
   SOLFEGE_SPECS,
@@ -109,9 +119,12 @@ export class RenderCoordinator {
   public onAutoTonicShift?: AutoTonicShiftHandler;
   private lastShiftWasAuto: boolean = false;
 
-  // Animation Frame Loop
+  // Animation Frame Loop & Idle Sleep
   private animId: number | null = null;
   private isRunning: boolean = false;
+  private isSleeping: boolean = false;
+  private lastRenderTime: number = 0;
+  private lastActivityTime: number = typeof performance !== 'undefined' ? performance.now() : Date.now();
   private lastFitUpdateTime: number = 0;
 
   // Real-time focus and multi-instance management
@@ -125,10 +138,32 @@ export class RenderCoordinator {
   private unsubMidiOff?: () => void;
 
   private handleFocusChange = () => {
+    if (typeof document === 'undefined' || !document.hidden) {
+      this.wakeLoop();
+    }
     if (this.isStageMode) return;
     const focused = this.isWindowFocused();
     if (!focused && (this.config.focusModeEnabled ?? true)) {
       this.clearActiveAndDecayingNotes();
+    }
+  };
+
+  /**
+   * Returns the effective graphics/battery performance profile for this device.
+   */
+  public getEffectivePerformanceProfile(): PerformanceProfile {
+    return this.config.performanceProfile ?? getDefaultPerformanceProfileForDevice();
+  }
+
+  /**
+   * Wakes the animation loop immediately when user/MIDI/layout activity occurs.
+   */
+  public wakeLoop = () => {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    this.lastActivityTime = now;
+    if (this.isRunning && this.isSleeping && typeof requestAnimationFrame !== 'undefined') {
+      this.isSleeping = false;
+      this.animId = requestAnimationFrame(this.masterLoop);
     }
   };
 
@@ -153,11 +188,15 @@ export class RenderCoordinator {
         cell.cachedRect = { left: cr.left, top: cr.top, width: cr.width, height: cr.height };
       }
     }
+    this.wakeLoop();
   };
 
   constructor(initialConfig: VisualiserConfig = DEFAULT_CONFIG) {
     this.config = initialConfig;
     this.cosmeticsEngine = new CosmeticsEngine();
+    this.cosmeticsEngine.setMaxParticles(
+      getMaxParticlesForProfile(this.getEffectivePerformanceProfile())
+    );
     this.scaleTracker = new ScaleAlignmentTracker();
     this.pitchClockRenderer = new PitchClockRenderer();
     this.pianoTrianglesRenderer = new PianoTrianglesRenderer();
@@ -262,6 +301,7 @@ export class RenderCoordinator {
       this.activeNotes.clear();
       this.decayingNotes.clear();
       synthInstance.stopAll(true);
+      this.wakeLoop();
       for (const listener of this.activeNotesListeners) {
         listener(this.activeNotes);
       }
@@ -271,6 +311,8 @@ export class RenderCoordinator {
   public start() {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.isSleeping = false;
+    this.lastActivityTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
     if (typeof requestAnimationFrame !== 'undefined') {
       this.animId = requestAnimationFrame(this.masterLoop);
     }
@@ -278,6 +320,7 @@ export class RenderCoordinator {
 
   public stop() {
     this.isRunning = false;
+    this.isSleeping = false;
     if (this.animId !== null && typeof cancelAnimationFrame !== 'undefined') {
       cancelAnimationFrame(this.animId);
       this.animId = null;
@@ -324,6 +367,10 @@ export class RenderCoordinator {
     const oldTonic = this.config.tonic;
 
     this.config = config;
+    this.cosmeticsEngine.setMaxParticles(
+      getMaxParticlesForProfile(this.getEffectivePerformanceProfile())
+    );
+    this.wakeLoop();
 
     if (focusChanged) {
       const focusMode = config.focusModeEnabled ?? true;
@@ -363,6 +410,7 @@ export class RenderCoordinator {
     this.pitchClockRenderer.resetRevealsAndActivity();
     this.staffStreamRenderer.reset();
     this.scaleTracker.reset();
+    this.wakeLoop();
     for (const listener of this.activeNotesListeners) {
       listener(this.activeNotes);
     }
@@ -393,10 +441,13 @@ export class RenderCoordinator {
   public triggerTonicShift(oldTonic: number, newTonic: number, isAuto: boolean = false) {
     if (oldTonic === newTonic) return;
 
+    this.wakeLoop();
+
     // Always re-align pitch clock tone circles even if kinetic animations are disabled
     this.pitchClockRenderer.remapTonic(newTonic, this.config.keyboardLowestMidi);
 
-    if (this.config.tonicShiftEffectsEnabled !== false) {
+    const profile = this.getEffectivePerformanceProfile();
+    if (profile !== 'none' && this.config.tonicShiftEffectsEnabled !== false) {
       if (!this.cachedTargetRect && typeof window !== 'undefined') {
         this.updateAllCachedBounds();
       }
@@ -508,15 +559,21 @@ export class RenderCoordinator {
 
   public renderBackground() {
     if (!this.bgCanvas || !this.bgCtx) return;
-    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const width = this.bgCanvas.width / dpr;
-    const height = this.bgCanvas.height / dpr;
+    const rawDpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const width =
+      this.bgCanvas.clientWidth || this.cachedTargetRect?.width || this.bgCanvas.width / rawDpr;
+    const height =
+      this.bgCanvas.clientHeight || this.cachedTargetRect?.height || this.bgCanvas.height / rawDpr;
     if (width <= 0 || height <= 0) return;
 
+    const scaleX = this.bgCanvas.width / width;
+    const scaleY = this.bgCanvas.height / height;
+
     this.bgCtx.save();
-    this.bgCtx.scale(dpr, dpr);
+    this.bgCtx.scale(scaleX, scaleY);
     this.cosmeticsEngine.renderBackground(this.bgCtx, width, height, this.config.backgroundTheme);
     this.bgCtx.restore();
+    this.wakeLoop();
   }
 
   public registerCellCanvas(
@@ -576,6 +633,7 @@ export class RenderCoordinator {
     if ((this.config.focusModeEnabled ?? true) && !this.isStageMode && !this.isWindowFocused()) {
       return;
     }
+    this.wakeLoop();
     if (!this.isDispatchingRemoteNote) {
       this.onLocalNoteDispatch?.('noteOn', midi, velocity);
     }
@@ -664,8 +722,10 @@ export class RenderCoordinator {
       radialAngle = angle;
     }
 
-    const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
-    const shockwavesOn = (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
+    const profile = this.getEffectivePerformanceProfile();
+    const kineticsAllowed = profile !== 'none';
+    const sparksOn = kineticsAllowed && (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
+    const shockwavesOn = kineticsAllowed && (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
     const shockwaveRadiusMult = this.config.shockwaveRadius ?? 1.0;
     const shockwaveSpeedMult = this.config.shockwaveSpeed ?? 1.0;
     const shockwaveDecayDuration = this.config.shockwaveDecayDurationMs ?? 650;
@@ -699,21 +759,21 @@ export class RenderCoordinator {
     }
 
     // Additional cell-specific note kinetics
-    if (targetCanvas && typeof window !== 'undefined') {
-      const overlayRect = targetCanvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
+    if (targetCanvas && kineticsAllowed && typeof window !== 'undefined') {
+      const overlayRect = this.cachedTargetRect || targetCanvas.getBoundingClientRect();
+      const caps = getCanvasDprCaps(profile);
 
       for (const cell of this.cellCanvases.values()) {
         const effConfig = cell.configOverrides
           ? { ...this.config, ...cell.configOverrides }
           : this.config;
+        const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
+        const w = cellRect.width || cell.canvas.clientWidth || cell.canvas.width / caps.cellDpr;
+        const h = cellRect.height || cell.canvas.clientHeight || cell.canvas.height / caps.cellDpr;
 
         if (cell.module === 'staff-stream' && sparksOn && effConfig.staffSparksEnabled !== false) {
-          const cellRect = cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
-          const w = cell.canvas.width / dpr;
-          const h = cell.canvas.height / dpr;
 
           const playhead = this.staffStreamRenderer.getPlayheadCoordinatesForMidi(
             midi,
@@ -739,7 +799,6 @@ export class RenderCoordinator {
             this.config.particleGravity
           );
         } else if (cell.module === 'triangles') {
-          const cellRect = cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
           const coord = this.pianoTrianglesRenderer.getVertexCoordinatesForPc(pc);
@@ -772,11 +831,8 @@ export class RenderCoordinator {
             }
           }
         } else if (cell.module === 'overtones' && effConfig.overtoneDropletsEnabled !== false) {
-          const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
-          const w = cell.canvas.width / dpr;
-          const h = cell.canvas.height / dpr;
           const coords = this.overtonesRenderer.getFundamentalCoordinatesForMidi(
             midi,
             w,
@@ -798,7 +854,7 @@ export class RenderCoordinator {
             );
 
             // 2. Amped up: Burst of kinetic sparks at the fundamental wave crest
-            if (effConfig.sparksEnabled !== false) {
+            if (sparksOn && effConfig.sparksEnabled !== false) {
               this.cosmeticsEngine.spawnDirectionalSparks(
                 cellLeft + coords.x,
                 cellTop + coords.y,
@@ -814,11 +870,8 @@ export class RenderCoordinator {
             }
           }
         } else if (cell.module === 'spiral-overtones' && effConfig.overtoneDropletsEnabled !== false) {
-          const cellRect = cell.cachedRect || cell.canvas.getBoundingClientRect();
           const cellLeft = cellRect.left - overlayRect.left;
           const cellTop = cellRect.top - overlayRect.top;
-          const w = cell.canvas.width / dpr;
-          const h = cell.canvas.height / dpr;
           const coords = this.spiralOvertonesRenderer.getFundamentalCoordinatesForMidi(
             midi,
             w,
@@ -839,7 +892,7 @@ export class RenderCoordinator {
               coords.angle
             );
 
-            if (effConfig.sparksEnabled !== false) {
+            if (sparksOn && effConfig.sparksEnabled !== false) {
               this.cosmeticsEngine.spawnDirectionalSparks(
                 cellLeft + coords.x,
                 cellTop + coords.y,
@@ -917,6 +970,7 @@ export class RenderCoordinator {
   };
 
   public triggerNoteOff = (midi: number) => {
+    this.wakeLoop();
     if (!this.isDispatchingRemoteNote) {
       this.onLocalNoteDispatch?.('noteOff', midi);
     }
@@ -942,11 +996,89 @@ export class RenderCoordinator {
     }
   };
 
+  private isOrganicDecayWindowActive(now: number): boolean {
+    const windowMs = Math.min(15000, (this.config.organicWindowDurationSec || 12) * 1000 + 1000);
+    if (now - this.lastActivityTime >= windowMs) return false;
+    if (this.cellCanvases.size === 0) {
+      return this.config.registerWeightMode === 'organic';
+    }
+    for (const cell of this.cellCanvases.values()) {
+      if (cell.module === 'orbital') {
+        const mode = cell.configOverrides?.registerWeightMode ?? this.config.registerWeightMode;
+        if (mode === 'organic') return true;
+      }
+    }
+    return false;
+  }
+
+  private hasActiveContinuousStreamItems(now: number): boolean {
+    if (!this.isContinuousStreamingActive()) return false;
+    const minScrollSpeed = Math.max(
+      20,
+      Math.min(this.config.scrollSpeed || 160, this.config.staffScrollSpeed || 160)
+    );
+    const maxViewportSpan = Math.max(this.cachedTargetRect?.width || 1600, 1200);
+    const maxVisibleTravelSec = Math.ceil(maxViewportSpan / minScrollSpeed) + 2;
+    const nowSec = now / 1000;
+    const lastStreamTs =
+      this.streamItems.length > 0 ? this.streamItems[this.streamItems.length - 1].timestamp : -Infinity;
+    const lastMarkerTs =
+      this.tonicShiftMarkers.length > 0
+        ? this.tonicShiftMarkers[this.tonicShiftMarkers.length - 1].timestamp
+        : -Infinity;
+    return nowSec - Math.max(lastStreamTs, lastMarkerTs) < maxVisibleTravelSec;
+  }
+
+  private canEnterIdleSleep(now: number, webglActive: boolean): boolean {
+    if (this.activeNotes.size > 0 || this.decayingNotes.size > 0) return false;
+    if (this.cosmeticsEngine.hasActiveEffects()) return false;
+    if (now - this.lastActivityTime < 2500) return false;
+    if (
+      webglActive &&
+      (this.config.filmGrainEnabled ?? true) &&
+      (this.config.filmGrainIntensity ?? 0) > 0.01
+    ) {
+      return false;
+    }
+    if (this.isOrganicDecayWindowActive(now)) return false;
+    if (this.hasActiveContinuousStreamItems(now)) return false;
+    return true;
+  }
+
   private masterLoop = (time: number) => {
     if (!this.isRunning) return;
 
     const now = performance.now();
+    const effectiveProfile = this.getEffectivePerformanceProfile();
+    const isEcoOrNone = effectiveProfile === 'eco' || effectiveProfile === 'none';
+    const isMobile = isMobileTouchDevice() || isIosDevice();
+
+    // Cap 120 Hz ProMotion / high-refresh panels to 60 FPS on mobile or in Eco mode
+    if ((isEcoOrNone || isMobile) && this.lastRenderTime > 0 && now - this.lastRenderTime < 15.5) {
+      this.animId = requestAnimationFrame(this.masterLoop);
+      return;
+    }
+
+    // Throttle organic ring decay redraws to ~15 FPS when no notes/effects/streams are animating
+    if (
+      this.activeNotes.size === 0 &&
+      this.decayingNotes.size === 0 &&
+      !this.cosmeticsEngine.hasActiveEffects() &&
+      now - this.lastActivityTime >= 2500 &&
+      !this.hasActiveContinuousStreamItems(now) &&
+      this.isOrganicDecayWindowActive(now) &&
+      this.lastRenderTime > 0 &&
+      now - this.lastRenderTime < 65
+    ) {
+      this.animId = requestAnimationFrame(this.masterLoop);
+      return;
+    }
+
+    this.lastRenderTime = now;
     const decayDuration = this.config.decayDurationMs;
+    const caps = getCanvasDprCaps(effectiveProfile);
+    const allowWebGL = isWebGLAllowedForProfile(effectiveProfile);
+    const allowPostProcessing = isPostProcessingAllowedForProfile(effectiveProfile);
 
     // 1. Tick note decay in-place on mutable map
     if (this.decayingNotes.size > 0) {
@@ -999,17 +1131,22 @@ export class RenderCoordinator {
     // 3. Render all registered cell canvases in coordinated lockstep
     for (const cell of this.cellCanvases.values()) {
       const { canvas, ctx, module, configOverrides } = cell;
-      const dpr = window.devicePixelRatio || 1;
-      const width = canvas.width / dpr;
-      const height = canvas.height / dpr;
+      const width = cell.cachedRect?.width || canvas.clientWidth || canvas.width / caps.cellDpr;
+      const height = cell.cachedRect?.height || canvas.clientHeight || canvas.height / caps.cellDpr;
       if (width <= 0 || height <= 0) continue;
 
-      const effectiveConfig = configOverrides
+      const baseEffective = configOverrides
         ? { ...this.config, ...configOverrides }
         : this.config;
+      const effectiveConfig = isEcoOrNone
+        ? { ...baseEffective, glowBloomEnabled: false, glowBloom: 0 }
+        : baseEffective;
+
+      const scaleX = canvas.width / width;
+      const scaleY = canvas.height / height;
 
       ctx.save();
-      ctx.scale(dpr, dpr);
+      ctx.scale(scaleX, scaleY);
       ctx.clearRect(0, 0, width, height);
 
       if (module === 'orbital') {
@@ -1045,6 +1182,7 @@ export class RenderCoordinator {
 
         // Sustained gentle fluid micro-droplets bubbling off active fundamental wave crests
         const dropletsOn =
+          allowPostProcessing &&
           (effectiveConfig.overtoneDropletsEnabled ?? true) &&
           effectiveConfig.particleIntensity > 0;
         if (dropletsOn && this.activeNotes.size > 0 && Math.random() < 0.38) {
@@ -1091,6 +1229,7 @@ export class RenderCoordinator {
         );
 
         const dropletsOn =
+          allowPostProcessing &&
           (effectiveConfig.overtoneDropletsEnabled ?? true) &&
           effectiveConfig.particleIntensity > 0;
         if (dropletsOn && this.activeNotes.size > 0 && Math.random() < 0.34) {
@@ -1155,8 +1294,9 @@ export class RenderCoordinator {
     }
 
     // 4. Update procedural kinetics, sparks, and phosphor physics (if any are active)
-    const sparksOn = (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
-    const shockwavesOn = (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
+    const allowKinetics = effectiveProfile !== 'none';
+    const sparksOn = allowKinetics && (this.config.sparksEnabled ?? true) && this.config.particleIntensity > 0;
+    const shockwavesOn = allowKinetics && (this.config.shockwavesEnabled ?? true) && this.config.pulseShockwaves !== false;
     const hasKinetics = sparksOn || shockwavesOn || this.cosmeticsEngine.hasActiveParticles();
     if (hasKinetics) {
       this.cosmeticsEngine.update();
@@ -1165,34 +1305,46 @@ export class RenderCoordinator {
     // 5. Render 2D kinetic sparks & expanding shockwave rings (+ 2D post-processing fallback if WebGL unavailable)
     const effCanvas = this.effectsCanvas || this.overlayCanvas;
     const effCtx = this.effectsCtx || this.overlayCtx;
-    const webglActive = !!(this.webglPipeline && this.webglPipeline.supported && this.config.webglEnabled !== false);
+    const webglActive = !!(
+      allowWebGL &&
+      this.webglPipeline &&
+      this.webglPipeline.supported &&
+      this.config.webglEnabled !== false
+    );
+
+    if (!webglActive && this.webglPipeline) {
+      this.webglPipeline.clearIfNeeded();
+    }
 
     if (effCanvas && effCtx) {
-      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-      const width = effCanvas.width / dpr;
-      const height = effCanvas.height / dpr;
+      const width =
+        this.cachedTargetRect?.width || effCanvas.clientWidth || effCanvas.width / caps.effectsDpr;
+      const height =
+        this.cachedTargetRect?.height || effCanvas.clientHeight || effCanvas.height / caps.effectsDpr;
 
       if (width > 0 && height > 0) {
+        const effScaleX = effCanvas.width / width;
+        const effScaleY = effCanvas.height / height;
         effCtx.save();
-        effCtx.scale(dpr, dpr);
+        effCtx.scale(effScaleX, effScaleY);
         effCtx.clearRect(0, 0, width, height);
 
         // A. Kinetic sparks & shockwaves
         if (hasKinetics) {
+          const effectiveGlow =
+            allowPostProcessing && (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
           if (!webglActive) {
             // 2D Canvas fallback: render particles and shockwaves on CPU context
-            const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
             this.cosmeticsEngine.renderEffects(effCtx, effectiveGlow, width, height);
           } else if (this.cosmeticsEngine.hasActiveTonicHUD()) {
             // When WebGL is active, particles and shockwaves run on the GPU!
             // Only render 2D HUD text banner on this context.
-            const effectiveGlow = (this.config.glowBloomEnabled ?? true) ? this.config.glowBloom : 0;
             this.cosmeticsEngine.renderHUDOnly(effCtx, effectiveGlow, width, height);
           }
         }
 
-        // B. If WebGL is not active/supported or disabled, render 2D post-processing fallback directly on this context
-        if (!webglActive) {
+        // B. If WebGL is not active/supported or disabled, render 2D post-processing fallback only when allowed
+        if (!webglActive && allowPostProcessing) {
           const lights = this.collectFlareLightSources();
           this.render2DPostProcessingFallback(effCtx, width, height, lights);
         }
@@ -1207,6 +1359,12 @@ export class RenderCoordinator {
       const shockwaves = this.cosmeticsEngine.getActiveShockwaves();
       const { buffer: pBuf, count: pCount } = this.cosmeticsEngine.getParticleGpuData();
       this.webglPipeline.render(this.config, lights, time, shockwaves, pBuf, pCount);
+    }
+
+    if (this.canEnterIdleSleep(now, webglActive)) {
+      this.isSleeping = true;
+      this.animId = null;
+      return;
     }
 
     this.animId = requestAnimationFrame(this.masterLoop);
@@ -1275,8 +1433,15 @@ export class RenderCoordinator {
         } else {
           const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
           const angle = getClockAngleRad(res.semitone);
-          const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
-          const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+          const fallbackDpr = getCanvasDprCaps(this.getEffectivePerformanceProfile()).effectsDpr;
+          const vpW =
+            targetRect?.width ||
+            targetCanvas?.clientWidth ||
+            (targetCanvas ? targetCanvas.width / fallbackDpr : 1920);
+          const vpH =
+            targetRect?.height ||
+            targetCanvas?.clientHeight ||
+            (targetCanvas ? targetCanvas.height / fallbackDpr : 1080);
           const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
           lx = vpW / 2 + radius * Math.cos(angle);
           ly = vpH / 2 + radius * Math.sin(angle);
@@ -1309,8 +1474,15 @@ export class RenderCoordinator {
         } else {
           const res = resolveMidiToRegisterAndSemitone(note.midi, tonic, lowestMidi);
           const angle = getClockAngleRad(res.semitone);
-          const vpW = targetCanvas ? targetCanvas.width / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1920;
-          const vpH = targetCanvas ? targetCanvas.height / (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1) : 1080;
+          const fallbackDpr = getCanvasDprCaps(this.getEffectivePerformanceProfile()).effectsDpr;
+          const vpW =
+            targetRect?.width ||
+            targetCanvas?.clientWidth ||
+            (targetCanvas ? targetCanvas.width / fallbackDpr : 1920);
+          const vpH =
+            targetRect?.height ||
+            targetCanvas?.clientHeight ||
+            (targetCanvas ? targetCanvas.height / fallbackDpr : 1080);
           const radius = Math.min(vpW, vpH) * 0.3 * (1 - res.registerIndex / 10);
           lx = vpW / 2 + radius * Math.cos(angle);
           ly = vpH / 2 + radius * Math.sin(angle);

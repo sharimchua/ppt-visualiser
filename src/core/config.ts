@@ -1,5 +1,6 @@
 import { VisualiserConfig, LayoutMode } from './types';
 import { PRESET_SIGNATURE, PRESET_LAYOUTS, getAllCellNodes } from './layout-models';
+import { getDefaultPerformanceProfileForDevice } from '../renderers/performance-profile';
 
 export const STORAGE_KEY = 'ppt_visualiser_config_v1';
 
@@ -140,19 +141,20 @@ export const DEFAULT_CONFIG: VisualiserConfig = {
  * falling back to DEFAULT_CONFIG if unset or corrupted.
  */
 export function loadSavedConfig(): VisualiserConfig {
+  const defaultProfile = getDefaultPerformanceProfileForDevice();
   if (typeof window === 'undefined' || !window.localStorage) {
-    return { ...DEFAULT_CONFIG };
+    return { ...DEFAULT_CONFIG, performanceProfile: defaultProfile };
   }
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_CONFIG };
+    if (!raw) return { ...DEFAULT_CONFIG, performanceProfile: defaultProfile };
 
     const parsed = JSON.parse(raw);
     return sanitizeConfig(parsed);
   } catch (err) {
     console.warn('[Config] Failed to load saved config from localStorage:', err);
-    return { ...DEFAULT_CONFIG };
+    return { ...DEFAULT_CONFIG, performanceProfile: defaultProfile };
   }
 }
 
@@ -388,6 +390,11 @@ export function sanitizeConfig(parsed: unknown): VisualiserConfig {
     if (!validSensitivities.has(merged.autoTonicSensitivity)) merged.autoTonicSensitivity = 'balanced';
 
     merged.focusModeEnabled = typeof merged.focusModeEnabled === 'boolean' ? merged.focusModeEnabled : true;
+
+    const validProfiles = new Set(['max', 'balanced', 'eco', 'none']);
+    if (!merged.performanceProfile || !validProfiles.has(merged.performanceProfile)) {
+      merged.performanceProfile = getDefaultPerformanceProfileForDevice();
+    }
 
     return merged;
   }

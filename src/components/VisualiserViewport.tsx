@@ -7,6 +7,7 @@ import {
   LayoutMode,
 } from '../core/types';
 import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
+import { getCanvasDprCaps, getDefaultPerformanceProfileForDevice } from '../renderers/performance-profile';
 import { FlexLayoutRenderer } from './FlexLayoutRenderer';
 import { getAllCellNodes } from '../core/layout-models';
 import { Plus, RotateCcw, Share2, Check } from 'lucide-react';
@@ -45,6 +46,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
   const containerRef = useRef<HTMLDivElement>(null);
 
   const coord = coordinator || renderCoordinatorInstance;
+  const effectiveProfile = config.performanceProfile ?? getDefaultPerformanceProfileForDevice();
 
   // Register background canvas with coordinator
   useEffect(() => {
@@ -79,36 +81,36 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
     };
   }, [coord]);
 
-  // High-DPI canvas resizing
+  // High-DPI canvas resizing calibrated to the active performance profile
   useEffect(() => {
     const handleResize = () => {
       const container = containerRef.current;
       if (!container) return;
 
-      const dpr = window.devicePixelRatio || 1;
+      const caps = getCanvasDprCaps(effectiveProfile);
       const rect = container.getBoundingClientRect();
-      const w = Math.round(rect.width * dpr);
-      const h = Math.round(rect.height * dpr);
 
       if (bgCanvasRef.current) {
-        bgCanvasRef.current.width = w;
-        bgCanvasRef.current.height = h;
+        bgCanvasRef.current.width = Math.round(rect.width * caps.bgDpr);
+        bgCanvasRef.current.height = Math.round(rect.height * caps.bgDpr);
         bgCanvasRef.current.style.width = `${rect.width}px`;
         bgCanvasRef.current.style.height = `${rect.height}px`;
       }
       if (effectsCanvasRef.current) {
-        effectsCanvasRef.current.width = w;
-        effectsCanvasRef.current.height = h;
+        effectsCanvasRef.current.width = Math.round(rect.width * caps.effectsDpr);
+        effectsCanvasRef.current.height = Math.round(rect.height * caps.effectsDpr);
         effectsCanvasRef.current.style.width = `${rect.width}px`;
         effectsCanvasRef.current.style.height = `${rect.height}px`;
       }
       if (postProcessingCanvasRef.current) {
-        postProcessingCanvasRef.current.width = w;
-        postProcessingCanvasRef.current.height = h;
+        postProcessingCanvasRef.current.width = Math.round(rect.width * caps.webglDpr);
+        postProcessingCanvasRef.current.height = Math.round(rect.height * caps.webglDpr);
         postProcessingCanvasRef.current.style.width = `${rect.width}px`;
         postProcessingCanvasRef.current.style.height = `${rect.height}px`;
       }
+      coord.updateAllCachedBounds();
       coord.renderBackground();
+      coord.wakeLoop();
     };
 
     handleResize();
@@ -121,7 +123,7 @@ export const VisualiserViewport = memo<VisualiserViewportProps>(function Visuali
       observer.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, [coord]);
+  }, [coord, effectiveProfile]);
 
   const [copiedShareLink, setCopiedShareLink] = useState(false);
   const layoutRoot = config.activeLayout?.root;

@@ -36,6 +36,14 @@ import {
   CUSTOM_MIDI_STORAGE_KEY,
 } from './custom-midi-store';
 import { CosmeticsEngine } from '../renderers/cosmetics';
+import {
+  getCanvasDprCaps,
+  getDefaultPerformanceProfileForDevice,
+  getMaxParticlesForProfile,
+  isPostProcessingAllowedForProfile,
+  isWebGLAllowedForProfile,
+} from '../renderers/performance-profile';
+import { pickSyncableConfig } from './stage-sync-utils';
 import { PitchClockRenderer } from '../renderers/pitch-clock-canvas';
 import { compute2DConvexHull } from './convex-hull';
 import { clusterSimultaneousNotes, resolveChordVoicingGroups } from './chord-clustering';
@@ -4123,6 +4131,58 @@ test('Stage Mode: suppresses blur auto-stop and MIDI note release while active',
   synthInstance.setFocusedForTesting(null);
   assert.strictEqual(synthInstance.getIsStageMode(), false);
 });
+
+test('Performance Profile: calibrates DPR caps, particle budgets, and GPU gating accurately', () => {
+  assert.strictEqual(getDefaultPerformanceProfileForDevice(), 'max');
+
+  assert.strictEqual(getMaxParticlesForProfile('max'), 2048);
+  assert.strictEqual(getMaxParticlesForProfile('balanced'), 512);
+  assert.strictEqual(getMaxParticlesForProfile('eco'), 128);
+  assert.strictEqual(getMaxParticlesForProfile('none'), 0);
+
+  assert.strictEqual(isWebGLAllowedForProfile('max'), true);
+  assert.strictEqual(isWebGLAllowedForProfile('balanced'), true);
+  assert.strictEqual(isWebGLAllowedForProfile('eco'), false);
+  assert.strictEqual(isWebGLAllowedForProfile('none'), false);
+
+  assert.strictEqual(isPostProcessingAllowedForProfile('max'), true);
+  assert.strictEqual(isPostProcessingAllowedForProfile('eco'), false);
+
+  const ecoCaps = getCanvasDprCaps('eco');
+  assert.ok(ecoCaps.cellDpr <= 1.25);
+  assert.ok(ecoCaps.webglDpr <= 1.0);
+  assert.ok(ecoCaps.effectsDpr <= 1.0);
+
+  const sanitized = sanitizeConfig({ performanceProfile: 'invalid' as any });
+  assert.strictEqual(sanitized.performanceProfile, 'max');
+  assert.strictEqual(sanitizeConfig({ performanceProfile: 'eco' }).performanceProfile, 'eco');
+});
+
+test('Stage Config Sync: strips device-local cosmetics, WebGL, and audio keys while preserving musical state', () => {
+  const syncable = pickSyncableConfig({
+    ...DEFAULT_CONFIG,
+    tonic: 7,
+    streamMode: 'fixed',
+    staffClef: 'treble',
+    performanceProfile: 'max',
+    webglEnabled: true,
+    filmGrainEnabled: true,
+    filmGrainIntensity: 0.9,
+    masterVolume: 0.25,
+    soundEnabled: false,
+  });
+
+  assert.strictEqual(syncable.tonic, 7);
+  assert.strictEqual(syncable.streamMode, 'fixed');
+  assert.strictEqual(syncable.staffClef, 'treble');
+  assert.strictEqual('performanceProfile' in syncable, false);
+  assert.strictEqual('webglEnabled' in syncable, false);
+  assert.strictEqual('filmGrainEnabled' in syncable, false);
+  assert.strictEqual('filmGrainIntensity' in syncable, false);
+  assert.strictEqual('masterVolume' in syncable, false);
+  assert.strictEqual('soundEnabled' in syncable, false);
+});
+
 
 
 

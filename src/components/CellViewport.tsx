@@ -9,6 +9,7 @@ import {
   ClockLabelType,
 } from '../core/types';
 import { RenderCoordinator, renderCoordinatorInstance } from '../core/render-coordinator';
+import { getCanvasDprCaps, getDefaultPerformanceProfileForDevice } from '../renderers/performance-profile';
 import { getDefaultModuleTitle } from '../core/layout-models';
 import {
   Waves,
@@ -57,6 +58,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const effectiveProfile = config.performanceProfile ?? getDefaultPerformanceProfileForDevice();
 
   // Merge cell-level config overrides onto base config
   const effectiveConfig: VisualiserConfig = {
@@ -83,19 +85,22 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
     coord.updateCellCanvas(cell.id, cell.module, cell.configOverrides);
   }, [cell.id, cell.module, cell.configOverrides, coordinator]);
 
-  // Handle high-DPI canvas resizing
+  // Handle high-DPI canvas resizing calibrated to the active performance profile
   useEffect(() => {
+    const coord = coordinator || renderCoordinatorInstance;
     const handleResize = () => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
       if (!canvas || !container) return;
 
-      const dpr = window.devicePixelRatio || 1;
+      const { cellDpr } = getCanvasDprCaps(effectiveProfile);
       const rect = container.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
+      canvas.width = Math.round(rect.width * cellDpr);
+      canvas.height = Math.round(rect.height * cellDpr);
       canvas.style.width = `${rect.width}px`;
       canvas.style.height = `${rect.height}px`;
+      coord.updateAllCachedBounds();
+      coord.wakeLoop();
     };
 
     handleResize();
@@ -108,7 +113,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
       observer.disconnect();
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [coordinator, effectiveProfile]);
 
   const handleToggleDirection = () => {
     if (!onUpdateCell || cell.module !== 'stream') return;
@@ -171,7 +176,7 @@ export const CellViewport = memo<CellViewportProps>(function CellViewport({
     <div
       ref={containerRef}
       data-module={cell.module}
-      className={`relative w-full h-full min-w-0 min-h-0 overflow-hidden rounded-lg bg-slate-950/20 backdrop-blur-xs group transition-all duration-150 ${
+      className={`relative w-full h-full min-w-0 min-h-0 overflow-hidden rounded-lg bg-slate-950/30 group transition-all duration-150 ${
         isEditMode
           ? 'border-2 border-dashed border-purple-500/70 shadow-[0_0_15px_rgba(168,85,247,0.15)] ring-1 ring-purple-500/30'
           : 'border border-slate-800/40'

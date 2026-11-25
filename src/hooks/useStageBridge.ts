@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { VisualiserConfig } from '../core/types';
+import { pickSyncableConfig } from '../core/stage-sync-utils';
 import { synthInstance } from '../core/audio-synth';
 import { midiManagerInstance } from '../core/midi-manager';
 import { renderCoordinatorInstance } from '../core/render-coordinator';
@@ -68,7 +69,7 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
   const embedded = isStageEmbedded();
   const isApplyingRemoteRef = useRef(false);
   const roleRef = useRef<'teacher' | 'student'>(getInitialRole());
-  const lastSentJsonRef = useRef(JSON.stringify(config));
+  const lastSentJsonRef = useRef(JSON.stringify(pickSyncableConfig(config)));
   const throttleRef = useRef<number | null>(null);
   const setConfigRef = useRef(setConfig);
   setConfigRef.current = setConfig;
@@ -81,9 +82,10 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
     renderCoordinatorInstance.setStageMode(true);
 
     const pushCurrentState = () => {
-      const encoded = JSON.stringify(configRef.current);
+      const syncable = pickSyncableConfig(configRef.current);
+      const encoded = JSON.stringify(syncable);
       lastSentJsonRef.current = encoded;
-      postToParent({ type: 'APP_STATE_UPDATE', state: configRef.current });
+      postToParent({ type: 'APP_STATE_UPDATE', state: syncable });
     };
 
     const handleGestureUnlock = () => {
@@ -129,8 +131,27 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
         case 'STAGE_INIT': {
           roleRef.current = data.role === 'teacher' ? 'teacher' : 'student';
           midiManagerInstance.setSuppressed(Boolean(data.suppressLocalMidi));
+          if (typeof data.ecoMode === 'boolean') {
+            const nextProfile = data.ecoMode ? 'eco' : 'max';
+            setConfigRef.current((prev) =>
+              prev.performanceProfile === nextProfile
+                ? prev
+                : { ...prev, performanceProfile: nextProfile }
+            );
+          }
           if (roleRef.current === 'teacher') {
             pushCurrentState();
+          }
+          break;
+        }
+        case 'STAGE_ECO_MODE': {
+          if (typeof data.ecoMode === 'boolean') {
+            const nextProfile = data.ecoMode ? 'eco' : 'max';
+            setConfigRef.current((prev) =>
+              prev.performanceProfile === nextProfile
+                ? prev
+                : { ...prev, performanceProfile: nextProfile }
+            );
           }
           break;
         }
@@ -167,12 +188,13 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
           break;
         }
         case 'REMOTE_STATE': {
-          const st = data.state as Partial<VisualiserConfig> | null;
-          if (!st || typeof st !== 'object') break;
+          const rawState = data.state as Partial<VisualiserConfig> | null;
+          if (!rawState || typeof rawState !== 'object') break;
+          const st = pickSyncableConfig(rawState);
           isApplyingRemoteRef.current = true;
           setConfigRef.current((prev) => {
             const merged = { ...prev, ...st };
-            lastSentJsonRef.current = JSON.stringify(merged);
+            lastSentJsonRef.current = JSON.stringify(pickSyncableConfig(merged));
             return merged;
           });
           window.setTimeout(() => {
@@ -214,10 +236,11 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
     };
   }, [embedded]);
 
-  // Throttled outbound config sync
+  // Throttled outbound config sync (musical & layout state only; cosmetics stay device-local)
   useEffect(() => {
     if (!embedded || isApplyingRemoteRef.current) return;
-    const encoded = JSON.stringify(config);
+    const syncable = pickSyncableConfig(config);
+    const encoded = JSON.stringify(syncable);
     if (encoded === lastSentJsonRef.current) return;
 
     if (throttleRef.current !== null) {
@@ -227,7 +250,7 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
       throttleRef.current = null;
       if (isApplyingRemoteRef.current) return;
       lastSentJsonRef.current = encoded;
-      postToParent({ type: 'APP_STATE_UPDATE', state: config });
+      postToParent({ type: 'APP_STATE_UPDATE', state: syncable });
     }, 120);
 
     return () => {

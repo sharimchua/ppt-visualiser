@@ -16,6 +16,7 @@ The `src/renderers` domain contains all high-performance 2D Canvas and WebGL gra
 - `src/renderers/spiral-overtones-canvas.ts` — Continuous logarithmic Harmonic Spiral (`spiral-overtones`) renderer projecting 7 harmonic partials around polar clock coordinates, fundamental chord polygons, spoke resonance beams, and a 360-degree outer collective dissonance corona (zero `ctx.shadowBlur`, preallocated typed buffers).
 - `src/renderers/cosmetics.ts` — Canvas 2D effects engine and GPU particle/shockwave data provider (preallocated GPU particle streaming buffers, kinetic note sparks physics, analogue light bleed, halation, optical lens flare starbursts, and tonic shift shockwaves/HUD badges).
 - `src/renderers/webgl-post-processing.ts` — GPU WebGL shader pipeline: Point Sprite particle engine (`gl.POINTS`), analytical expanding shockwaves, CRT scanlines, chromatic phosphor ghosts, bloom, and 24fps procedural film grain.
+- `src/renderers/performance-profile.ts` — Platform-aware performance profiles (`max`, `balanced`, `eco`, `none`), iPadOS/touch detection, calibrated DPR caps, GPU particle budgets, and WebGL/post-processing bypass helpers.
 
 ## Local Contracts
 
