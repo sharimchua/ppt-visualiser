@@ -19,9 +19,44 @@ export function isStageEmbedded(): boolean {
   }
 }
 
+function getInitialRole(): 'teacher' | 'student' {
+  if (typeof window === 'undefined') return 'student';
+  return new URLSearchParams(window.location.search).get('role') === 'teacher'
+    ? 'teacher'
+    : 'student';
+}
+
 function postToParent(msg: Record<string, unknown>): void {
   if (typeof window === 'undefined' || window.parent === window) return;
   window.parent.postMessage({ protocol: STAGE_PROTOCOL, appId: APP_ID, ...msg }, '*');
+}
+
+function mountAudioPromptPill(onTap: () => void) {
+  let el: HTMLButtonElement | null = null;
+  const hide = () => {
+    if (el) {
+      el.remove();
+      el = null;
+    }
+  };
+  const show = () => {
+    if (el || typeof document === 'undefined' || !document.body) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Tap to Enable Sound';
+    btn.style.cssText =
+      'position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
+      'padding:10px 18px;border-radius:9999px;border:1px solid rgba(34,211,238,0.55);' +
+      'background:rgba(15,23,42,0.95);color:#67e8f9;font:600 13px/1.2 system-ui,sans-serif;' +
+      'box-shadow:0 10px 28px rgba(0,0,0,0.45);cursor:pointer;backdrop-filter:blur(8px);';
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      onTap();
+    });
+    document.body.appendChild(btn);
+    el = btn;
+  };
+  return { show, hide, destroy: hide };
 }
 
 interface UseStageBridgeOptions {
@@ -32,15 +67,46 @@ interface UseStageBridgeOptions {
 export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
   const embedded = isStageEmbedded();
   const isApplyingRemoteRef = useRef(false);
-  const lastSentJsonRef = useRef('');
+  const roleRef = useRef<'teacher' | 'student'>(getInitialRole());
+  const lastSentJsonRef = useRef(JSON.stringify(config));
   const throttleRef = useRef<number | null>(null);
   const setConfigRef = useRef(setConfig);
   setConfigRef.current = setConfig;
+  const configRef = useRef(config);
+  configRef.current = config;
 
   useEffect(() => {
     if (!embedded) return;
 
     renderCoordinatorInstance.setStageMode(true);
+
+    const pushCurrentState = () => {
+      const encoded = JSON.stringify(configRef.current);
+      lastSentJsonRef.current = encoded;
+      postToParent({ type: 'APP_STATE_UPDATE', state: configRef.current });
+    };
+
+    const handleGestureUnlock = () => {
+      if (synthInstance.getAudioState() === 'running') {
+        prompt.hide();
+        return;
+      }
+      void synthInstance.unlock().then((audioState) => {
+        postToParent({ type: 'STAGE_AUDIO_STATE', audioState });
+        if (audioState === 'running') {
+          prompt.hide();
+        }
+      });
+    };
+
+    const prompt = mountAudioPromptPill(handleGestureUnlock);
+    const onPointerUnlock = () => {
+      if (synthInstance.getAudioState() !== 'running') {
+        handleGestureUnlock();
+      }
+    };
+    window.addEventListener('pointerdown', onPointerUnlock, true);
+
     postToParent({
       type: 'STAGE_READY',
       audioState: synthInstance.getAudioState(),
@@ -61,12 +127,27 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
 
       switch (data.type) {
         case 'STAGE_INIT': {
+          roleRef.current = data.role === 'teacher' ? 'teacher' : 'student';
           midiManagerInstance.setSuppressed(Boolean(data.suppressLocalMidi));
+          if (roleRef.current === 'teacher') {
+            pushCurrentState();
+          }
+          break;
+        }
+        case 'STAGE_REQUEST_STATE': {
+          if (roleRef.current === 'teacher') {
+            pushCurrentState();
+          }
           break;
         }
         case 'STAGE_UNLOCK_AUDIO': {
           void synthInstance.unlock().then((audioState) => {
             postToParent({ type: 'STAGE_AUDIO_STATE', audioState });
+            if (audioState !== 'running') {
+              prompt.show();
+            } else {
+              prompt.hide();
+            }
           });
           break;
         }
@@ -75,6 +156,9 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
           if (ev === 'noteOn' && typeof data.midi === 'number') {
             const vel = typeof data.velocity === 'number' ? data.velocity : 0.8;
             renderCoordinatorInstance.triggerRemoteNoteOn(data.midi, vel);
+            if (synthInstance.getAudioState() !== 'running') {
+              prompt.show();
+            }
           } else if (ev === 'noteOff' && typeof data.midi === 'number') {
             renderCoordinatorInstance.triggerRemoteNoteOff(data.midi);
           } else if (ev === 'allNotesOff') {
@@ -86,10 +170,11 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
           const st = data.state as Partial<VisualiserConfig> | null;
           if (!st || typeof st !== 'object') break;
           isApplyingRemoteRef.current = true;
-          setConfigRef.current((prev) => ({
-            ...prev,
-            ...st,
-          }));
+          setConfigRef.current((prev) => {
+            const merged = { ...prev, ...st };
+            lastSentJsonRef.current = JSON.stringify(merged);
+            return merged;
+          });
           window.setTimeout(() => {
             isApplyingRemoteRef.current = false;
           }, 50);
@@ -104,6 +189,9 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
           } else if (action === 'MIDI_NOTE_ON' && typeof payload?.midi === 'number') {
             const vel = typeof payload.velocity === 'number' ? payload.velocity : 0.8;
             renderCoordinatorInstance.triggerRemoteNoteOn(payload.midi, vel);
+            if (synthInstance.getAudioState() !== 'running') {
+              prompt.show();
+            }
           } else if (action === 'MIDI_NOTE_OFF' && typeof payload?.midi === 'number') {
             renderCoordinatorInstance.triggerRemoteNoteOff(payload.midi);
           }
@@ -118,6 +206,8 @@ export function useStageBridge({ config, setConfig }: UseStageBridgeOptions) {
     window.addEventListener('message', handleMessage);
     return () => {
       window.removeEventListener('message', handleMessage);
+      window.removeEventListener('pointerdown', onPointerUnlock, true);
+      prompt.destroy();
       renderCoordinatorInstance.onLocalNoteDispatch = undefined;
       renderCoordinatorInstance.setStageMode(false);
       midiManagerInstance.setSuppressed(false);
